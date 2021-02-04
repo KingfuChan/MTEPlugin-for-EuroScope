@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.3.0"
+#define PLUGIN_VERSION "1.3.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -25,7 +25,7 @@ const char CHR_GS_NON = ' ';
 const char CHR_GS_ACC = 'A';
 const char CHR_GS_DEC = 'L';
 
-// RELATED TO COMPUTERISING
+// COMPUTERISING RELATED
 const float CONVERSION_KN_KPH = 1.85184; // 1 knot = 1.85184 kph
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 
@@ -33,16 +33,14 @@ const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
 
 // CURSOR RELATED
-// Note that cursor setting will only be effective with it's original file name (MTEPlugIn.dll)
-bool initCursor = true; // if cursor is set to custom
+bool initCursor = true; // if cursor has not been set to custom / if using default cursor
 bool customCursor = false; // if cursor need to be set to custom
 WNDPROC gSourceProc;
 HWND pluginWindow;
 HCURSOR myCursor = nullptr;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 #define CPCUR CopyCursor((HCURSOR)::LoadImage(GetModuleHandle("MTEPlugIn.dll"), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED))
-void SetCustomCursor(void);
-void CancelCustomCursor(void);
+// Note that cursor setting will only be effective with it's original file name (MTEPlugIn.dll)
 
 using namespace EuroScopePlugIn;
 
@@ -61,7 +59,14 @@ CMTEPlugIn::CMTEPlugIn(void)
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
 	myCursor = CPCUR;
-	//pluginWindow = GetActiveWindow();
+	if (customCursor && myCursor == nullptr)
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			"Cursor will not be set! Use original dll file name (MTEPlugIn.dll) to enable custom cursor.",
+			1, 0, 0, 0, 0);
+	else if (customCursor && myCursor != nullptr)
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			"If custom cursor does not show on radar screen, please use \".mtep cursor on\" command.",
+			1, 0, 0, 0, 0);
 }
 
 CMTEPlugIn::~CMTEPlugIn(void)
@@ -100,8 +105,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 void CMTEPlugIn::OnTimer(int Counter)
 {
-	// cursor
-	if (initCursor && customCursor) SetCustomCursor();
+	if (initCursor && customCursor) SetCustomCursor(); // cursor
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
@@ -166,19 +170,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 }
 
-void SetCustomCursor(void)
+void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
 	if (myCursor == nullptr) return;
 	pluginWindow = GetActiveWindow();
 	gSourceProc = (WNDPROC)SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)WindowProc);
 	initCursor = false;
+	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is set!", 1, 0, 0, 0, 0);
 }
 
-void CancelCustomCursor(void)
+void CMTEPlugIn::CancelCustomCursor(void)
 {
 	// uncorrelate cursor
 	if (myCursor == nullptr) return;
 	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)gSourceProc);
 	initCursor = true;
+	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
 }

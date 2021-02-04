@@ -25,4 +25,6 @@ public:
 private:
 	int GetRadarGS(CRadarTarget RadarTarget);
 	char GetGSTrend(CRadarTarget RadarTarget);
+	void SetCustomCursor(void);
+	void CancelCustomCursor(void);
 };
