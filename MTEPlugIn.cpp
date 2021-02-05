@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.3.1"
+#define PLUGIN_VERSION "1.4.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -19,6 +19,7 @@
 // TAG ITEM TYPE
 const int TAG_ITEM_TYPE_GS_W_IND = 1;
 const int TAG_ITEM_TYPE_RMK_IND = 2;
+const int TAG_ITEM_TYPE_VS_FPM = 3;
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -55,6 +56,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 	RegisterTagItemType("GS(KPH) with indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
+	RegisterTagItemType("V/S(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -96,6 +98,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		remarks.MakeUpper();
 		if (remarks.Find("RMK/") != -1 || remarks.Find("STS/") != -1)
 			sprintf_s(sItemString, 2, "*");
+
+		break; }
+	case TAG_ITEM_TYPE_VS_FPM: {
+		int vs = abs(RadarTarget.GetVerticalSpeed());
+		vs = vs < 10000 ? vs : 9999; // in case of overflow
+		sprintf_s(sItemString, 5, "%04d", vs);
 
 		break; }
 	default:
