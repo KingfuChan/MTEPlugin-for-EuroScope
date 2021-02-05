@@ -206,7 +206,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="arrow.cur" />
     <None Include="cross.cur" />
     <None Include="res\MTEPforES.rc2" />
   </ItemGroup>

@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.4.0"
+#define PLUGIN_VERSION "1.4.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -17,9 +17,11 @@
 
 
 // TAG ITEM TYPE
-const int TAG_ITEM_TYPE_GS_W_IND = 1;
-const int TAG_ITEM_TYPE_RMK_IND = 2;
-const int TAG_ITEM_TYPE_VS_FPM = 3;
+const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with indicator
+const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
+const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
+const int TAG_ITEM_TYPE_CDL_IND = 4; // TODO: Climb / Descend / Level indicator
+const int TAG_ITEM_TYPE_AFL_MTR = 5; // TODO: Acutal flight level (m)
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -102,8 +104,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_VS_FPM: {
 		int vs = abs(RadarTarget.GetVerticalSpeed());
-		vs = vs < 10000 ? vs : 9999; // in case of overflow
-		sprintf_s(sItemString, 5, "%04d", vs);
+		if (vs > 100) {
+			vs = vs < 10000 ? vs : 9999; // in case of overflow
+			sprintf_s(sItemString, 5, "%04d", vs);
+		}
+		else // recogize as level flight
+			sprintf_s(sItemString, 5, "    ");
 
 		break; }
 	default:
