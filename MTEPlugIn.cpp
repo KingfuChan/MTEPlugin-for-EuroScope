@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.4.1"
+#define PLUGIN_VERSION "1.4.2"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -20,7 +20,7 @@
 const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
-const int TAG_ITEM_TYPE_CDL_IND = 4; // TODO: Climb / Descend / Level indicator
+const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // TODO: Acutal flight level (m)
 
 // GROUND SPEED TREND CHAR
@@ -31,6 +31,8 @@ const char CHR_GS_DEC = 'L';
 // COMPUTERISING RELATED
 const float CONVERSION_KN_KPH = 1.85184; // 1 knot = 1.85184 kph
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
+#define KN2KPH(int) 1.85184*(int)
+#define KPH2KN(int) (int)/1.85184
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -59,6 +61,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("GS(KPH) with indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("V/S(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
+	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -88,10 +91,23 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	switch (ItemCode)
 	{
 	case TAG_ITEM_TYPE_GS_W_IND: {
-		int cgs = round(GetRadarGS(RadarTarget) * CONVERSION_KN_KPH / 10.0);// current GS
-		cgs = cgs < 1000 ? cgs : 999; // in case of overflow
-		char ad = GetGSTrend(RadarTarget);
-		sprintf_s(sItemString, 5, "%03d%c", cgs, ad);
+		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
+		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
+		int curgs = curpos.GetReportedGS(); // current GS
+		int dspgs = round(KN2KPH(curgs) / 10.0); // display GS
+		dspgs = dspgs ? dspgs : RadarTarget.GetGS(); // If reported GS is 0 then uses the calculated one.
+		dspgs = dspgs < 1000 ? dspgs : 999; // in case of overflow
+		int pregs = prepos.GetReportedGS(); // previous GS
+		float diff = KN2KPH(curgs - pregs);
+		char gsTrend;
+		if (diff >= THRESHOLD_ACC_DEC)
+			gsTrend = CHR_GS_ACC;
+		else if (diff <= -THRESHOLD_ACC_DEC)
+			gsTrend = CHR_GS_DEC;
+		else
+			gsTrend = CHR_GS_NON;
+
+		sprintf_s(sItemString, 5, "%03d%c", dspgs, gsTrend);
 
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
@@ -110,6 +126,16 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		else // recogize as level flight
 			sprintf_s(sItemString, 5, "    ");
+
+		break; }
+	case TAG_ITEM_TYPE_LVL_IND: {
+		int vs = RadarTarget.GetVerticalSpeed();
+		if (vs > 100)
+			sprintf_s(sItemString, 2, "^");
+		else if (vs < -100)
+			sprintf_s(sItemString, 2, "|");
+		else
+			sprintf_s(sItemString, 2, ">");
 
 		break; }
 	default:
@@ -147,29 +173,6 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		return true;
 	}
 	return false;
-}
-
-int CMTEPlugIn::GetRadarGS(CRadarTarget RadarTarget)
-{
-	int rpgs = RadarTarget.GetPosition().GetReportedGS();
-	rpgs = rpgs ? rpgs : RadarTarget.GetGS();
-	//If reported GS is 0 then uses the calculated one.
-	return rpgs;
-}
-
-char CMTEPlugIn::GetGSTrend(CRadarTarget RadarTarget)
-{
-	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
-	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-	int curgs = curpos.GetReportedGS();
-	int pregs = prepos.GetReportedGS();
-	float diff = (curgs - pregs) * CONVERSION_KN_KPH;
-	if (diff >= THRESHOLD_ACC_DEC)
-		return CHR_GS_ACC;
-	else if (diff <= -THRESHOLD_ACC_DEC)
-		return CHR_GS_DEC;
-	else
-		return CHR_GS_NON;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
