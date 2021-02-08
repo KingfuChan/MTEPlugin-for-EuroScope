@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.4.2"
+#define PLUGIN_VERSION "1.4.3"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -21,7 +21,7 @@ const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
-const int TAG_ITEM_TYPE_AFL_MTR = 5; // TODO: Acutal flight level (m)
+const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual flight level (m)
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -33,6 +33,8 @@ const float CONVERSION_KN_KPH = 1.85184; // 1 knot = 1.85184 kph
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 #define KN2KPH(int) 1.85184*(int)
 #define KPH2KN(int) (int)/1.85184
+#define FT2M(int) (int)/3.28084
+#define M2FT(int) (int)*3.28084
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -62,6 +64,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("V/S(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
 	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
+	//RegisterTagItemType("Actutal flight level (m)", TAG_ITEM_TYPE_AFL_MTR);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -96,7 +99,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int curgs = curpos.GetReportedGS(); // current GS
 		int dspgs = round(KN2KPH(curgs) / 10.0); // display GS
 		dspgs = dspgs ? dspgs : RadarTarget.GetGS(); // If reported GS is 0 then uses the calculated one.
-		dspgs = dspgs < 1000 ? dspgs : 999; // in case of overflow
+		dspgs = dspgs > 999 ? 999 : dspgs; // in case of overflow
 		int pregs = prepos.GetReportedGS(); // previous GS
 		float diff = KN2KPH(curgs - pregs);
 		char gsTrend;
@@ -119,9 +122,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_VS_FPM: {
-		int vs = abs(RadarTarget.GetVerticalSpeed());
+		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
+		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
+		int curAlt = curpos.GetPressureAltitude();
+		int preAlt = prepos.GetPressureAltitude();
+		int preT = prepos.GetReceivedTime();
+		int curT = curpos.GetReceivedTime();
+		int deltaT = preT - curT;
+		deltaT = deltaT ? deltaT : INFINITE;
+		int vs = abs(round((curAlt - preAlt) / deltaT * 60));
+		//int vs = abs(RadarTarget.GetVerticalSpeed()); // not accurate
 		if (vs > 100) {
-			vs = vs < 10000 ? vs : 9999; // in case of overflow
+			vs = vs > 9999 ? 9999 : vs; // in case of overflow
 			sprintf_s(sItemString, 5, "%04d", vs);
 		}
 		else // recogize as level flight
@@ -136,6 +148,16 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 2, "|");
 		else
 			sprintf_s(sItemString, 2, ">");
+
+		break; }
+	case TAG_ITEM_TYPE_AFL_MTR: {
+		int trsAlt = GetTransitionAltitude();
+		int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
+		int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
+		int dspAlt = qnhAlt > trsAlt ? stdAlt : qnhAlt;
+		dspAlt = round(FT2M(dspAlt) / 10.0);
+		dspAlt = dspAlt > 9999 ? 9999 : dspAlt;
+		sprintf_s(sItemString, 5, "%04d", dspAlt);
 
 		break; }
 	default:
