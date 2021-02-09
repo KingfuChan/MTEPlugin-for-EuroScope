@@ -1,13 +1,13 @@
-﻿// MTEPforES.h: MTEPforES DLL 的主标头文件
-//
+﻿// MTEPlugIn.h
 
 #pragma once
 // 主符号
 #include "pch.h"
 #include "framework.h"
-#include "resource.h"		
+#include "resource.h"
 #include <EuroScopePlugIn.h>
 #include <string>
+#include "MetricAlt.h"
 
 using namespace EuroScopePlugIn;
 

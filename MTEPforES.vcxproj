@@ -197,6 +197,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="MetricAlt.cpp" />
     <ClCompile Include="MTEPlugIn.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -212,6 +213,7 @@
   <ItemGroup>
     <ClInclude Include="EuroScopePlugIn.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="MetricAlt.h" />
     <ClInclude Include="MTEPlugIn.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />

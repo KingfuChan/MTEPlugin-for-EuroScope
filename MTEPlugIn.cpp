@@ -1,15 +1,15 @@
-﻿// MTEPforES.cpp: 定义 DLL 的初始化例程。
-//
+﻿// MTEPlugIn.cpp
 
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
 #include "MTEPlugIn.h"
+#include "MetricAlt.h"
 
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.4.3"
+#define PLUGIN_VERSION "1.5.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -22,6 +22,8 @@ const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual flight level (m)
+const int TAG_ITEM_TYPE_CFL_MTR = 6; // Cleared flight level (m)
+const int TAG_ITEM_TYPE_RFL_MTR = 7; // Final flight level (m)
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -29,12 +31,9 @@ const char CHR_GS_ACC = 'A';
 const char CHR_GS_DEC = 'L';
 
 // COMPUTERISING RELATED
-const float CONVERSION_KN_KPH = 1.85184; // 1 knot = 1.85184 kph
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
-#define KN2KPH(int) 1.85184*(int)
+#define KN2KPH(int) 1.85184*(int) // 1 knot = 1.85184 kph
 #define KPH2KN(int) (int)/1.85184
-#define FT2M(int) (int)/3.28084
-#define M2FT(int) (int)*3.28084
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -64,7 +63,9 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("V/S(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
 	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
-	//RegisterTagItemType("Actutal flight level (m)", TAG_ITEM_TYPE_AFL_MTR);
+	RegisterTagItemType("Actutal flight level (m)", TAG_ITEM_TYPE_AFL_MTR);
+	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
+	RegisterTagItemType("Final flight level (m)", TAG_ITEM_TYPE_RFL_MTR);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -101,7 +102,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		dspgs = dspgs ? dspgs : RadarTarget.GetGS(); // If reported GS is 0 then uses the calculated one.
 		dspgs = dspgs > 999 ? 999 : dspgs; // in case of overflow
 		int pregs = prepos.GetReportedGS(); // previous GS
-		float diff = KN2KPH(curgs - pregs);
+		double diff = KN2KPH(curgs - pregs);
 		char gsTrend;
 		if (diff >= THRESHOLD_ACC_DEC)
 			gsTrend = CHR_GS_ACC;
@@ -137,7 +138,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 5, "%04d", vs);
 		}
 		else // recogize as level flight
-			sprintf_s(sItemString, 5, "    ");
+			sprintf_s(sItemString, 5, "    "); // place-holder
 
 		break; }
 	case TAG_ITEM_TYPE_LVL_IND: {
@@ -155,9 +156,26 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
 		int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
 		int dspAlt = qnhAlt > trsAlt ? stdAlt : qnhAlt;
-		dspAlt = round(FT2M(dspAlt) / 10.0);
-		dspAlt = dspAlt > 9999 ? 9999 : dspAlt;
+		dspAlt = round(MetricAlt::FeettoM(dspAlt) / 10.0);
+		dspAlt = dspAlt > 9999 ? 9999 : dspAlt; // in case of overflow
 		sprintf_s(sItemString, 5, "%04d", dspAlt);
+
+		break; }
+	case TAG_ITEM_TYPE_CFL_MTR: {
+		int cflAlt = FlightPlan.GetClearedAltitude();
+		if (cflAlt != 0 && cflAlt != FlightPlan.GetFinalAltitude()) {
+			cflAlt = MetricAlt::LvlFeettoM(cflAlt) / 10;
+			cflAlt = cflAlt > 9999 ? 9999 : cflAlt; // in case of overflow
+			sprintf_s(sItemString, 5, "%04d", cflAlt);
+		}
+		else
+			sprintf_s(sItemString, 5, "    "); // place-holder
+
+		break; }
+	case TAG_ITEM_TYPE_RFL_MTR: {
+		int rflAlt = MetricAlt::LvlFeettoM(FlightPlan.GetFinalAltitude()) / 10;
+		rflAlt = rflAlt > 9999 ? 9999 : rflAlt; // in case of overflow
+		sprintf_s(sItemString, 5, "%04d", rflAlt);
 
 		break; }
 	default:
