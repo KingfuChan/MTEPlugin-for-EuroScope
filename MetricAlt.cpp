@@ -101,22 +101,22 @@ const std::map<int, int> m_ftm = {
 	{48900,14900},
 };
 
-int MetricAlt::MtoFeet(int meter)
+int MetricAlt::MtoFeet(const int meter)
 {
 	return round(meter * 3.28084);
 }
 
-int MetricAlt::FeettoM(int feet)
+int MetricAlt::FeettoM(const int feet)
 {
 	return round(feet / 3.28084);
 }
 
-int MetricAlt::LvlMtoFeet(int meter)
+int MetricAlt::LvlMtoFeet(const int meter)
 {
 	return m_mft.count(meter) ? m_mft.at(meter) : MtoFeet(meter);
 }
 
-int MetricAlt::LvlFeettoM(int feet)
+int MetricAlt::LvlFeettoM(const int feet)
 {
 	return m_ftm.count(feet) ? m_ftm.at(feet) : FeettoM(feet);
 }

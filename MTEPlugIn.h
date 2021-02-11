@@ -7,9 +7,13 @@
 #include "resource.h"
 #include <EuroScopePlugIn.h>
 #include <string>
+#include <list>
 #include "MetricAlt.h"
 
-using namespace EuroScopePlugIn;
+typedef std::map<CString, bool> StrMark;
+typedef std::list<char> CharList;
+
+CharList ExtractNumfromCallsign(const CString callsign);
 
 class CMTEPlugIn :
 	public EuroScopePlugIn::CPlugIn
@@ -23,6 +27,8 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
+	StrMark m_similarMarker;
+	void ParseSimilarCallsign(void);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 };

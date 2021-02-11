@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.5.0"
+#define PLUGIN_VERSION "1.6.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -21,9 +21,10 @@ const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
-const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual flight level (m)
+const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m)
 const int TAG_ITEM_TYPE_CFL_MTR = 6; // Cleared flight level (m)
 const int TAG_ITEM_TYPE_RFL_MTR = 7; // Final flight level (m)
+const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -61,11 +62,12 @@ CMTEPlugIn::CMTEPlugIn(void)
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 	RegisterTagItemType("GS(KPH) with indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
-	RegisterTagItemType("V/S(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
+	RegisterTagItemType("VS(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
 	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
-	RegisterTagItemType("Actutal flight level (m)", TAG_ITEM_TYPE_AFL_MTR);
+	RegisterTagItemType("Actual altitude (m)", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
 	RegisterTagItemType("Final flight level (m)", TAG_ITEM_TYPE_RFL_MTR);
+	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -120,6 +122,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		remarks.MakeUpper();
 		if (remarks.Find("RMK/") != -1 || remarks.Find("STS/") != -1)
 			sprintf_s(sItemString, 2, "*");
+		else
+			sprintf_s(sItemString, 2, " ");
 
 		break; }
 	case TAG_ITEM_TYPE_VS_FPM: {
@@ -178,6 +182,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		sprintf_s(sItemString, 5, "%04d", rflAlt);
 
 		break; }
+	case TAG_ITEM_TYPE_SC_IND: {
+		CString marker;
+		StrMark::iterator item = m_similarMarker.find(RadarTarget.GetCallsign());
+		if (item != m_similarMarker.end() && item->second) // item exist and is similar
+			sprintf_s(sItemString, 2, "*");
+		else
+			sprintf_s(sItemString, 2, " ");
+
+		break; }
 	default:
 		break;
 	}
@@ -186,6 +199,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 void CMTEPlugIn::OnTimer(int Counter)
 {
 	if (initCursor && customCursor) SetCustomCursor(); // cursor
+
+	// deals with similar callsign stuff, scan every 3 seconds
+	if (!(Counter % 3)) {
+		m_similarMarker.clear(); // re-initialize map
+		for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt))
+			if (rt.GetPosition().GetTransponderC()) // in-flight, ignores on ground
+				m_similarMarker[rt.GetCallsign()] = false;
+		ParseSimilarCallsign();
+	}
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
@@ -227,6 +249,53 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 }
 
+void CMTEPlugIn::ParseSimilarCallsign(void)
+{
+	// parse m_similarMarker and set if a callsign is similar to others
+	for (StrMark::iterator it1 = m_similarMarker.begin(); it1 != m_similarMarker.end(); it1++) {
+		CharList cs1 = ExtractNumfromCallsign(it1->first);
+		if (cs1.size() > 4) continue; // skip
+		for (StrMark::iterator it2 = it1; it2 != m_similarMarker.end(); it2++) {
+			if (it1 == it2) continue;
+			CharList cs2 = ExtractNumfromCallsign(it2->first);
+			if (cs2.size() > 4) continue; // skip
+
+			// compare two callsign num
+			CharList::iterator p1, p2;
+			int same = 0; // same number on same position count
+			CharList dn1, dn2; // different number on same position list
+			for (p1 = cs1.begin(), p2 = cs2.begin(); p1 != cs1.end() && p2 != cs2.end(); p1++, p2++) {
+				if (*p1 == *p2)
+					same++;
+				else {
+					dn1.push_back(*p1);
+					dn2.push_back(*p2);
+				}
+			}
+			bool isSimilar = false;
+			switch (same)
+			{
+			case 4:
+			case 3:
+				isSimilar = true;
+				break;
+			case 2:
+			case 1: {
+				dn1.sort();
+				dn2.sort();
+				isSimilar = dn1 == dn2;
+				break;
+			}
+			default:
+				isSimilar = false;
+				break;
+			}
+			if (isSimilar) // same num count
+				it1->second = it2->second = true;
+		}
+	}
+}
+
 void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
@@ -244,4 +313,20 @@ void CMTEPlugIn::CancelCustomCursor(void)
 	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)gSourceProc);
 	initCursor = true;
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
+}
+
+CharList ExtractNumfromCallsign(const CString callsign)
+{
+	// extract num from callsign, no less than 4 digits
+	CharList csnum;
+	bool numbegin = false;
+	for (int i = 0; i < callsign.GetLength(); i++) {
+		numbegin = numbegin || (callsign[i] >= '0' && callsign[i] <= '9');
+		if (numbegin)
+			csnum.push_back(callsign[i]);
+	}
+	int size = csnum.size();
+	for (int i = 0; i < 4 - size; i++)
+		csnum.push_back(' '); // make 4 digits
+	return csnum;
 }

@@ -11,8 +11,8 @@ namespace MetricAlt {
 	//std::map<int, int> m_mft;
 	//std::map<int, int> m_ftm;
 
-	int MtoFeet(int meter);
-	int FeettoM(int feet);
-	int LvlMtoFeet(int meter);
-	int LvlFeettoM(int feet);
+	int MtoFeet(const int meter);
+	int FeettoM(const int feet);
+	int LvlMtoFeet(const int meter);
+	int LvlFeettoM(const int feet);
 }
