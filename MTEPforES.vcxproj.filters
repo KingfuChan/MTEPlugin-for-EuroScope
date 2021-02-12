@@ -35,6 +35,7 @@
     <None Include="cross.cur">
       <Filter>资源文件</Filter>
     </None>
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">

@@ -213,14 +213,12 @@ void CMTEPlugIn::OnTimer(int Counter)
 {
 	if (initCursor && customCursor) SetCustomCursor(); // cursor
 
-	// deals with similar callsign stuff, scan every 3 seconds
-	if (!(Counter % 3)) {
-		m_similarMarker.clear(); // re-initialize map
-		for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt))
-			if (rt.GetPosition().GetTransponderC()) // in-flight, ignores on ground
-				m_similarMarker[rt.GetCallsign()] = false;
-		ParseSimilarCallsign();
-	}
+	// deals with similar callsign stuff
+	m_similarMarker.clear(); // re-initialize map
+	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt))
+		if (rt.GetPosition().GetTransponderC()) // in-flight, ignores on ground
+			m_similarMarker[rt.GetCallsign()] = false;
+	ParseSimilarCallsign();
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
@@ -268,15 +266,17 @@ void CMTEPlugIn::ParseSimilarCallsign(void)
 	for (StrMark::iterator it1 = m_similarMarker.begin(); it1 != m_similarMarker.end(); it1++) {
 		for (StrMark::iterator it2 = it1; it2 != m_similarMarker.end(); it2++) {
 			if (it1 == it2) continue;
-
-			// determine digits to process
 			CharList cs1 = ExtractNumfromCallsign(it1->first);
 			CharList cs2 = ExtractNumfromCallsign(it2->first);
-			if (cs1.size() <= 1 && cs2.size() <= 1) continue;
+			bool isSimilar = false;
 
 			// compares
-			bool isSimilar = false;
-			if (cs1.size() == cs2.size()) {
+			if (!cs1.size() || !cs2.size()) // one of it doesn't have a number
+				continue;
+			else if (cs1.size() <= 1 && cs2.size() <= 1) { // prevents (1,1) bug in CompareCallsignNum()
+				isSimilar = cs1 == cs2;
+			}
+			else if (cs1.size() == cs2.size()) {
 				isSimilar = CompareCallsignNum(cs1, cs2);
 			}
 			else {
@@ -293,7 +293,7 @@ void CMTEPlugIn::ParseSimilarCallsign(void)
 				isSimilar = CompareCallsignNum(cs1, csl) || CompareCallsignNum(cs1, csr);
 			}
 
-			if (isSimilar) // same num count
+			if (isSimilar)
 				it1->second = it2->second = true;
 		}
 	}
@@ -325,7 +325,7 @@ CharList ExtractNumfromCallsign(const CString callsign)
 	CharList csnum;
 	bool numbegin = false;
 	for (int i = 0; i < callsign.GetLength(); i++) {
-		numbegin = numbegin || (callsign[i] >= '0' && callsign[i] <= '9');
+		numbegin = numbegin || (callsign[i] >= '1' && callsign[i] <= '9');
 		if (numbegin)
 			csnum.push_back(callsign[i]);
 	}
