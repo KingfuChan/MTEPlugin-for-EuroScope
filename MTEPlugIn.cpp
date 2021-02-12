@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.6.1"
+#define PLUGIN_VERSION "1.6.2"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -141,8 +141,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			vs = vs > 9999 ? 9999 : vs; // in case of overflow
 			sprintf_s(sItemString, 5, "%04d", vs);
 		}
-		else // recogize as level flight
-			sprintf_s(sItemString, 5, "    "); // place-holder
+		//else // recogize as level flight
+		//	sprintf_s(sItemString, 5, "    "); // place-holder
 
 		break; }
 	case TAG_ITEM_TYPE_LVL_IND: {
@@ -166,18 +166,29 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {
-		int cflAlt = FlightPlan.GetClearedAltitude();
-		if (cflAlt != 0 && cflAlt != FlightPlan.GetFinalAltitude()) {
+		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+		switch (cflAlt)
+		{
+		case 2: // cleared for visual approach
+			sprintf_s(sItemString, 6, "V/APP");
+			break;
+		case 1: // cleared for ILS approach
+			sprintf_s(sItemString, 5, "ILS ");
+			break;
+		case 0: // no cleared level
+			sprintf_s(sItemString, 5, "    ");
+			break;
+		default: // have a cleared level
 			cflAlt = MetricAlt::LvlFeettoM(cflAlt) / 10;
 			cflAlt = cflAlt > 9999 ? 9999 : cflAlt; // in case of overflow
 			sprintf_s(sItemString, 5, "%04d", cflAlt);
+			break;
 		}
-		else
-			sprintf_s(sItemString, 5, "    "); // place-holder
 
 		break; }
 	case TAG_ITEM_TYPE_RFL_MTR: {
-		int rflAlt = MetricAlt::LvlFeettoM(FlightPlan.GetFinalAltitude()) / 10;
+		int rflAlt = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
+		rflAlt = MetricAlt::LvlFeettoM(rflAlt) / 10;
 		rflAlt = rflAlt > 9999 ? 9999 : rflAlt; // in case of overflow
 		sprintf_s(sItemString, 5, "%04d", rflAlt);
 
@@ -185,10 +196,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_SC_IND: {
 		CString marker;
 		StrMark::iterator item = m_similarMarker.find(RadarTarget.GetCallsign());
-		if (item != m_similarMarker.end() && item->second) // item exist and is similar
-			sprintf_s(sItemString, 2, "*");
-		else
-			sprintf_s(sItemString, 2, " ");
+		if (item != m_similarMarker.end() && item->second) { // item exist and is similar
+			sprintf_s(sItemString, 3, "SC");
+			*pColorCode = TAG_COLOR_RGB_DEFINED;
+			*pRGB = RGB(255, 255, 0);
+		}
+
 
 		break; }
 	default:
@@ -253,43 +266,33 @@ void CMTEPlugIn::ParseSimilarCallsign(void)
 {
 	// parse m_similarMarker and set if a callsign is similar to others
 	for (StrMark::iterator it1 = m_similarMarker.begin(); it1 != m_similarMarker.end(); it1++) {
-		CharList cs1 = ExtractNumfromCallsign(it1->first);
-		if (cs1.size() > 4) continue; // skip
 		for (StrMark::iterator it2 = it1; it2 != m_similarMarker.end(); it2++) {
 			if (it1 == it2) continue;
-			CharList cs2 = ExtractNumfromCallsign(it2->first);
-			if (cs2.size() > 4) continue; // skip
 
-			// compare two callsign num
-			CharList::iterator p1, p2;
-			int same = 0; // same number on same position count
-			CharList dn1, dn2; // different number on same position list
-			for (p1 = cs1.begin(), p2 = cs2.begin(); p1 != cs1.end() && p2 != cs2.end(); p1++, p2++) {
-				if (*p1 == *p2)
-					same++;
-				else {
-					dn1.push_back(*p1);
-					dn2.push_back(*p2);
-				}
-			}
+			// determine digits to process
+			CharList cs1 = ExtractNumfromCallsign(it1->first);
+			CharList cs2 = ExtractNumfromCallsign(it2->first);
+			if (cs1.size() <= 1 && cs2.size() <= 1) continue;
+
+			// compares
 			bool isSimilar = false;
-			switch (same)
-			{
-			case 4:
-			case 3:
-				isSimilar = true;
-				break;
-			case 2:
-			case 1: {
-				dn1.sort();
-				dn2.sort();
-				isSimilar = dn1 == dn2;
-				break;
+			if (cs1.size() == cs2.size()) {
+				isSimilar = CompareCallsignNum(cs1, cs2);
 			}
-			default:
-				isSimilar = false;
-				break;
+			else {
+				// make cs1 the longer callsign for justification
+				CharList cst = cs1.size() < cs2.size() ? cs1 : cs2;
+				cs1 = cs1.size() > cs2.size() ? cs1 : cs2;
+				cs2 = cst;
+				CharList csl, csr;
+				int i = 0;
+				for (csl = cs2, csr = cs2; i < cs1.size() - cs2.size(); i++) {
+					csl.push_back(' ');
+					csr.push_front(' ');
+				}
+				isSimilar = CompareCallsignNum(cs1, csl) || CompareCallsignNum(cs1, csr);
 			}
+
 			if (isSimilar) // same num count
 				it1->second = it2->second = true;
 		}
@@ -317,7 +320,8 @@ void CMTEPlugIn::CancelCustomCursor(void)
 
 CharList ExtractNumfromCallsign(const CString callsign)
 {
-	// extract num from callsign, no less than 4 digits
+	// extract num from callsign
+	// no less than given digits, positive for right justify, negative for left
 	CharList csnum;
 	bool numbegin = false;
 	for (int i = 0; i < callsign.GetLength(); i++) {
@@ -325,8 +329,32 @@ CharList ExtractNumfromCallsign(const CString callsign)
 		if (numbegin)
 			csnum.push_back(callsign[i]);
 	}
-	int size = csnum.size();
-	for (int i = 0; i < 4 - size; i++)
-		csnum.push_back(' '); // make 4 digits
 	return csnum;
+}
+
+bool CompareCallsignNum(CharList cs1, CharList cs2)
+{
+	// compares tow callsign, CharList in same size
+	int size;
+	if ((size = cs1.size()) != cs2.size()) return false;
+	CharList::iterator p1, p2;
+	int same = 0; // same number on same position count
+	CharList dn1, dn2; // different number on same position list
+	for (p1 = cs1.begin(), p2 = cs2.begin(); p1 != cs1.end() && p2 != cs2.end(); p1++, p2++) {
+		if (*p1 == *p2)
+			same++;
+		else {
+			dn1.push_back(*p1);
+			dn2.push_back(*p2);
+		}
+	}
+	bool isSimilar = false;
+	if (size - same <= 1)
+		isSimilar = true;
+	else if (size - same <= size - 2) {
+		dn1.sort();
+		dn2.sort();
+		isSimilar = dn1 == dn2;
+	}
+	return isSimilar;
 }

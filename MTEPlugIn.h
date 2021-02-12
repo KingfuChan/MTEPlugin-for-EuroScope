@@ -1,7 +1,7 @@
 ﻿// MTEPlugIn.h
 
 #pragma once
-// 主符号
+
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
@@ -14,6 +14,7 @@ typedef std::map<CString, bool> StrMark;
 typedef std::list<char> CharList;
 
 CharList ExtractNumfromCallsign(const CString callsign);
+bool CompareCallsignNum(CharList cs1, CharList cs2);
 
 class CMTEPlugIn :
 	public EuroScopePlugIn::CPlugIn
