@@ -16,7 +16,10 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 
 ## Custom Cursor Settings
 
-You may turn the default mouse arrow to a cross to simulate real-world radar screens.
+You may turn the default mouse arrow into a cross to simulate real-world radar screens.
+
 Enter **.MTEP CURSOR ON** (case-insensitive) in your command line at the bottom of the screen to activate the cursor feature.
+
 Enter **".MTEP CURSOR OFF** to de-activate.
+
 This setting will be saved in your EuroScope plugin settings.

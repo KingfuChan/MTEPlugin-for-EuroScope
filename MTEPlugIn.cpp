@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.6.2"
+#define PLUGIN_VERSION "1.6.3"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -156,10 +156,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_AFL_MTR: {
-		int trsAlt = GetTransitionAltitude();
+		int trsAlt = GetTransitionAltitude(); // should be transition level
 		int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
 		int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
-		int dspAlt = qnhAlt > trsAlt ? stdAlt : qnhAlt;
+		int dspAlt = stdAlt >= trsAlt ? stdAlt : qnhAlt;
 		dspAlt = round(MetricAlt::FeettoM(dspAlt) / 10.0);
 		dspAlt = dspAlt > 9999 ? 9999 : dspAlt; // in case of overflow
 		sprintf_s(sItemString, 5, "%04d", dspAlt);
@@ -187,10 +187,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RFL_MTR: {
-		int rflAlt = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
+		int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
+		int rflFpl = FlightPlan.GetFinalAltitude();
+		int rflAlt = rflCtr ? rflCtr : rflFpl;
+		char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
 		rflAlt = MetricAlt::LvlFeettoM(rflAlt) / 10;
 		rflAlt = rflAlt > 9999 ? 9999 : rflAlt; // in case of overflow
-		sprintf_s(sItemString, 5, "%04d", rflAlt);
+		sprintf_s(sItemString, 6, "%c%04d", trsMrk, rflAlt);
 
 		break; }
 	case TAG_ITEM_TYPE_SC_IND: {
