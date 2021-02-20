@@ -12,4 +12,5 @@ namespace MetricAlt {
 	int FeettoM(const int feet);
 	int LvlMtoFeet(const int meter);
 	int LvlFeettoM(const int feet);
+	bool RflFeettoM(int feet, int& meter);
 }

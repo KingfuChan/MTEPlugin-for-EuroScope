@@ -36,6 +36,9 @@
       <Filter>资源文件</Filter>
     </None>
     <None Include="README.md" />
+    <None Include="EuroScopePlugIn.h">
+      <Filter>头文件</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -45,9 +48,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="pch.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="EuroScopePlugIn.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="MTEPlugIn.h">

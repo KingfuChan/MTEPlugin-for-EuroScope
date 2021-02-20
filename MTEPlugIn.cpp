@@ -1,5 +1,6 @@
 ﻿// MTEPlugIn.cpp
 
+
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
@@ -9,7 +10,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.6.3"
+#define PLUGIN_VERSION "1.6.4"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -23,7 +24,7 @@ const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m)
 const int TAG_ITEM_TYPE_CFL_MTR = 6; // Cleared flight level (m)
-const int TAG_ITEM_TYPE_RFL_MTR = 7; // Final flight level (m)
+const int TAG_ITEM_TYPE_RFL_MTR = 7; // Final flight level (m/FL)
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 
 // GROUND SPEED TREND CHAR
@@ -66,7 +67,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
 	RegisterTagItemType("Actual altitude (m)", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
-	RegisterTagItemType("Final flight level (m)", TAG_ITEM_TYPE_RFL_MTR);
+	RegisterTagItemType("Final flight level (m/FL)", TAG_ITEM_TYPE_RFL_MTR);
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
@@ -190,10 +191,16 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
 		int rflFpl = FlightPlan.GetFinalAltitude();
 		int rflAlt = rflCtr ? rflCtr : rflFpl;
-		char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
-		rflAlt = MetricAlt::LvlFeettoM(rflAlt) / 10;
-		rflAlt = rflAlt > 9999 ? 9999 : rflAlt; // in case of overflow
-		sprintf_s(sItemString, 6, "%c%04d", trsMrk, rflAlt);
+		int dspMtr;
+		if (MetricAlt::RflFeettoM(rflAlt, dspMtr)) { // is metric RVSM
+			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
+			dspMtr = dspMtr / 10 > 9999 ? 9999 : dspMtr / 10; // in case of overflow
+			sprintf_s(sItemString, 6, "%c%04d", trsMrk, dspMtr);
+		}
+		else {
+			rflAlt = round(rflAlt / 100.0);
+			sprintf_s(sItemString, 5, "F%03d", rflAlt);
+		}
 
 		break; }
 	case TAG_ITEM_TYPE_SC_IND: {
