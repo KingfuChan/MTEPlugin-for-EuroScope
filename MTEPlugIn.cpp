@@ -10,7 +10,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.6.4"
+#define PLUGIN_VERSION "1.6.5"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -24,8 +24,10 @@ const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m)
 const int TAG_ITEM_TYPE_CFL_MTR = 6; // Cleared flight level (m)
-const int TAG_ITEM_TYPE_RFL_MTR = 7; // Final flight level (m/FL)
+const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level (m/FL)
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
+const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
+const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -67,8 +69,10 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
 	RegisterTagItemType("Actual altitude (m)", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
-	RegisterTagItemType("Final flight level (m/FL)", TAG_ITEM_TYPE_RFL_MTR);
+	RegisterTagItemType("Final flight level (m/FL)", TAG_ITEM_TYPE_RFL_ICAO);
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
+	RegisterTagItemType("RFL unit indicator", TAG_ITEM_TYPE_RFL_IND);
+	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -128,16 +132,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_VS_FPM: {
-		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
-		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-		int curAlt = curpos.GetPressureAltitude();
-		int preAlt = prepos.GetPressureAltitude();
-		int preT = prepos.GetReceivedTime();
-		int curT = curpos.GetReceivedTime();
-		int deltaT = preT - curT;
-		deltaT = deltaT ? deltaT : INFINITE;
-		int vs = abs(round((curAlt - preAlt) / deltaT * 60));
-		//int vs = abs(RadarTarget.GetVerticalSpeed()); // not accurate
+		int vs = abs(CalculateVerticalSpeed(RadarTarget));
 		if (vs > 100) {
 			vs = vs > 9999 ? 9999 : vs; // in case of overflow
 			sprintf_s(sItemString, 5, "%04d", vs);
@@ -147,7 +142,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_LVL_IND: {
-		int vs = RadarTarget.GetVerticalSpeed();
+		int vs = CalculateVerticalSpeed(RadarTarget);
 		if (vs > 100)
 			sprintf_s(sItemString, 2, "^");
 		else if (vs < -100)
@@ -187,7 +182,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 
 		break; }
-	case TAG_ITEM_TYPE_RFL_MTR: {
+	case TAG_ITEM_TYPE_RFL_ICAO: {
 		int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
 		int rflFpl = FlightPlan.GetFinalAltitude();
 		int rflAlt = rflCtr ? rflCtr : rflFpl;
@@ -212,6 +207,25 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			*pRGB = RGB(255, 255, 0);
 		}
 
+		break; }
+	case TAG_ITEM_TYPE_RFL_IND: {
+		int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
+		int rflFpl = FlightPlan.GetFinalAltitude();
+		int rflAlt = rflCtr ? rflCtr : rflFpl;
+		int _meter;
+		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
+			sprintf_s(sItemString, 2, "#");
+
+		break; }
+	case TAG_ITEM_TYPE_RVSM_IND: {
+		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
+		char capa = fpdata.GetCapibilities();
+		if (!strcmp(fpdata.GetPlanType(), "V"))
+			sprintf_s(sItemString, 2, "V");
+		else if (capa == 'H' || capa == 'W' || capa == 'J' || capa == 'K' || capa == 'L' || capa == 'Z' || capa == '?')
+			sprintf_s(sItemString, 2, " ");
+		else
+			sprintf_s(sItemString, 2, "X");
 
 		break; }
 	default:
@@ -268,6 +282,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	default:
 		return CallWindowProc(gSourceProc, hwnd, uMsg, wParam, lParam);
 	}
+}
+
+int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget)
+{
+	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
+	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
+	int curAlt = curpos.GetPressureAltitude();
+	int preAlt = prepos.GetPressureAltitude();
+	int preT = prepos.GetReceivedTime();
+	int curT = curpos.GetReceivedTime();
+	int deltaT = preT - curT;
+	deltaT = deltaT ? deltaT : INFINITE;
+	return round((curAlt - preAlt) / deltaT * 60);
 }
 
 void CMTEPlugIn::ParseSimilarCallsign(void)

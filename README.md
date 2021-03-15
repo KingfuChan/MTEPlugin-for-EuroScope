@@ -12,6 +12,8 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 6. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, else calculated meters.
 7. **Final flight level (m/FL)** - shows Chinese metric RVSM levels if matches, else Flight Level in feet.
 8. **Similar callsign indicator** - algorithm is too complex to explain here and may contain bugs.
+9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
+10. **RVSM indicator** - shows **V** for VFR flights, ***A SPACE*** if aircraft has RVSM capability, **X** if not.
 
 
 ## Custom Cursor Settings

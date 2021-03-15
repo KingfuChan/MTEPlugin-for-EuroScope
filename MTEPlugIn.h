@@ -29,6 +29,7 @@ public:
 
 private:
 	StrMark m_similarMarker;
+	int CalculateVerticalSpeed(EuroScopePlugIn::CRadarTarget RadarTarget);
 	void ParseSimilarCallsign(void);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
