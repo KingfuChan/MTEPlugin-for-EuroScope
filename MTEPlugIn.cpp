@@ -10,7 +10,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.6.5"
+#define PLUGIN_VERSION "1.7.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -239,9 +239,16 @@ void CMTEPlugIn::OnTimer(int Counter)
 
 	// deals with similar callsign stuff
 	m_similarMarker.clear(); // re-initialize map
-	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt))
-		if (rt.GetPosition().GetTransponderC()) // in-flight, ignores on ground
+	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
+		int state = rt.GetCorrelatedFlightPlan().GetState();
+		if (rt.GetPosition().GetTransponderC() && // in-flight, ignores on ground
+			( // consider assumed aircraft
+				state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
+				state == FLIGHT_PLAN_STATE_ASSUMED
+				)
+			)
 			m_similarMarker[rt.GetCallsign()] = false;
+	}
 	ParseSimilarCallsign();
 }
 
