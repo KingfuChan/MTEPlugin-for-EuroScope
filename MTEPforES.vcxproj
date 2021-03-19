@@ -5,13 +5,13 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
@@ -34,18 +34,18 @@
     <CharacterSet>MultiByte</CharacterSet>
     <UseOfMfc>Dynamic</UseOfMfc>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <UseOfMfc>Dynamic</UseOfMfc>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
-    <UseOfMfc>Dynamic</UseOfMfc>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseOfMfc>Dynamic</UseOfMfc>
   </PropertyGroup>
@@ -65,13 +65,13 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -94,7 +94,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
     </ClCompile>
     <Link>
@@ -117,9 +117,9 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
     </ClCompile>
     <Link>
@@ -146,7 +146,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
     </ClCompile>
     <Link>
@@ -173,9 +173,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_WINDOWS;NDEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>E:\EuroScope\PlugInEnvironment</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Program Files\EuroScope\PlugInEnvironment;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
     </ClCompile>
     <Link>
@@ -183,7 +183,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>.\MTEPforES.def</ModuleDefinitionFile>
-      <AdditionalDependencies>E:\EuroScope\PlugInEnvironment\EuroScopePlugInDll.lib</AdditionalDependencies>
+      <AdditionalDependencies>D:\Program Files\EuroScope\PlugInEnvironment\EuroScopePlugInDll.lib</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>

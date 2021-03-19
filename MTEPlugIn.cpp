@@ -10,7 +10,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.7.2"
+#define PLUGIN_VERSION "1.7.3"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -220,11 +220,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_RVSM_IND: {
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
 		CString acinf = fpdata.GetAircraftInfo();
-		if (acinf.GetLength() <= 8) { // assume FAA format
+		if (!strcmp(fpdata.GetPlanType(), "V"))
+			sprintf_s(sItemString, 2, "V");
+		else if (acinf.GetLength() <= 8) { // assume FAA format
 			char capa = fpdata.GetCapibilities();
-			if (!strcmp(fpdata.GetPlanType(), "V"))
-				sprintf_s(sItemString, 2, "V");
-			else if (capa == 'H' || capa == 'W' || capa == 'J' || capa == 'K' || capa == 'L' || capa == 'Z' || capa == '?')
+			if (capa == 'H' || capa == 'W' || capa == 'J' || capa == 'K' || capa == 'L' || capa == 'Z' || capa == '?')
 				sprintf_s(sItemString, 2, " ");
 			else {
 				sprintf_s(sItemString, 2, "X");
@@ -232,8 +232,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		else { // assume ICAO format, no format check
 			CString acet = acinf.Mid(acinf.Find('-') + 1);
-			CString ace = acet.Left(acet.Find('/'));
-			if (ace.Find('W') >= 0)
+			if (acet.Left(acet.Find('/')).Find('W') >= 0)
 				sprintf_s(sItemString, 2, " ");
 			else
 				sprintf_s(sItemString, 2, "X");
