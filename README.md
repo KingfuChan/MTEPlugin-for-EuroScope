@@ -14,6 +14,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 8. **Similar callsign indicator** - algorithm is too complex to explain here and may contain bugs.
 9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, ***A SPACE*** if aircraft has RVSM capability, **X** if not.
+11. **COMM ESTB indicator** - shows a white **C** when assuming. Use **Set COMM ESTB** function to cancel this **C**.
 
 
 ## Custom Cursor Settings

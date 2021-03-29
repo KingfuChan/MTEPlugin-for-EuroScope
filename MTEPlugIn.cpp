@@ -10,7 +10,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.7.4"
+#define PLUGIN_VERSION "1.8.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -28,6 +28,10 @@ const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level (m/FL)
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
+const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
+
+// TAG ITEM FUNCTION
+const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -73,6 +77,9 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
 	RegisterTagItemType("RFL unit indicator", TAG_ITEM_TYPE_RFL_IND);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
+	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
+
+	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -238,8 +245,39 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				sprintf_s(sItemString, 2, "X");
 		}
 
+		break; }
+	case TAG_ITEM_TYPE_COMM_IND: {
+		// in marker, false means not established
+		CString marker;
+		StrMark::iterator item = m_communMarker.find(RadarTarget.GetCallsign());
+		if (item == m_communMarker.end() || !item->second) { // comm not established
+			sprintf_s(sItemString, 2, "C");
+			*pColorCode = TAG_COLOR_RGB_DEFINED;
+			*pRGB = RGB(255, 255, 255);
+		}
+
+		break; }
+	default:
 		break;
 	}
+}
+
+void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area) {
+	CRadarTarget RadarTarget = RadarTargetSelectASEL();
+	if (!RadarTarget.IsValid()) return;
+
+	switch (FunctionId)
+	{
+	case TAG_ITEM_FUNCTION_COMM_ESTAB: {
+		int state = RadarTarget.GetCorrelatedFlightPlan().GetState();
+		if (RadarTarget.GetPosition().GetTransponderC() && // in-flight, ignores on ground
+			( // consider assumed aircraft
+				state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
+				state == FLIGHT_PLAN_STATE_ASSUMED
+				))
+			m_communMarker[RadarTarget.GetCallsign()] = true;
+
+		break; }
 	default:
 		break;
 	}
@@ -249,7 +287,7 @@ void CMTEPlugIn::OnTimer(int Counter)
 {
 	if (initCursor && customCursor) SetCustomCursor(); // cursor
 
-	// deals with similar callsign stuff
+	// deals with similar callsign stuff, and communication establish stuff
 	m_similarMarker.clear(); // re-initialize map
 	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
 		int state = rt.GetCorrelatedFlightPlan().GetState();
@@ -258,8 +296,12 @@ void CMTEPlugIn::OnTimer(int Counter)
 				state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
 				state == FLIGHT_PLAN_STATE_ASSUMED
 				)
-			)
+			) {
 			m_similarMarker[rt.GetCallsign()] = false;
+		}
+		else {
+			m_communMarker[rt.GetCallsign()] = false;
+		}
 	}
 	ParseSimilarCallsign();
 }
