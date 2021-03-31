@@ -10,7 +10,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.8.0"
+#define PLUGIN_VERSION "1.8.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -29,9 +29,11 @@ const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
+const int TAG_ITEM_TYPE_ASSIGN_VS = 12; // Assigned V/S in 4 digits
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
+const int TAG_ITEM_FUNCTION_RATE_W_CD = 2; // Assign V/S with +/-
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -78,8 +80,10 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RFL unit indicator", TAG_ITEM_TYPE_RFL_IND);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
+	//RegisterTagItemType("Assigned V/S in 4 digits", TAG_ITEM_TYPE_ASSIGN_VS);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
+	//RegisterTagItemFunction("Assign V/S with +/-", TAG_ITEM_FUNCTION_RATE_W_CD);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -248,6 +252,16 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_COMM_IND: {
 		// in marker, false means not established
+		int state = FlightPlan.GetState();
+		if (!
+			(RadarTarget.GetPosition().GetTransponderC() &&
+				(
+					state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
+					state == FLIGHT_PLAN_STATE_ASSUMED
+					)
+				)
+			)
+			break; // only valid for assumed flights
 		CString marker;
 		StrMark::iterator item = m_communMarker.find(RadarTarget.GetCallsign());
 		if (item == m_communMarker.end() || !item->second) { // comm not established
@@ -255,6 +269,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
 			*pRGB = RGB(255, 255, 255);
 		}
+
+		break; }
+	case TAG_ITEM_TYPE_ASSIGN_VS: {
+		int rate = FlightPlan.GetControllerAssignedData().GetAssignedRate();
+		char cd = rate > 0 ? '+' : '-';
+		sprintf_s(sItemString, 6, "%c%4d", cd, rate);
 
 		break; }
 	default:
@@ -278,6 +298,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			m_communMarker[RadarTarget.GetCallsign()] = true;
 
 		break; }
+	case TAG_ITEM_FUNCTION_RATE_W_CD: {
+
+		break;	}
 	default:
 		break;
 	}
