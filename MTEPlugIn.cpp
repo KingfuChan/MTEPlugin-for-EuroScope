@@ -6,11 +6,12 @@
 #include "resource.h"
 #include "MTEPlugIn.h"
 #include "MetricAlt.h"
+#include "ReCat.hpp"
 
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.8.1"
+#define PLUGIN_VERSION "1.9.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -30,6 +31,7 @@ const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
 const int TAG_ITEM_TYPE_ASSIGN_VS = 12; // Assigned V/S in 4 digits
+const int TAG_ITEM_TYPE_RECAT = 13; // RECAT-CN
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -81,6 +83,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
 	//RegisterTagItemType("Assigned V/S in 4 digits", TAG_ITEM_TYPE_ASSIGN_VS);
+	RegisterTagItemType("RECAT-CN", TAG_ITEM_TYPE_RECAT);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	//RegisterTagItemFunction("Assign V/S with +/-", TAG_ITEM_FUNCTION_RATE_W_CD);
@@ -271,11 +274,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 
 		break; }
-	case TAG_ITEM_TYPE_ASSIGN_VS: {
+	case TAG_ITEM_TYPE_ASSIGN_VS: { // NOT IN USE
 		int rate = FlightPlan.GetControllerAssignedData().GetAssignedRate();
 		char cd = rate > 0 ? '+' : '-';
 		sprintf_s(sItemString, 6, "%c%4d", cd, rate);
 
+		break; }
+	case TAG_ITEM_TYPE_RECAT: {
+		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
+		CString acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
+		if (categ == 'H' && m_ReCatMap.count(acType))
+			sprintf_s(sItemString, 3, "-%c", m_ReCatMap.at(acType));
 		break; }
 	default:
 		break;
