@@ -5,13 +5,11 @@
 #include "framework.h"
 #include "resource.h"
 #include "MTEPlugIn.h"
-#include "MetricAlt.h"
-#include "ReCat.hpp"
 
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "1.9.0"
+#define PLUGIN_VERSION "2.0.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -285,6 +283,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		CString acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
 		if (categ == 'H' && m_ReCatMap.count(acType))
 			sprintf_s(sItemString, 3, "-%c", m_ReCatMap.at(acType));
+
 		break; }
 	default:
 		break;
@@ -320,22 +319,33 @@ void CMTEPlugIn::OnTimer(int Counter)
 	if (initCursor && customCursor) SetCustomCursor(); // cursor
 
 	// deals with similar callsign stuff, and communication establish stuff
-	m_similarMarker.clear(); // re-initialize map
+	StrMark mkrCN, mkrEN;
 	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
-		int state = rt.GetCorrelatedFlightPlan().GetState();
+		CFlightPlan fp = rt.GetCorrelatedFlightPlan();
+		int state = fp.GetState();
 		if (rt.GetPosition().GetTransponderC() && // in-flight, ignores on ground
 			( // consider assumed aircraft
 				state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
 				state == FLIGHT_PLAN_STATE_ASSUMED
 				)
-			) {
-			m_similarMarker[rt.GetCallsign()] = false;
+			)
+		{ // used for similar callsign
+			if (!fp.IsTextCommunication()) {
+				if (IsCallsignChinese(fp))
+					mkrCN[rt.GetCallsign()] = false;
+				else
+					mkrEN[rt.GetCallsign()] = false;
+			}
+			else
+				OutputDebugString("Text aircraft!");
 		}
-		else {
+		else { // used for communication marker
 			m_communMarker[rt.GetCallsign()] = false;
 		}
 	}
-	ParseSimilarCallsign();
+	m_similarMarker.clear();
+	m_similarMarker.merge(ParseSimilarCallsign(mkrCN));
+	m_similarMarker.merge(ParseSimilarCallsign(mkrEN));
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
@@ -390,45 +400,6 @@ int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget)
 	return round((curAlt - preAlt) / deltaT * 60);
 }
 
-void CMTEPlugIn::ParseSimilarCallsign(void)
-{
-	// parse m_similarMarker and set if a callsign is similar to others
-	for (StrMark::iterator it1 = m_similarMarker.begin(); it1 != m_similarMarker.end(); it1++) {
-		for (StrMark::iterator it2 = it1; it2 != m_similarMarker.end(); it2++) {
-			if (it1 == it2) continue;
-			CharList cs1 = ExtractNumfromCallsign(it1->first);
-			CharList cs2 = ExtractNumfromCallsign(it2->first);
-			bool isSimilar = false;
-
-			// compares
-			if (!cs1.size() || !cs2.size()) // one of it doesn't have a number
-				continue;
-			else if (cs1.size() <= 1 && cs2.size() <= 1) { // prevents (1,1) bug in CompareCallsignNum()
-				isSimilar = cs1 == cs2;
-			}
-			else if (cs1.size() == cs2.size()) {
-				isSimilar = CompareCallsignNum(cs1, cs2);
-			}
-			else {
-				// make cs1 the longer callsign for justification
-				CharList cst = cs1.size() < cs2.size() ? cs1 : cs2;
-				cs1 = cs1.size() > cs2.size() ? cs1 : cs2;
-				cs2 = cst;
-				CharList csl, csr;
-				int i = 0;
-				for (csl = cs2, csr = cs2; i < cs1.size() - cs2.size(); i++) {
-					csl.push_back(' ');
-					csr.push_front(' ');
-				}
-				isSimilar = CompareCallsignNum(cs1, csl) || CompareCallsignNum(cs1, csr);
-			}
-
-			if (isSimilar)
-				it1->second = it2->second = true;
-		}
-	}
-}
-
 void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
@@ -446,45 +417,4 @@ void CMTEPlugIn::CancelCustomCursor(void)
 	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)gSourceProc);
 	initCursor = true;
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
-}
-
-CharList ExtractNumfromCallsign(const CString callsign)
-{
-	// extract num from callsign
-	// no less than given digits, positive for right justify, negative for left
-	CharList csnum;
-	bool numbegin = false;
-	for (int i = 0; i < callsign.GetLength(); i++) {
-		numbegin = numbegin || (callsign[i] >= '1' && callsign[i] <= '9');
-		if (numbegin)
-			csnum.push_back(callsign[i]);
-	}
-	return csnum;
-}
-
-bool CompareCallsignNum(CharList cs1, CharList cs2)
-{
-	// compares tow callsign, CharList in same size
-	int size;
-	if ((size = cs1.size()) != cs2.size()) return false;
-	CharList::iterator p1, p2;
-	int same = 0; // same number on same position count
-	CharList dn1, dn2; // different number on same position list
-	for (p1 = cs1.begin(), p2 = cs2.begin(); p1 != cs1.end() && p2 != cs2.end(); p1++, p2++) {
-		if (*p1 == *p2)
-			same++;
-		else {
-			dn1.push_back(*p1);
-			dn2.push_back(*p2);
-		}
-	}
-	bool isSimilar = false;
-	if (size - same <= 1)
-		isSimilar = true;
-	else if (size - same <= size - 2) {
-		dn1.sort();
-		dn2.sort();
-		isSimilar = dn1 == dn2;
-	}
-	return isSimilar;
 }
