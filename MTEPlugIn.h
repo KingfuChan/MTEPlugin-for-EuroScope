@@ -9,12 +9,9 @@
 #include <string>
 #include <list>
 #include "MetricAlt.h"
+#include "ReCat.hpp"
+#include "SimilarCallsign.h"
 
-typedef std::map<CString, bool> StrMark;
-typedef std::list<char> CharList;
-
-CharList ExtractNumfromCallsign(const CString callsign);
-bool CompareCallsignNum(CharList cs1, CharList cs2);
 
 class CMTEPlugIn :
 	public EuroScopePlugIn::CPlugIn
@@ -29,9 +26,9 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
-	StrMark m_similarMarker, m_communMarker;
+	StrMark m_similarMarker;
+	StrMark m_communMarker;
 	int CalculateVerticalSpeed(EuroScopePlugIn::CRadarTarget RadarTarget);
-	void ParseSimilarCallsign(void);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 };

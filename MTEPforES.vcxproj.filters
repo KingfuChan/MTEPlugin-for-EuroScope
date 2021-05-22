@@ -30,6 +30,9 @@
     <ClCompile Include="ReCat.hpp">
       <Filter>头文件</Filter>
     </ClCompile>
+    <ClCompile Include="SimilarCallsign.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\MTEPforES.rc2">
@@ -60,6 +63,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="MetricAlt.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SimilarCallsign.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
