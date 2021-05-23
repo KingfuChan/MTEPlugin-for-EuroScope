@@ -11,7 +11,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
 6. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, else calculated meters.
 7. **Final flight level (m/FL)** - shows Chinese metric RVSM levels if matches, else Flight Level in feet.
-8. **Similar callsign indicator** - shows SC if similar callsigns are detected. Note that /t and CN/EN are considered.
+8. **Similar callsign indicator** - shows **SC** if similar callsigns are detected. Note that /t and CN/EN are considered.
 9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, ***A SPACE*** if aircraft has RVSM capability, **X** if not.
 11. **COMM ESTB indicator** - shows a white **C** when assuming. Use **Set COMM ESTB** function to cancel this **C**.

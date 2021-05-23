@@ -9,6 +9,7 @@
 
 // generate RVSM FLAS
 const std::map<int, int> m_mft = {
+	{  300, 1000},
 	{  600, 2000},
 	{  900, 3000},
 	{ 1200, 3900},
@@ -53,9 +54,11 @@ const std::map<int, int> m_mft = {
 	{13700,44900},
 	{14300,46900},
 	{14900,48900},
+	{15500,50900},
 };
 
 const std::map<int, int> m_ftm = {
+	{ 1000,  300},
 	{ 2000,  600},
 	{ 3000,  900},
 	{ 3900, 1200},
@@ -100,6 +103,7 @@ const std::map<int, int> m_ftm = {
 	{44900,13700},
 	{46900,14300},
 	{48900,14900},
+	{50900,15500},
 };
 
 int MetricAlt::MtoFeet(const int meter)

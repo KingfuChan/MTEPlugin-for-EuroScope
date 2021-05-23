@@ -9,12 +9,13 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.0.0"
+#define PLUGIN_VERSION "2.0.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
 #endif // !COPYRIGHTS
 
+using namespace EuroScopePlugIn;
 
 // TAG ITEM TYPE
 const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with indicator
@@ -44,6 +45,7 @@ const char CHR_GS_DEC = 'L';
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 #define KN2KPH(int) 1.85184*(int) // 1 knot = 1.85184 kph
 #define KPH2KN(int) (int)/1.85184
+int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -57,8 +59,6 @@ HCURSOR myCursor = nullptr;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 #define CPCUR CopyCursor((HCURSOR)::LoadImage(GetModuleHandle("MTEPlugIn.dll"), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED))
 // Note that cursor setting will only be effective with it's original file name (MTEPlugIn.dll)
-
-using namespace EuroScopePlugIn;
 
 
 CMTEPlugIn::CMTEPlugIn(void)
@@ -206,6 +206,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		else {
 			rflAlt = round(rflAlt / 100.0);
+			rflAlt = rflAlt > 999 ? 999 : rflAlt; // in case of overflow
 			sprintf_s(sItemString, 5, "F%03d", rflAlt);
 		}
 
@@ -272,11 +273,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 
 		break; }
-	case TAG_ITEM_TYPE_ASSIGN_VS: { // NOT IN USE
+	case TAG_ITEM_TYPE_ASSIGN_VS: {
+		//////////////////// NOT IN USE ////////////////////
 		int rate = FlightPlan.GetControllerAssignedData().GetAssignedRate();
 		char cd = rate > 0 ? '+' : '-';
+		rate = rate > 9999 ? 9999 : rate; // in case of overflow
 		sprintf_s(sItemString, 6, "%c%4d", cd, rate);
-
+		//////////////////// NOT IN USE ////////////////////
 		break; }
 	case TAG_ITEM_TYPE_RECAT: {
 		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
@@ -307,7 +310,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RATE_W_CD: {
-
+		//////////////////// NOT IN USE ////////////////////
 		break;	}
 	default:
 		break;
@@ -375,31 +378,6 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 	return false;
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	switch (uMsg)
-	{
-	case WM_SETCURSOR:
-		SetCursor(myCursor);
-		return true;
-	default:
-		return CallWindowProc(gSourceProc, hwnd, uMsg, wParam, lParam);
-	}
-}
-
-int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget)
-{
-	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
-	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-	int curAlt = curpos.GetPressureAltitude();
-	int preAlt = prepos.GetPressureAltitude();
-	int preT = prepos.GetReceivedTime();
-	int curT = curpos.GetReceivedTime();
-	int deltaT = preT - curT;
-	deltaT = deltaT ? deltaT : INFINITE;
-	return round((curAlt - preAlt) / deltaT * 60);
-}
-
 void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
@@ -417,4 +395,29 @@ void CMTEPlugIn::CancelCustomCursor(void)
 	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)gSourceProc);
 	initCursor = true;
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
+}
+
+int CalculateVerticalSpeed(CRadarTarget RadarTarget)
+{
+	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
+	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
+	int curAlt = curpos.GetPressureAltitude();
+	int preAlt = prepos.GetPressureAltitude();
+	int preT = prepos.GetReceivedTime();
+	int curT = curpos.GetReceivedTime();
+	int deltaT = preT - curT;
+	deltaT = deltaT ? deltaT : INFINITE;
+	return round((curAlt - preAlt) / deltaT * 60);
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	switch (uMsg)
+	{
+	case WM_SETCURSOR:
+		SetCursor(myCursor);
+		return true;
+	default:
+		return CallWindowProc(gSourceProc, hwnd, uMsg, wParam, lParam);
+	}
 }
