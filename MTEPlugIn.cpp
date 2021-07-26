@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.0.1"
+#define PLUGIN_VERSION "2.0.2"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -46,6 +46,7 @@ const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 #define KN2KPH(int) 1.85184*(int) // 1 knot = 1.85184 kph
 #define KPH2KN(int) (int)/1.85184
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
+int GetFlightPlanFinalAltitude(CFlightPlan FlightPlan);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -164,11 +165,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_AFL_MTR: {
-		int trsAlt = GetTransitionAltitude(); // should be transition level
-		int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
-		int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
-		int dspAlt = stdAlt >= trsAlt ? stdAlt : qnhAlt;
-		dspAlt = round(MetricAlt::FeettoM(dspAlt) / 10.0);
+		int dspAlt = round(MetricAlt::FeettoM(GetRadarDisplayAltitude(RadarTarget)) / 10.0);
 		dspAlt = dspAlt > 9999 ? 9999 : dspAlt; // in case of overflow
 		sprintf_s(sItemString, 5, "%04d", dspAlt);
 
@@ -183,21 +180,44 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case 1: // cleared for ILS approach
 			sprintf_s(sItemString, 5, "ILS ");
 			break;
-		case 0: // no cleared level
-			sprintf_s(sItemString, 5, "    ");
-			break;
+		case 0: // no cleared level (can be used to assign RFL as CFL)
+		{
+			int aflAlt = GetRadarDisplayAltitude(RadarTarget);
+			int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
+			if (abs(rflAlt - aflAlt) <= 200) {
+				// at final altitude, no display
+				sprintf_s(sItemString, 5, "    ");
+				break; // switch (cflAlt)
+			}
+			else {
+				// not at final altitude, continue to default
+				cflAlt = GetFlightPlanFinalAltitude(FlightPlan);
+			}
+		}
 		default: // have a cleared level
-			cflAlt = MetricAlt::LvlFeettoM(cflAlt) / 10;
-			cflAlt = cflAlt > 9999 ? 9999 : cflAlt; // in case of overflow
-			sprintf_s(sItemString, 5, "%04d", cflAlt);
-			break;
+		{
+			int dspAlt;
+			if (MetricAlt::RflFeettoM(cflAlt, dspAlt)) { // is metric RVSM
+				dspAlt = dspAlt / 10 > 9999 ? 9999 : dspAlt / 10; // in case of overflow
+				sprintf_s(sItemString, 5, "%04d", dspAlt);
+			}
+			else if (cflAlt % 1000) { // not metric RVSM nor FL xx0, convert to metric
+				dspAlt = MetricAlt::FeettoM(cflAlt) / 10;
+				dspAlt = dspAlt > 9999 ? 9999 : dspAlt; // in case of overflow
+				sprintf_s(sItemString, 5, "%04d", dspAlt);
+			}
+			else { // FL xx0, show FL in feet
+				dspAlt = cflAlt / 100;
+				dspAlt = dspAlt > 999 ? 999 : dspAlt; // in case of overflow
+				sprintf_s(sItemString, 5, "F%03d", dspAlt);
+			}
+			break; }
 		}
 
-		break; }
+		break;
+	}
 	case TAG_ITEM_TYPE_RFL_ICAO: {
-		int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
-		int rflFpl = FlightPlan.GetFinalAltitude();
-		int rflAlt = rflCtr ? rflCtr : rflFpl;
+		int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
 		int dspMtr;
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr)) { // is metric RVSM
 			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
@@ -222,9 +242,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
-		int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
-		int rflFpl = FlightPlan.GetFinalAltitude();
-		int rflAlt = rflCtr ? rflCtr : rflFpl;
+		int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
 		int _meter;
 		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
 			sprintf_s(sItemString, 2, "#");
@@ -378,6 +396,13 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 	return false;
 }
 
+int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
+	int trsAlt = GetTransitionAltitude(); // should be transition level
+	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
+	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
+	return stdAlt >= trsAlt ? stdAlt : qnhAlt;
+}
+
 void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
@@ -408,6 +433,12 @@ int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 	int deltaT = preT - curT;
 	deltaT = deltaT ? deltaT : INFINITE;
 	return round((curAlt - preAlt) / deltaT * 60);
+}
+
+int GetFlightPlanFinalAltitude(CFlightPlan FlightPlan) {
+	int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
+	int rflFpl = FlightPlan.GetFinalAltitude();
+	return rflCtr ? rflCtr : rflFpl;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

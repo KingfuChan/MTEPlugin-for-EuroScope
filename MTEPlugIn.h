@@ -29,6 +29,7 @@ public:
 private:
 	StrMark m_similarMarker;
 	StrMark m_communMarker;
+	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 };

@@ -1,15 +1,14 @@
-﻿// dllmain.cpp : 定义 DLL 应用程序的入口点。
+﻿// dllmain.cpp
 #include "pch.h"
 #include <EuroScopePlugIn.h>
 #include "MTEPlugIn.h"
 
-//用于EuroScope加载插件
+// Interface for EuroScope plugin loading
 CMTEPlugIn* pMyPlugIn = nullptr;
 
 void __declspec (dllexport)
 EuroScopePlugInInit(EuroScopePlugIn::CPlugIn** ppPlugInInstance)
 {
-	// allocate
 	*ppPlugInInstance = pMyPlugIn = new CMTEPlugIn;
 }
 
@@ -18,4 +17,3 @@ EuroScopePlugInExit(void)
 {
 	delete pMyPlugIn;
 }
-//以上为ES特有

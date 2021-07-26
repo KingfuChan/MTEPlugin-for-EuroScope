@@ -126,7 +126,7 @@ int MetricAlt::LvlFeettoM(const int feet)
 	return m_ftm.count(feet) ? m_ftm.at(feet) : FeettoM(feet);
 }
 
-bool MetricAlt::RflFeettoM(int feet, int& meter) {
+bool MetricAlt::RflFeettoM(const int feet, int& meter) {
 	// matches to int& meter
 	if (m_ftm.count(feet)) {
 		meter = m_ftm.at(feet);
