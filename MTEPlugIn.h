@@ -27,8 +27,9 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
-	StrMark m_similarMarker;
-	StrMark m_communMarker;
+	CSMark m_similarMarker; // true means is similar
+	CSMark m_communMarker; // true means communication established
+	AltRec m_cflRecorder; // should be the same as GetClearedAltitude except RFL
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);

@@ -71,11 +71,11 @@ bool CompareCallsignNum(CharList cs1, CharList cs2)
 	return isSimilar;
 }
 
-StrMark ParseSimilarCallsign(StrMark MarkerMap)
+CSMark ParseSimilarCallsign(CSMark MarkerMap)
 {
 	// parse m_similarMarker and set if a callsign is similar to others
-	for (StrMark::iterator it1 = MarkerMap.begin(); it1 != MarkerMap.end(); it1++) {
-		for (StrMark::iterator it2 = it1; it2 != MarkerMap.end(); it2++) {
+	for (CSMark::iterator it1 = MarkerMap.begin(); it1 != MarkerMap.end(); it1++) {
+		for (CSMark::iterator it2 = it1; it2 != MarkerMap.end(); it2++) {
 			if (it1 == it2) continue;
 			CharList cs1 = ExtractNumfromCallsign(it1->first);
 			CharList cs2 = ExtractNumfromCallsign(it2->first);

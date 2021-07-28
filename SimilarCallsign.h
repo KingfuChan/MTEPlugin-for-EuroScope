@@ -11,12 +11,12 @@
 #include <map>
 #include <list>
 
-typedef std::map<CString, bool> StrMark;
+typedef std::map<CString, bool> CSMark; // Callsign Marker
 typedef std::list<char> CharList;
 
 // public functions
 bool IsCallsignChinese(EuroScopePlugIn::CFlightPlan FlightPlan);
-StrMark ParseSimilarCallsign(StrMark MarkerMap);
+CSMark ParseSimilarCallsign(CSMark MarkerMap);
 
 // private functions
 CharList ExtractNumfromCallsign(const CString callsign);
