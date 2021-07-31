@@ -16,6 +16,7 @@ typedef std::list<char> CharList;
 
 // public functions
 bool IsCallsignChinese(EuroScopePlugIn::CFlightPlan FlightPlan);
+bool IsCallsignSimilar(CString callsign1, CString callsign2);
 CSMark ParseSimilarCallsign(CSMark MarkerMap);
 
 // private functions

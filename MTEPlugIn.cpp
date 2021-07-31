@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.1.0"
+#define PLUGIN_VERSION "2.2.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -34,11 +34,13 @@ const int TAG_ITEM_TYPE_RECAT = 12; // RECAT-CN
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
 const int TAG_ITEM_FUNCTION_CFL_SET = 10; // Set CFL (not registered)
-const int TAG_ITEM_FUNCTION_CFL_LIST = 11; // Open CFL popup list
+const int TAG_ITEM_FUNCTION_CFL_MENU = 11; // Open CFL popup menu
 const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit (not registered)
 const int TAG_ITEM_FUNCTION_RFL_SET = 20; // Set RFL (not registered)
-const int TAG_ITEM_FUNCTION_RFL_LIST = 21; // Open RFL popup list
+const int TAG_ITEM_FUNCTION_RFL_MENU = 21; // Open RFL popup menu
 const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit (not registered)
+const int TAG_ITEM_FUNCTION_SC_LIST = 30; // Open similar callsign list
+const int TAG_ITEM_FUNCTION_SC_SELECT = 31; // Select in similar callsign list (not registered)
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -50,7 +52,6 @@ const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 #define KN2KPH(int) 1.85184*(int) // 1 knot = 1.85184 kph
 #define KPH2KN(int) (int)/1.85184
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
-int GetFlightPlanFinalAltitude(CFlightPlan FlightPlan);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -88,8 +89,9 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RECAT-CN", TAG_ITEM_TYPE_RECAT);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
-	RegisterTagItemFunction("Open CFL popup list", TAG_ITEM_FUNCTION_CFL_LIST);
-	RegisterTagItemFunction("Open RFL popup list", TAG_ITEM_FUNCTION_RFL_LIST);
+	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
+	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
+	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -185,7 +187,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case 0: // no cleared level (can be used to assign RFL as CFL)
 		{
 			int lastAlt = m_cflRecorder[FlightPlan.GetCallsign()];
-			int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
+			int rflAlt = FlightPlan.GetFinalAltitude();
 			if (lastAlt != rflAlt) {
 				sprintf_s(sItemString, 5, "    ");
 				break;
@@ -217,7 +219,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break;
 	}
 	case TAG_ITEM_TYPE_RFL_ICAO: {
-		int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
+		int rflAlt = FlightPlan.GetFinalAltitude();
 		int dspMtr;
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr)) { // is metric RVSM
 			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
@@ -235,12 +237,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (m_similarMarker[RadarTarget.GetCallsign()]) { // there is similar
 			sprintf_s(sItemString, 3, "SC");
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 0);
+			*pRGB = RGB(255, 255, 0); // yellow
 		}
 
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
-		int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
+		int rflAlt = FlightPlan.GetFinalAltitude();
 		int _meter;
 		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
 			sprintf_s(sItemString, 2, "#");
@@ -276,20 +278,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_COMM_IND: {
 		// in marker, false means not established
-		int state = FlightPlan.GetState();
-		if (!
-			(RadarTarget.GetPosition().GetTransponderC() &&
-				(
-					state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
-					state == FLIGHT_PLAN_STATE_ASSUMED
-					)
-				)
-			)
+		if (!(RadarTarget.GetPosition().GetTransponderC() && FlightPlan.GetTrackingControllerIsMe()))
 			break; // only valid for assumed flights
 		if (!m_communMarker[RadarTarget.GetCallsign()]) { // comm not established
 			sprintf_s(sItemString, 2, "C");
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 255);
+			*pRGB = RGB(255, 255, 255); // white
 		}
 
 		break; }
@@ -313,52 +307,56 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	switch (FunctionId)
 	{
 	case TAG_ITEM_FUNCTION_COMM_ESTAB: {
-		int state = RadarTarget.GetCorrelatedFlightPlan().GetState();
-		if (RadarTarget.GetPosition().GetTransponderC() && // in-flight, ignores on ground
-			( // consider assumed aircraft
-				state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
-				state == FLIGHT_PLAN_STATE_ASSUMED
-				))
+		if (RadarTarget.GetPosition().GetTransponderC() && FlightPlan.GetTrackingControllerIsMe())
 			m_communMarker[RadarTarget.GetCallsign()] = true;
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET: {
-		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
-		if (!strcmp(sItemString, "NONE")) {
-			ctrData.SetClearedAltitude(0);
-			m_cflRecorder[FlightPlan.GetCallsign()] = 0;
-		}
-		else if (!strcmp(sItemString, "ILS")) {
-			ctrData.SetClearedAltitude(1);
-			m_cflRecorder[FlightPlan.GetCallsign()] = 1;
-		}
-		else if (!strcmp(sItemString, "VA")) {
-			ctrData.SetClearedAltitude(2);
-			m_cflRecorder[FlightPlan.GetCallsign()] = 2;
-		}
-		else if (strlen(sItemString)) {
-			int alt;
-			if (sscanf_s(sItemString, "F%3d", &alt) || sscanf_s(sItemString, "f%3d", &alt)) { // FL in feet
-				alt = alt * 100;
-				ctrData.SetClearedAltitude(alt);
-				m_cflRecorder[FlightPlan.GetCallsign()] = alt;
+		CString input = sItemString;
+		input.Trim();
+		input.MakeUpper();
+		if (input == "NONE")
+			SetClearedAltitude(FlightPlan, 0);
+		else if (input == "ILS")
+			SetClearedAltitude(FlightPlan, 1);
+		else if (input == "VA")
+			SetClearedAltitude(FlightPlan, 2);
+		else {
+			bool f = input[0] == 'F'; // whether 'F' is present and at first place
+			bool d = false; // whether '.'(dot) is present
+			int alt = 0;
+			for (int i = f; i < input.GetLength(); i++) { // parse input
+				if (input[i] >= '0' && input[i] <= '9') {
+					alt = alt * 10 + input[i] - '0';
+				}
+				else if (input[i] == '.') {
+					d = true;
+					break;
+				}
+				else
+					break;
 			}
-			else if (sscanf_s(sItemString, "%3d", &alt)) { // otherwise Metric
-				alt = MetricAlt::LvlMtoFeet(alt * 100);
-				ctrData.SetClearedAltitude(alt);
-				m_cflRecorder[FlightPlan.GetCallsign()] = alt;
-			}
+			if (!alt) break; // invalid entry
+			if (f && d) // FL in feet, precise
+				SetClearedAltitude(FlightPlan, alt);
+			else if (f && !d) // FL in feet
+				SetClearedAltitude(FlightPlan, alt * 100);
+			else if (!f && d) // metric, precise
+				SetClearedAltitude(FlightPlan, MetricAlt::LvlMtoFeet(alt));
+			else if (!f && !d)  // otherwise metric
+				SetClearedAltitude(FlightPlan, MetricAlt::LvlMtoFeet(alt * 100));
 		}
 		break; }
-	case TAG_ITEM_FUNCTION_CFL_LIST: {
-		// will do nothing if other controller is tracking
+	case TAG_ITEM_FUNCTION_CFL_MENU: {
+		// don't show list if other controller is tracking
 		if (strlen(FlightPlan.GetTrackingControllerId()) && !FlightPlan.GetTrackingControllerIsMe()) {
 			break;
 		}
-		OpenPopupList(Area, "ClearedAlt", 2);
+		OpenPopupList(Area, "CFL Menu", 2);
 		// pre-select altitude
 		int minDif(1e6), minAlt(0); // a big enough number
-		int cflAlt = m_cflRecorder[FlightPlan.GetCallsign()];
+		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+		cflAlt = cflAlt ? cflAlt : m_cflRecorder[FlightPlan.GetCallsign()]; // adapt received hand-off
 		int rdrAlt = GetRadarDisplayAltitude(RadarTarget);
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		for (auto it = MetricAlt::m_fm.begin(); it != MetricAlt::m_fm.end(); it++) {
@@ -368,6 +366,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 				minAlt = it->first;
 			}
 		}
+		printf_s("cfl:%d,rdr:%d,cmp:%d,min:%d", cflAlt, rdrAlt, cmpAlt, minAlt);
 		for (auto it = MetricAlt::m_mf.rbegin(); it != MetricAlt::m_mf.rend(); it++) {
 			int m = it->first / 100;
 			int f = it->second / 100;
@@ -376,7 +375,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			sprintf_s(fs, 4, "%d", f);
 			AddPopupListElement(ms, fs, TAG_ITEM_FUNCTION_CFL_SET, it->second == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
 		}
-		AddPopupListElement("[   ", "   ]", TAG_ITEM_FUNCTION_CFL_EDIT, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
+		AddPopupListElement("[   ", "  ]", TAG_ITEM_FUNCTION_CFL_EDIT, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
 		AddPopupListElement("ILS", "", TAG_ITEM_FUNCTION_CFL_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
 		AddPopupListElement("VA", "", TAG_ITEM_FUNCTION_CFL_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
 		AddPopupListElement("NONE", "", TAG_ITEM_FUNCTION_CFL_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
@@ -387,32 +386,37 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_SET: {
+		CFlightPlanData fplData = FlightPlan.GetFlightPlanData();
 		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
 		if (strlen(sItemString)) {
 			int alt;
 			if (sscanf_s(sItemString, "F%3d", &alt) || sscanf_s(sItemString, "f%3d", &alt)) { // FL in feet
-				// set CFL if CFL is previous RFL
-				if (m_cflRecorder[FlightPlan.GetCallsign()] == GetFlightPlanFinalAltitude(FlightPlan))
-					OnFunctionCall(TAG_ITEM_FUNCTION_CFL_SET, sItemString, Pt, Area);
-				ctrData.SetFinalAltitude(alt * 100);
+				alt = alt * 100;
+				if (m_cflRecorder[FlightPlan.GetCallsign()] == FlightPlan.GetFinalAltitude())
+					// set CFL if CFL is previous RFL
+					SetClearedAltitude(FlightPlan, alt);
+				fplData.SetFinalAltitude(alt);
+				ctrData.SetFinalAltitude(alt);
 			}
 			else if (sscanf_s(sItemString, "%3d", &alt)) { // otherwise Metric
-				// set CFL if CFL is previous RFL
-				if (m_cflRecorder[FlightPlan.GetCallsign()] == GetFlightPlanFinalAltitude(FlightPlan))
-					OnFunctionCall(TAG_ITEM_FUNCTION_CFL_SET, sItemString, Pt, Area);
-				ctrData.SetFinalAltitude(MetricAlt::LvlMtoFeet(alt * 100));
+				alt = MetricAlt::LvlMtoFeet(alt * 100);
+				if (m_cflRecorder[FlightPlan.GetCallsign()] == FlightPlan.GetFinalAltitude())
+					// set CFL if CFL is previous RFL
+					SetClearedAltitude(FlightPlan, alt);
+				fplData.SetFinalAltitude(alt);
+				ctrData.SetFinalAltitude(alt);
 			}
 		}
 		break; }
-	case TAG_ITEM_FUNCTION_RFL_LIST: {
-		// will do nothing if other controller is tracking
+	case TAG_ITEM_FUNCTION_RFL_MENU: {
+		// don't show list if other controller is tracking
 		if (strlen(FlightPlan.GetTrackingControllerId()) && !FlightPlan.GetTrackingControllerIsMe()) {
 			break;
 		}
-		OpenPopupList(Area, "FinalAlt", 2);
+		OpenPopupList(Area, "RFL Menu", 2);
 		// pre-select altitude
 		int minDif(1e6), minAlt(0); // a big enough number
-		int rflAlt = GetFlightPlanFinalAltitude(FlightPlan);
+		int rflAlt = FlightPlan.GetFinalAltitude();
 		for (auto it = MetricAlt::m_fm.begin(); it != MetricAlt::m_fm.end(); it++) {
 			int dif = abs(it->first - rflAlt);
 			if (dif < minDif) {
@@ -428,12 +432,39 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			sprintf_s(fs, 4, "%d", f);
 			AddPopupListElement(ms, fs, TAG_ITEM_FUNCTION_RFL_SET, it->second == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
 		}
-		AddPopupListElement("[   ", "   ]", TAG_ITEM_FUNCTION_RFL_EDIT, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
+		AddPopupListElement("[   ", "  ]", TAG_ITEM_FUNCTION_RFL_EDIT, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
 
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_EDIT: {
 		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_RFL_SET, "");
 
+		break; }
+	case TAG_ITEM_FUNCTION_SC_LIST: {
+		CString cs0 = RadarTarget.GetCallsign();
+		if (!m_similarMarker[cs0]) // not a SC
+			break;
+		OpenPopupList(Area, "SC List", 1);
+		AddPopupListElement(cs0, nullptr, TAG_ITEM_FUNCTION_SC_SELECT, true);
+		bool cs0isCHN = IsCallsignChinese(FlightPlan);
+		for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
+			CString cs1 = rt.GetCallsign();
+			if (cs0 != cs1 &&
+				m_similarMarker[cs1] &&
+				cs0isCHN == IsCallsignChinese(rt.GetCorrelatedFlightPlan()) &&
+				IsCallsignSimilar(cs0, cs1))
+				// also a SC
+				AddPopupListElement(cs1, nullptr, TAG_ITEM_FUNCTION_SC_SELECT);
+		}
+		break; }
+	case TAG_ITEM_FUNCTION_SC_SELECT: {
+		SetASELAircraft(FlightPlanSelect(sItemString));
+		/*
+		for (CFlightPlan fp = FlightPlanSelectFirst(); fp.IsValid(); fp = FlightPlanSelectNext(fp)) {
+			if (!strcmp(fp.GetCallsign(), sItemString)) {
+				SetASELAircraft(fp);
+				break;
+			}
+		}*/
 		break; }
 	default:
 		break;
@@ -448,13 +479,7 @@ void CMTEPlugIn::OnTimer(int Counter)
 	CSMark mkrCN, mkrEN;
 	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
 		CFlightPlan fp = rt.GetCorrelatedFlightPlan();
-		int state = fp.GetState();
-		if (rt.GetPosition().GetTransponderC() && // in-flight, ignores on ground
-			( // consider assumed aircraft
-				state == FLIGHT_PLAN_STATE_TRANSFER_FROM_ME_INITIATED ||
-				state == FLIGHT_PLAN_STATE_ASSUMED
-				)
-			)
+		if (rt.GetPosition().GetTransponderC() && fp.GetTrackingControllerIsMe())
 		{ // used for similar callsign
 			if (!fp.IsTextCommunication()) {
 				if (IsCallsignChinese(fp))
@@ -462,8 +487,6 @@ void CMTEPlugIn::OnTimer(int Counter)
 				else
 					mkrEN[rt.GetCallsign()] = false;
 			}
-			else
-				OutputDebugString("Text aircraft!");
 		}
 		else { // used for communication marker
 			m_communMarker[rt.GetCallsign()] = false;
@@ -509,6 +532,11 @@ int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
 	return stdAlt >= trsAlt ? stdAlt : qnhAlt;
 }
 
+void CMTEPlugIn::SetClearedAltitude(CFlightPlan FlightPlan, int Altitude) {
+	FlightPlan.GetControllerAssignedData().SetClearedAltitude(Altitude);
+	m_cflRecorder[FlightPlan.GetCallsign()] = Altitude;
+}
+
 void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
@@ -539,12 +567,6 @@ int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 	int deltaT = preT - curT;
 	deltaT = deltaT ? deltaT : INFINITE;
 	return round((curAlt - preAlt) / deltaT * 60);
-}
-
-int GetFlightPlanFinalAltitude(CFlightPlan FlightPlan) {
-	int rflCtr = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
-	int rflFpl = FlightPlan.GetFinalAltitude();
-	return rflCtr ? rflCtr : rflFpl;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

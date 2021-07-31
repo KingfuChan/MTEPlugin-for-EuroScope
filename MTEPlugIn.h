@@ -31,6 +31,7 @@ private:
 	CSMark m_communMarker; // true means communication established
 	AltRec m_cflRecorder; // should be the same as GetClearedAltitude except RFL
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
+	void SetClearedAltitude(CFlightPlan FlightPlan, int Altitude);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 };

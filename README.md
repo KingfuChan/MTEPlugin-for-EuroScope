@@ -11,7 +11,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
 6. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, or FLxxx, otherwise calculated meters.
 7. **Final flight level (m/FL)** - shows Chinese metric RVSM levels if matches, otherwise Flight Level in feet.
-8. **Similar callsign indicator** - shows **SC** if similar callsigns are detected. Note that /t and CN/EN are considered.
+8. **Similar callsign indicator** - shows **SC** if similar callsigns are detected. Flight plan status, /t and CN/EN are considered.
 9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
 11. **COMM ESTB indicator** - shows a white **C** when assuming. Use **Set COMM ESTB** function to cancel this **C**.
@@ -21,8 +21,9 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 ## Tag Functions
 
 1. **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
-2. **Open CFL popup list** - Chinese metric RVSM altitudes along with ILS/VA/NONE options. Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx.
-3. **Open RFL popup list** - Chinese metric RVSM altitudes. Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx.
+2. **Open CFL popup menu** - Chinese metric RVSM altitudes, along with ILS/VA/NONE options. Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx.
+3. **Open RFL popup menu** - Chinese metric RVSM altitudes. Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx.
+4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
 
 
 ## Custom Cursor Settings
