@@ -42,9 +42,6 @@
       <Filter>资源文件</Filter>
     </None>
     <None Include="README.md" />
-    <None Include="EuroScopePlugIn.h">
-      <Filter>头文件</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">

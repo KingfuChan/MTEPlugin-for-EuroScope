@@ -8,8 +8,6 @@
 #include <string>
 #include <map>
 
-typedef std::map<CString, int> AltRec; // Altitude Recorder
-
 namespace MetricAlt {
 	const std::map<int, int> m_mf = { // meter to feet map
 	{  300, 1000},

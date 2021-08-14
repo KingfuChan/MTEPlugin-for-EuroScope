@@ -222,7 +222,6 @@
     <None Include="res\MTEPforES.rc2" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="EuroScopePlugIn.h" />
     <ClInclude Include="SimilarCallsign.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="MetricAlt.h" />

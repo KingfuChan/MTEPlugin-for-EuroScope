@@ -9,7 +9,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.2.0"
+#define PLUGIN_VERSION "2.2.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -51,7 +51,10 @@ const char CHR_GS_DEC = 'L';
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
 #define KN2KPH(int) 1.85184*(int) // 1 knot = 1.85184 kph
 #define KPH2KN(int) (int)/1.85184
+#define OVRFLW3(int) abs((int))>999?999:abs((int)) // overflow pre-process 3 digits
+#define OVRFLW4(int) abs((int))>9999?9999:abs((int))  // overflow pre-process 4 digits
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
+bool IsCFLAssigned(CFlightPlan FlightPlan);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -126,9 +129,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int curgs = curpos.GetReportedGS(); // current GS
 		int dspgs = round(KN2KPH(curgs) / 10.0); // display GS
 		dspgs = dspgs ? dspgs : RadarTarget.GetGS(); // If reported GS is 0 then uses the calculated one.
-		dspgs = dspgs > 999 ? 999 : dspgs; // in case of overflow
 		int pregs = prepos.GetReportedGS(); // previous GS
-		double diff = KN2KPH(curgs - pregs);
+		double diff = KN2KPH((double)curgs - (double)pregs);
 		char gsTrend;
 		if (diff >= THRESHOLD_ACC_DEC)
 			gsTrend = CHR_GS_ACC;
@@ -137,7 +139,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else
 			gsTrend = CHR_GS_NON;
 
-		sprintf_s(sItemString, 5, "%03d%c", dspgs, gsTrend);
+		sprintf_s(sItemString, 5, "%03d%c", OVRFLW3(dspgs), gsTrend);
 
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
@@ -152,10 +154,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_VS_FPM: {
 		int vs = abs(CalculateVerticalSpeed(RadarTarget));
-		if (vs > 100) {
-			vs = vs > 9999 ? 9999 : vs; // in case of overflow
-			sprintf_s(sItemString, 5, "%04d", vs);
-		}
+		if (vs > 100)
+			sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 
 		break; }
 	case TAG_ITEM_TYPE_LVL_IND: {
@@ -170,8 +170,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_AFL_MTR: {
 		int dspAlt = round(MetricAlt::FeettoM(GetRadarDisplayAltitude(RadarTarget)) / 10.0);
-		dspAlt = dspAlt > 9999 ? 9999 : dspAlt; // in case of overflow
-		sprintf_s(sItemString, 5, "%04d", dspAlt);
+		sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
 
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {
@@ -184,52 +183,45 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case 1: // cleared for ILS approach
 			sprintf_s(sItemString, 5, " ILS");
 			break;
-		case 0: // no cleared level (can be used to assign RFL as CFL)
-		{
-			int lastAlt = m_cflRecorder[FlightPlan.GetCallsign()];
-			int rflAlt = FlightPlan.GetFinalAltitude();
-			if (lastAlt != rflAlt) {
+		case 0: { // no cleared level or CFL==RFL
+			if (!IsCFLAssigned(FlightPlan)) {
 				sprintf_s(sItemString, 5, "    ");
 				break;
 			}
 			else {
-				cflAlt = lastAlt;
+				cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
 			}
 		}
-		default: // have a cleared level
-		{
+		default: {// have a cleared level
 			int dspAlt;
 			if (MetricAlt::RflFeettoM(cflAlt, dspAlt)) { // is metric RVSM
-				dspAlt = dspAlt / 10 > 9999 ? 9999 : dspAlt / 10; // in case of overflow
-				sprintf_s(sItemString, 5, "%04d", dspAlt);
+				sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt / 10));
 			}
 			else if (cflAlt % 1000) { // not metric RVSM nor FL xx0, convert to metric
 				dspAlt = MetricAlt::FeettoM(cflAlt) / 10;
-				dspAlt = dspAlt > 9999 ? 9999 : dspAlt; // in case of overflow
-				sprintf_s(sItemString, 5, "%04d", dspAlt);
+				sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
 			}
 			else { // FL xx0, show FL in feet
 				dspAlt = cflAlt / 100;
-				dspAlt = dspAlt > 999 ? 999 : dspAlt; // in case of overflow
-				sprintf_s(sItemString, 5, "F%03d", dspAlt);
+				sprintf_s(sItemString, 5, "F%03d", OVRFLW3(dspAlt));
 			}
 			break; }
 		}
-
-		break;
-	}
+		if (FlightPlan.GetTrackingControllerIsMe() && m_cflcfmMarker[FlightPlan.GetCallsign()]) {
+			*pColorCode = TAG_COLOR_RGB_DEFINED;
+			*pRGB = RGB(255, 255, 255); // white
+		}
+		break; }
 	case TAG_ITEM_TYPE_RFL_ICAO: {
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int dspMtr;
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr)) { // is metric RVSM
 			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
-			dspMtr = dspMtr / 10 > 9999 ? 9999 : dspMtr / 10; // in case of overflow
-			sprintf_s(sItemString, 6, "%c%04d", trsMrk, dspMtr);
+			sprintf_s(sItemString, 6, "%c%04d", trsMrk, OVRFLW4(dspMtr / 10));
 		}
 		else {
 			rflAlt = round(rflAlt / 100.0);
-			rflAlt = rflAlt > 999 ? 999 : rflAlt; // in case of overflow
-			sprintf_s(sItemString, 5, "F%03d", rflAlt);
+			sprintf_s(sItemString, 5, "F%03d", OVRFLW3(rflAlt));
 		}
 
 		break; }
@@ -315,12 +307,13 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		CString input = sItemString;
 		input.Trim();
 		input.MakeUpper();
+		int tgtAlt = -1;
 		if (input == "NONE")
-			SetClearedAltitude(FlightPlan, 0);
+			tgtAlt = 0;
 		else if (input == "ILS")
-			SetClearedAltitude(FlightPlan, 1);
+			tgtAlt = 1;
 		else if (input == "VA")
-			SetClearedAltitude(FlightPlan, 2);
+			tgtAlt = 2;
 		else {
 			bool f = input[0] == 'F'; // whether 'F' is present and at first place
 			bool d = false; // whether '.'(dot) is present
@@ -336,27 +329,32 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 				else
 					break;
 			}
-			if (!alt) break; // invalid entry
-			if (f && d) // FL in feet, precise
-				SetClearedAltitude(FlightPlan, alt);
+			if (alt <= 0); // invalid entry, only NONE from menu will clear CFL
+			else if (f && d) // FL in feet, precise
+				tgtAlt = alt;
 			else if (f && !d) // FL in feet
-				SetClearedAltitude(FlightPlan, alt * 100);
+				tgtAlt = alt * 100;
 			else if (!f && d) // metric, precise
-				SetClearedAltitude(FlightPlan, MetricAlt::LvlMtoFeet(alt));
+				tgtAlt = MetricAlt::LvlMtoFeet(alt);
 			else if (!f && !d)  // otherwise metric
-				SetClearedAltitude(FlightPlan, MetricAlt::LvlMtoFeet(alt * 100));
+				tgtAlt = MetricAlt::LvlMtoFeet(alt * 100);
 		}
+		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
-		// don't show list if other controller is tracking
 		if (strlen(FlightPlan.GetTrackingControllerId()) && !FlightPlan.GetTrackingControllerIsMe()) {
+			// don't show list if other controller is tracking
+			break;
+		}
+		else if (FlightPlan.GetTrackingControllerIsMe() && m_cflcfmMarker[FlightPlan.GetCallsign()]) {
+			// confirm previous CFL first
+			m_cflcfmMarker[FlightPlan.GetCallsign()] = false;
 			break;
 		}
 		OpenPopupList(Area, "CFL Menu", 2);
 		// pre-select altitude
 		int minDif(1e6), minAlt(0); // a big enough number
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-		cflAlt = cflAlt ? cflAlt : m_cflRecorder[FlightPlan.GetCallsign()]; // adapt received hand-off
 		int rdrAlt = GetRadarDisplayAltitude(RadarTarget);
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		for (auto it = MetricAlt::m_fm.begin(); it != MetricAlt::m_fm.end(); it++) {
@@ -392,17 +390,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			int alt;
 			if (sscanf_s(sItemString, "F%3d", &alt) || sscanf_s(sItemString, "f%3d", &alt)) { // FL in feet
 				alt = alt * 100;
-				if (m_cflRecorder[FlightPlan.GetCallsign()] == FlightPlan.GetFinalAltitude())
-					// set CFL if CFL is previous RFL
-					SetClearedAltitude(FlightPlan, alt);
 				fplData.SetFinalAltitude(alt);
 				ctrData.SetFinalAltitude(alt);
 			}
 			else if (sscanf_s(sItemString, "%3d", &alt)) { // otherwise Metric
 				alt = MetricAlt::LvlMtoFeet(alt * 100);
-				if (m_cflRecorder[FlightPlan.GetCallsign()] == FlightPlan.GetFinalAltitude())
-					// set CFL if CFL is previous RFL
-					SetClearedAltitude(FlightPlan, alt);
 				fplData.SetFinalAltitude(alt);
 				ctrData.SetFinalAltitude(alt);
 			}
@@ -458,16 +450,23 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_SC_SELECT: {
 		SetASELAircraft(FlightPlanSelect(sItemString));
-		/*
-		for (CFlightPlan fp = FlightPlanSelectFirst(); fp.IsValid(); fp = FlightPlanSelectNext(fp)) {
-			if (!strcmp(fp.GetCallsign(), sItemString)) {
-				SetASELAircraft(fp);
-				break;
-			}
-		}*/
 		break; }
 	default:
 		break;
+	}
+}
+
+void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan, int DataType)
+{
+	if (!FlightPlan.IsValid())
+		return;
+	if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE &&
+		FlightPlan.GetTrackingControllerIsMe() &&
+		FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
+		(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())
+		) {
+		// initiate CFL to be confirmed
+		m_cflcfmMarker[FlightPlan.GetCallsign()] = true;
 	}
 }
 
@@ -488,8 +487,9 @@ void CMTEPlugIn::OnTimer(int Counter)
 					mkrEN[rt.GetCallsign()] = false;
 			}
 		}
-		else { // used for communication marker
+		else { // used for communication marker and CFL confirm marker
 			m_communMarker[rt.GetCallsign()] = false;
+			m_cflcfmMarker[rt.GetCallsign()] = false;
 		}
 	}
 	m_similarMarker.clear();
@@ -532,11 +532,6 @@ int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
 	return stdAlt >= trsAlt ? stdAlt : qnhAlt;
 }
 
-void CMTEPlugIn::SetClearedAltitude(CFlightPlan FlightPlan, int Altitude) {
-	FlightPlan.GetControllerAssignedData().SetClearedAltitude(Altitude);
-	m_cflRecorder[FlightPlan.GetCallsign()] = Altitude;
-}
-
 void CMTEPlugIn::SetCustomCursor(void)
 {
 	// correlate cursor
@@ -560,13 +555,33 @@ int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 {
 	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-	int curAlt = curpos.GetPressureAltitude();
-	int preAlt = prepos.GetPressureAltitude();
-	int preT = prepos.GetReceivedTime();
-	int curT = curpos.GetReceivedTime();
-	int deltaT = preT - curT;
+	double curAlt = curpos.GetPressureAltitude();
+	double preAlt = prepos.GetPressureAltitude();
+	double preT = prepos.GetReceivedTime();
+	double curT = curpos.GetReceivedTime();
+	double deltaT = preT - curT;
 	deltaT = deltaT ? deltaT : INFINITE;
-	return round((curAlt - preAlt) / deltaT * 60);
+	return round((curAlt - preAlt) / deltaT * 60.0);
+}
+
+bool IsCFLAssigned(CFlightPlan FlightPlan)
+{
+	// tell when cleared altitude is 0, is CFL not assigned or assigned to RFL
+	// true means CFL is assigned to RFL, false means no CFL
+	bool noCfl;
+	if (strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
+		CRadarTargetPositionData rdpos = FlightPlan.GetCorrelatedRadarTarget().GetPosition();
+		CString squawk = rdpos.GetSquawk();
+		if (squawk == "7700" || squawk == "7600" || squawk == "7500" || !rdpos.GetTransponderC())
+			// emergency or on the ground
+			noCfl = false;
+		else // in air no emergency
+			noCfl = true;
+	}
+	else { // not tracked
+		noCfl = false;
+	}
+	return noCfl;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
