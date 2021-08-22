@@ -1,13 +1,13 @@
 // SimilarCallsign.cpp
 
-
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
 #include "SimilarCallsign.h"
 
+using namespace std;
 
-const std::set<CString> m_CHNCallsign = {
+const unordered_set<string> m_CHNCallsign = {
 	"ALP","AYE","BDJ","BFM","BGC","BJN","BNH","BSH","CAF","CAO",
 	"CBG","CBJ","CCA","CCD","CCO","CDC","CDG","CES","CFA","CFB",
 	"CFI","CFZ","CGH","CGN","CGZ","CHB","CHC","CHF","CHH","CJX",
@@ -23,63 +23,66 @@ const std::set<CString> m_CHNCallsign = {
 	"UTP","VGA","WFH","WLF","WUA","XAI","XTH","YZR"
 };
 
-
-bool IsCallsignChinese(EuroScopePlugIn::CFlightPlan FlightPlan) {
-	CString scrpd = FlightPlan.GetControllerAssignedData().GetScratchPadString();
-	CString csicao = CString(FlightPlan.GetCallsign()).Left(3);
-	return m_CHNCallsign.count(csicao) && scrpd.Find("*EN") == -1;
+bool IsChineseCallsign(EuroScopePlugIn::CFlightPlan FlightPlan) {
+	string scrpd = FlightPlan.GetControllerAssignedData().GetScratchPadString();
+	string csicao = string(FlightPlan.GetCallsign()).substr(0, 3);
+	return m_CHNCallsign.count(csicao) && scrpd.find("*EN") == -1;
 }
 
-bool IsCallsignSimilar(CString callsign1, CString callsign2)
+bool CompareCallsign(string callsign1, string callsign2)
 {
 	// compares tow complete callsigns
 	bool isSimilar = false;
-	CharList cs1 = ExtractNumfromCallsign(callsign1);
-	CharList cs2 = ExtractNumfromCallsign(callsign2);
+	char_list cs1 = ExtractNumfromCallsign(callsign1);
+	char_list cs2 = ExtractNumfromCallsign(callsign2);
 	if (!cs1.size() || !cs2.size()) // one of it doesn't have a number
 		isSimilar = false;
 	else if (cs1.size() <= 1 && cs2.size() <= 1) { // prevents (1,1) bug in CompareCallsignNum()
 		isSimilar = cs1 == cs2;
 	}
 	else if (cs1.size() == cs2.size()) {
-		isSimilar = CompareCallsignNum(cs1, cs2);
+		isSimilar = CompareFlightNum(cs1, cs2);
 	}
 	else {
-		// make cs1 the longer callsign for justification
-		CharList cst = cs1.size() < cs2.size() ? cs1 : cs2;
+		// exchange, make cs1 the longer callsign for justification
+		char_list cst = cs1.size() < cs2.size() ? cs1 : cs2;
 		cs1 = cs1.size() > cs2.size() ? cs1 : cs2;
 		cs2 = cst;
-		CharList csl, csr;
+		char_list csl, csr;
 		int i = 0;
 		for (csl = cs2, csr = cs2; i < cs1.size() - cs2.size(); i++) {
+			// use space to fill digits
 			csl.push_back(' ');
 			csr.push_front(' ');
 		}
-		isSimilar = CompareCallsignNum(cs1, csl) || CompareCallsignNum(cs1, csr);
+		isSimilar = CompareFlightNum(cs1, csl) || CompareFlightNum(cs1, csr);
 	}
 	return isSimilar;
 }
 
-CSMark ParseSimilarCallsign(CSMark MarkerMap)
+unordered_set<string> ParseSimilarCallsignSet(unordered_set<string> callsigns)
 {
-	// parse m_similarMarker and set if a callsign is similar to others
-	for (CSMark::iterator it1 = MarkerMap.begin(); it1 != MarkerMap.end(); it1++) {
-		for (CSMark::iterator it2 = it1; it2 != MarkerMap.end(); it2++) {
-			if (it1 == it2) continue;
-			if (IsCallsignSimilar(it1->first, it2->first))
-				it1->second = it2->second = true;
+	// input: callsigns, output: callsigns that are similar
+	unordered_set<string> res, tmp;
+	for (auto itn : callsigns) {
+		for (auto itt : tmp) {
+			if (CompareCallsign(itn, itt)) {
+				res.insert(itt);
+				res.insert(itn);
+				break;
+			}
 		}
+		tmp.insert(itn);
 	}
-	return MarkerMap;
+	return res;
 }
 
-CharList ExtractNumfromCallsign(const CString callsign)
+char_list ExtractNumfromCallsign(const string callsign)
 {
 	// extract num from callsign
-	// no less than given digits, positive for right justify, negative for left
-	CharList csnum;
+	char_list csnum;
 	bool numbegin = false;
-	for (int i = 0; i < callsign.GetLength(); i++) {
+	for (size_t i = 0; i < callsign.size(); i++) {
 		numbegin = numbegin || (callsign[i] >= '1' && callsign[i] <= '9');
 		if (numbegin)
 			csnum.push_back(callsign[i]);
@@ -87,14 +90,14 @@ CharList ExtractNumfromCallsign(const CString callsign)
 	return csnum;
 }
 
-bool CompareCallsignNum(CharList cs1, CharList cs2)
+bool CompareFlightNum(char_list cs1, char_list cs2)
 {
 	// compares tow callsign, CharList in same size
 	int size;
 	if ((size = cs1.size()) != cs2.size()) return false;
-	CharList::iterator p1, p2;
+	char_list::iterator p1, p2;
 	int same = 0; // same number on same position count
-	CharList dn1, dn2; // different number on same position list
+	char_list dn1, dn2; // different number on same position list
 	for (p1 = cs1.begin(), p2 = cs2.begin(); p1 != cs1.end() && p2 != cs2.end(); p1++, p2++) {
 		if (*p1 == *p2)
 			same++;

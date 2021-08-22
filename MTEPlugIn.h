@@ -7,9 +7,11 @@
 #include "resource.h"
 #include <EuroScopePlugIn.h>
 #include <string>
-#include <list>
+#include <unordered_set>
+#include <unordered_map>
+#include <regex>
 #include "MetricAlt.h"
-#include "ReCat.hpp"
+#include "ReCat.h"
 #include "SimilarCallsign.h"
 
 using namespace EuroScopePlugIn;
@@ -28,9 +30,9 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
-	CSMark m_similarMarker; // true means is similar
-	CSMark m_communMarker; // true means communication established
-	CSMark m_cflcfmMarker; // true means CFL needs confirm
+	unordered_set<string> m_SimilarCallsignSet; // similar callsign set
+	unordered_map<string, bool> m_ComEstbMap; // true means communication established
+	unordered_map<string, bool> m_CFLConfirmMap; // true means CFL needs confirm
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);

@@ -23,7 +23,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 1. **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
 2. **Open CFL popup menu** - Chinese metric RVSM altitudes, along with ILS/VA/NONE options. Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx.
 3. **Open RFL popup menu** - Chinese metric RVSM altitudes. Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx.
-4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
+4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one. Selecting one will set the ASEL aircraft, which works the same as a mouse click so it can be used along with command lines and function keys (open list first, then enter commands or keys, finally select in the list).
 
 
 ## Custom Cursor Settings
@@ -32,6 +32,11 @@ You may turn the default mouse arrow into a cross to simulate real-world radar s
 
 Enter **.MTEP CURSOR ON** (case-insensitive) in your command line at the bottom of the screen to activate the cursor feature.
 
-Enter **".MTEP CURSOR OFF** to de-activate.
+Enter **.MTEP CURSOR OFF** to de-activate.
 
 This setting will be saved in your EuroScope plugin settings.
+
+
+## Other Command Line Features
+
+1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens ***www.flightradar24.com / flightadsb.variflight.com*** in web browser and centers the map on the given ICAO airport. Only works with airports within sector file.

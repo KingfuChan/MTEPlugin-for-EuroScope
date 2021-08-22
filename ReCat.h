@@ -1,16 +1,15 @@
-// ReCat.hpp
+// ReCat.h
 
 #pragma once
 
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
-#include <map>
 #include <string>
-
+#include <unordered_map>
 
 // typical RECAT-CN rules
-const std::map<CString, char> m_ReCatMap = {
+const std::unordered_map<std::string, char> m_ReCatMap = {
 	//{"A388",	'J'},
 	//{"A225",	'J'},
 	//{"SLCN",	'J'},

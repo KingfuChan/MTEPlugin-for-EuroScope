@@ -27,9 +27,6 @@
     <ClCompile Include="MetricAlt.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="ReCat.hpp">
-      <Filter>头文件</Filter>
-    </ClCompile>
     <ClCompile Include="SimilarCallsign.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -63,6 +60,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="SimilarCallsign.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ReCat.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

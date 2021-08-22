@@ -7,18 +7,18 @@
 #include "resource.h"
 #include <EuroScopePlugIn.h>
 #include <string>
-#include <set>
-#include <map>
+#include <unordered_set>
 #include <list>
 
-typedef std::map<CString, bool> CSMark; // Callsign Marker
-typedef std::list<char> CharList;
+using namespace std;
+
+typedef list<char> char_list;
 
 // public functions
-bool IsCallsignChinese(EuroScopePlugIn::CFlightPlan FlightPlan);
-bool IsCallsignSimilar(CString callsign1, CString callsign2);
-CSMark ParseSimilarCallsign(CSMark MarkerMap);
+bool IsChineseCallsign(EuroScopePlugIn::CFlightPlan FlightPlan);
+bool CompareCallsign(string callsign1, string callsign2);
+unordered_set<string> ParseSimilarCallsignSet(unordered_set<string> callsigns);
 
 // private functions
-CharList ExtractNumfromCallsign(const CString callsign);
-bool CompareCallsignNum(CharList cs1, CharList cs2);
+char_list ExtractNumfromCallsign(const string callsign);
+bool CompareFlightNum(char_list cs1, char_list cs2);

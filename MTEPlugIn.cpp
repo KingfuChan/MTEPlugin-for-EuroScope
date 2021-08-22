@@ -1,20 +1,19 @@
 ﻿// MTEPlugIn.cpp
 
-
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
 #include "MTEPlugIn.h"
 
-
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.2.1"
+#define PLUGIN_VERSION "2.2.2"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
 #endif // !COPYRIGHTS
 
+using namespace std;
 using namespace EuroScopePlugIn;
 
 // TAG ITEM TYPE
@@ -49,10 +48,10 @@ const char CHR_GS_DEC = 'L';
 
 // COMPUTERISING RELATED
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
-#define KN2KPH(int) 1.85184*(int) // 1 knot = 1.85184 kph
-#define KPH2KN(int) (int)/1.85184
-#define OVRFLW3(int) abs((int))>999?999:abs((int)) // overflow pre-process 3 digits
-#define OVRFLW4(int) abs((int))>9999?9999:abs((int))  // overflow pre-process 4 digits
+constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
+constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
+constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
+constexpr int OVRFLW4(int t) { return abs(t) > 9999 ? 9999 : abs(t); }  // overflow pre-process 4 digits
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 bool IsCFLAssigned(CFlightPlan FlightPlan);
 
@@ -68,7 +67,6 @@ HCURSOR myCursor = nullptr;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 #define CPCUR CopyCursor((HCURSOR)::LoadImage(GetModuleHandle("MTEPlugIn.dll"), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED))
 // Note that cursor setting will only be effective with it's original file name (MTEPlugIn.dll)
-
 
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
@@ -127,10 +125,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 		int curgs = curpos.GetReportedGS(); // current GS
-		int dspgs = round(KN2KPH(curgs) / 10.0); // display GS
+		int dspgs = round(KN_KPH(curgs) / 10.0); // display GS
 		dspgs = dspgs ? dspgs : RadarTarget.GetGS(); // If reported GS is 0 then uses the calculated one.
 		int pregs = prepos.GetReportedGS(); // previous GS
-		double diff = KN2KPH((double)curgs - (double)pregs);
+		double diff = KN_KPH(double(curgs) - double(pregs));
 		char gsTrend;
 		if (diff >= THRESHOLD_ACC_DEC)
 			gsTrend = CHR_GS_ACC;
@@ -143,10 +141,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
-		CString remarks;
+		string remarks;
 		remarks = FlightPlan.GetFlightPlanData().GetRemarks();
 		// remarks.MakeUpper(); // could crash by some special characters in certain system environment
-		if (remarks.Find("RMK/") != -1 || remarks.Find("STS/") != -1)
+		if (remarks.find("RMK/") != string::npos || remarks.find("STS/") != string::npos)
 			sprintf_s(sItemString, 2, "*");
 		else
 			sprintf_s(sItemString, 2, " ");
@@ -191,6 +189,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			else {
 				cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
 			}
+			[[fallthrough]];
 		}
 		default: {// have a cleared level
 			int dspAlt;
@@ -207,7 +206,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			}
 			break; }
 		}
-		if (FlightPlan.GetTrackingControllerIsMe() && m_cflcfmMarker[FlightPlan.GetCallsign()]) {
+		if (FlightPlan.GetTrackingControllerIsMe() && m_CFLConfirmMap[FlightPlan.GetCallsign()]) {
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
 			*pRGB = RGB(255, 255, 255); // white
 		}
@@ -226,7 +225,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_SC_IND: {
-		if (m_similarMarker[RadarTarget.GetCallsign()]) { // there is similar
+		if (m_SimilarCallsignSet.find(RadarTarget.GetCallsign()) != m_SimilarCallsignSet.end()) { // there is similar
 			sprintf_s(sItemString, 3, "SC");
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
 			*pRGB = RGB(255, 255, 0); // yellow
@@ -242,10 +241,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_RVSM_IND: {
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
-		CString acinf = fpdata.GetAircraftInfo();
+		string acinf = fpdata.GetAircraftInfo();
 		if (!strcmp(fpdata.GetPlanType(), "V"))
 			sprintf_s(sItemString, 2, "V");
-		else if (acinf.GetLength() <= 8) { // assume FAA format
+		else if (acinf.size() <= 8) { // assume FAA format
 			char capa = fpdata.GetCapibilities();
 			if (capa == 'H' || capa == 'W' || capa == 'J' || capa == 'K' || capa == 'L' || capa == 'Z' || capa == '?')
 				sprintf_s(sItemString, 2, " ");
@@ -254,25 +253,26 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			}
 		}
 		else { // assume ICAO format
-			CString acet;
-			if (acinf.Find('(') >= 0 && acinf.Find(')') >= 0) { // () in string, for TopSky. e.g. A321/L (SDE2E3FGIJ1RWY/H)
-				acet = acinf.Mid(acinf.Find('(') + 1);
-				acet = acet.Left(acet.Find(')'));
+			string acet;
+			if (acinf.find('(') != string::npos && acinf.find(')') != string::npos) { // () in string, for TopSky. e.g. A321/L (SDE2E3FGIJ1RWY/H)
+				int lc = acinf.find('(');
+				int rc = acinf.find(')');
+				acet = acinf.substr(lc + 1, rc - lc);
 			}
 			else { // no () in string, for erroneous simbrief prefile. e.g. A333/H-SDE3GHIJ2J3J5M1RVWXY/LB2D1
-				acet = acinf.Mid(acinf.Find('-') + 1);
+				acet = acinf.substr(acinf.find('-') + 1);
 			}
-			if (acet.Left(acet.Find('/')).Find('W') >= 0)
+			if (acet.substr(0, acet.find('/')).find('W') != string::npos)
 				sprintf_s(sItemString, 2, " ");
 			else
 				sprintf_s(sItemString, 2, "X");
 		}
 		break; }
 	case TAG_ITEM_TYPE_COMM_IND: {
-		// in marker, false means not established
+		// in map, false means not established
 		if (!(RadarTarget.GetPosition().GetTransponderC() && FlightPlan.GetTrackingControllerIsMe()))
 			break; // only valid for assumed flights
-		if (!m_communMarker[RadarTarget.GetCallsign()]) { // comm not established
+		if (!m_ComEstbMap[RadarTarget.GetCallsign()]) { // comm not established
 			sprintf_s(sItemString, 2, "C");
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
 			*pRGB = RGB(255, 255, 255); // white
@@ -281,7 +281,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_RECAT: {
 		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
-		CString acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
+		string acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
 		if (categ == 'H' && m_ReCatMap.count(acType))
 			sprintf_s(sItemString, 3, "-%c", m_ReCatMap.at(acType));
 
@@ -300,13 +300,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	{
 	case TAG_ITEM_FUNCTION_COMM_ESTAB: {
 		if (RadarTarget.GetPosition().GetTransponderC() && FlightPlan.GetTrackingControllerIsMe())
-			m_communMarker[RadarTarget.GetCallsign()] = true;
+			m_ComEstbMap[RadarTarget.GetCallsign()] = true;
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET: {
-		CString input = sItemString;
-		input.Trim();
-		input.MakeUpper();
+		string input = sItemString;
 		int tgtAlt = -1;
 		if (input == "NONE")
 			tgtAlt = 0;
@@ -315,19 +313,17 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		else if (input == "VA")
 			tgtAlt = 2;
 		else {
-			bool f = input[0] == 'F'; // whether 'F' is present and at first place
+			bool f = input[0] == 'F' || input[0] == 'f'; // whether 'F' is present and at first place
 			bool d = false; // whether '.'(dot) is present
 			int alt = 0;
-			for (int i = f; i < input.GetLength(); i++) { // parse input
+			for (size_t i = f; i < input.size(); i++) { // parse input
 				if (input[i] >= '0' && input[i] <= '9') {
 					alt = alt * 10 + input[i] - '0';
 				}
-				else if (input[i] == '.') {
-					d = true;
+				else {
+					d = input[i] == '.';
 					break;
 				}
-				else
-					break;
 			}
 			if (alt <= 0); // invalid entry, only NONE from menu will clear CFL
 			else if (f && d) // FL in feet, precise
@@ -340,15 +336,16 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 				tgtAlt = MetricAlt::LvlMtoFeet(alt * 100);
 		}
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
+
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
 		if (strlen(FlightPlan.GetTrackingControllerId()) && !FlightPlan.GetTrackingControllerIsMe()) {
 			// don't show list if other controller is tracking
 			break;
 		}
-		else if (FlightPlan.GetTrackingControllerIsMe() && m_cflcfmMarker[FlightPlan.GetCallsign()]) {
+		else if (FlightPlan.GetTrackingControllerIsMe() && m_CFLConfirmMap[FlightPlan.GetCallsign()]) {
 			// confirm previous CFL first
-			m_cflcfmMarker[FlightPlan.GetCallsign()] = false;
+			m_CFLConfirmMap[FlightPlan.GetCallsign()] = false;
 			break;
 		}
 		OpenPopupList(Area, "CFL Menu", 2);
@@ -357,7 +354,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		int rdrAlt = GetRadarDisplayAltitude(RadarTarget);
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
-		for (auto it = MetricAlt::m_fm.begin(); it != MetricAlt::m_fm.end(); it++) {
+		for (auto it = MetricAlt::m_ftom.begin(); it != MetricAlt::m_ftom.end(); it++) {
 			int dif = abs(it->first - cmpAlt);
 			if (dif < minDif) {
 				minDif = dif;
@@ -365,7 +362,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			}
 		}
 		printf_s("cfl:%d,rdr:%d,cmp:%d,min:%d", cflAlt, rdrAlt, cmpAlt, minAlt);
-		for (auto it = MetricAlt::m_mf.rbegin(); it != MetricAlt::m_mf.rend(); it++) {
+		for (auto it = MetricAlt::m_mtof.rbegin(); it != MetricAlt::m_mtof.rend(); it++) {
 			int m = it->first / 100;
 			int f = it->second / 100;
 			char ms[4], fs[4];
@@ -409,14 +406,14 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		// pre-select altitude
 		int minDif(1e6), minAlt(0); // a big enough number
 		int rflAlt = FlightPlan.GetFinalAltitude();
-		for (auto it = MetricAlt::m_fm.begin(); it != MetricAlt::m_fm.end(); it++) {
+		for (auto it = MetricAlt::m_ftom.begin(); it != MetricAlt::m_ftom.end(); it++) {
 			int dif = abs(it->first - rflAlt);
 			if (dif < minDif) {
 				minDif = dif;
 				minAlt = it->first;
 			}
 		}
-		for (auto it = MetricAlt::m_mf.rbegin(); it != MetricAlt::m_mf.rend(); it++) {
+		for (auto it = MetricAlt::m_mtof.rbegin(); it != MetricAlt::m_mtof.rend(); it++) {
 			int m = it->first / 100;
 			int f = it->second / 100;
 			char ms[4], fs[4];
@@ -432,24 +429,25 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_SC_LIST: {
-		CString cs0 = RadarTarget.GetCallsign();
-		if (!m_similarMarker[cs0]) // not a SC
+		string cs0 = RadarTarget.GetCallsign();
+		if (m_SimilarCallsignSet.find(cs0) == m_SimilarCallsignSet.end()) // not a SC
 			break;
 		OpenPopupList(Area, "SC List", 1);
-		AddPopupListElement(cs0, nullptr, TAG_ITEM_FUNCTION_SC_SELECT, true);
-		bool cs0isCHN = IsCallsignChinese(FlightPlan);
+		AddPopupListElement(cs0.c_str(), nullptr, TAG_ITEM_FUNCTION_SC_SELECT, true);
+		bool cs0isCHN = IsChineseCallsign(FlightPlan);
 		for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
-			CString cs1 = rt.GetCallsign();
+			string cs1 = rt.GetCallsign();
 			if (cs0 != cs1 &&
-				m_similarMarker[cs1] &&
-				cs0isCHN == IsCallsignChinese(rt.GetCorrelatedFlightPlan()) &&
-				IsCallsignSimilar(cs0, cs1))
+				m_SimilarCallsignSet.find(cs1) != m_SimilarCallsignSet.end() &&
+				cs0isCHN == IsChineseCallsign(rt.GetCorrelatedFlightPlan()) &&
+				CompareCallsign(cs0, cs1))
 				// also a SC
-				AddPopupListElement(cs1, nullptr, TAG_ITEM_FUNCTION_SC_SELECT);
+				AddPopupListElement(cs1.c_str(), nullptr, TAG_ITEM_FUNCTION_SC_SELECT);
 		}
 		break; }
 	case TAG_ITEM_FUNCTION_SC_SELECT: {
 		SetASELAircraft(FlightPlanSelect(sItemString));
+
 		break; }
 	default:
 		break;
@@ -466,7 +464,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())
 		) {
 		// initiate CFL to be confirmed
-		m_cflcfmMarker[FlightPlan.GetCallsign()] = true;
+		m_CFLConfirmMap[FlightPlan.GetCallsign()] = true;
 	}
 }
 
@@ -474,33 +472,33 @@ void CMTEPlugIn::OnTimer(int Counter)
 {
 	if (initCursor && customCursor) SetCustomCursor(); // cursor
 
-	// deals with similar callsign stuff, and communication establish stuff
-	CSMark mkrCN, mkrEN;
+	unordered_set<string> setCN, setEN;
 	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
 		CFlightPlan fp = rt.GetCorrelatedFlightPlan();
 		if (rt.GetPosition().GetTransponderC() && fp.GetTrackingControllerIsMe())
-		{ // used for similar callsign
+		{ // for similar callsign
 			if (!fp.IsTextCommunication()) {
-				if (IsCallsignChinese(fp))
-					mkrCN[rt.GetCallsign()] = false;
+				if (IsChineseCallsign(fp))
+					setCN.insert(rt.GetCallsign());
 				else
-					mkrEN[rt.GetCallsign()] = false;
+					setEN.insert(rt.GetCallsign());
 			}
 		}
-		else { // used for communication marker and CFL confirm marker
-			m_communMarker[rt.GetCallsign()] = false;
-			m_cflcfmMarker[rt.GetCallsign()] = false;
+		else { // for communication map and CFL confirm map
+			m_ComEstbMap[rt.GetCallsign()] = false;
+			m_CFLConfirmMap[fp.GetCallsign()] = false;
 		}
 	}
-	m_similarMarker.clear();
-	m_similarMarker.merge(ParseSimilarCallsign(mkrCN));
-	m_similarMarker.merge(ParseSimilarCallsign(mkrEN));
+	m_SimilarCallsignSet.clear();
+	m_SimilarCallsignSet.merge(ParseSimilarCallsignSet(setCN));
+	m_SimilarCallsignSet.merge(ParseSimilarCallsignSet(setEN));
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
-	CString cmd = sCommandLine;
-	cmd.Trim();
-	cmd.MakeUpper();
+	string cmd = sCommandLine;
+	for (size_t i = 0; i < cmd.size(); i++) { // make upper
+		cmd[i] = cmd[i] >= 'a' && cmd[i] <= 'z' ? cmd[i] + 'A' - 'a' : cmd[i];
+	}
 
 	if (cmd == ".MTEP CURSOR ON") {
 		if (customCursor) { // reset
@@ -514,12 +512,45 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		}
 		return true;
 	}
+
 	if (cmd == ".MTEP CURSOR OFF") {
 		if (!customCursor) return true;
 		customCursor = false;
 		CancelCustomCursor();
 		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "0");
 		return true;
+	}
+
+	if (cmd.find("FR24") != string::npos || cmd.find("VARI") != string::npos) {
+		regex rxf(".MTEP FR24 ([A-Z]{4})");
+		regex rxv(".MTEP VARI ([A-Z]{4})");
+		smatch match;
+		string airport, url_base, url_full;
+		bool mf, mv;
+		if (mf = regex_match(cmd, match, rxf)) {
+			url_base = "https://www.flightradar24.com/";
+			airport = match[1].str();
+		}
+		else if (mv = regex_match(cmd, match, rxv)) {
+			url_base = "https://flightadsb.variflight.com/tracker/";
+			airport = match[1].str();
+		}
+		else {
+			return false;
+		}
+		for (CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
+			se.IsValid(); se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT)) {
+			if (string(se.GetName()) == airport) {
+				CPosition pos;
+				se.GetPosition(&pos, 0);
+				if (mf)
+					url_full = url_base + to_string(pos.m_Latitude) + "," + to_string(pos.m_Longitude) + "/9";
+				else if (mv)
+					url_full = url_base + to_string(pos.m_Longitude) + "," + to_string(pos.m_Latitude) + "/9";
+				ShellExecute(NULL, "open", url_full.c_str(), NULL, NULL, SW_SHOW);
+				return true;
+			}
+		}
 	}
 	return false;
 }
@@ -571,7 +602,7 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 	bool noCfl;
 	if (strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
 		CRadarTargetPositionData rdpos = FlightPlan.GetCorrelatedRadarTarget().GetPosition();
-		CString squawk = rdpos.GetSquawk();
+		string squawk = rdpos.GetSquawk();
 		if (squawk == "7700" || squawk == "7600" || squawk == "7500" || !rdpos.GetTransponderC())
 			// emergency or on the ground
 			noCfl = false;

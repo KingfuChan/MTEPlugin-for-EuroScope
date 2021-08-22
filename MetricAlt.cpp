@@ -1,11 +1,9 @@
 // MetricAlt.cpp
 
-
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
 #include "MetricAlt.h"
-
 
 int MetricAlt::MtoFeet(const int meter)
 {
@@ -19,18 +17,18 @@ int MetricAlt::FeettoM(const int feet)
 
 int MetricAlt::LvlMtoFeet(const int meter)
 {
-	return m_mf.count(meter) ? m_mf.at(meter) : MtoFeet(meter);
+	return m_mtof.count(meter) ? m_mtof.at(meter) : MtoFeet(meter);
 }
 
 int MetricAlt::LvlFeettoM(const int feet)
 {
-	return m_fm.count(feet) ? m_fm.at(feet) : FeettoM(feet);
+	return m_ftom.count(feet) ? m_ftom.at(feet) : FeettoM(feet);
 }
 
 bool MetricAlt::RflFeettoM(const int feet, int& meter) {
 	// matches to int& meter
-	if (m_fm.count(feet)) {
-		meter = m_fm.at(feet);
+	if (m_ftom.count(feet)) {
+		meter = m_ftom.at(feet);
 		return true;
 	}
 	else {
