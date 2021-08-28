@@ -21,4 +21,4 @@ unordered_set<string> ParseSimilarCallsignSet(unordered_set<string> callsigns);
 
 // private functions
 char_list ExtractNumfromCallsign(const string callsign);
-bool CompareFlightNum(char_list cs1, char_list cs2);
+bool CompareFlightNum(char_list num1, char_list num2);

@@ -90,15 +90,15 @@ char_list ExtractNumfromCallsign(const string callsign)
 	return csnum;
 }
 
-bool CompareFlightNum(char_list cs1, char_list cs2)
+bool CompareFlightNum(char_list num1, char_list num2)
 {
 	// compares tow callsign, CharList in same size
 	int size;
-	if ((size = cs1.size()) != cs2.size()) return false;
+	if ((size = num1.size()) != num2.size()) return false;
 	char_list::iterator p1, p2;
 	int same = 0; // same number on same position count
 	char_list dn1, dn2; // different number on same position list
-	for (p1 = cs1.begin(), p2 = cs2.begin(); p1 != cs1.end() && p2 != cs2.end(); p1++, p2++) {
+	for (p1 = num1.begin(), p2 = num2.begin(); p1 != num1.end() && p2 != num2.end(); p1++, p2++) {
 		if (*p1 == *p2)
 			same++;
 		else {

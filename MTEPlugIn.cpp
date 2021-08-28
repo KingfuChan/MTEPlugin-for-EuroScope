@@ -7,7 +7,7 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.2.2"
+#define PLUGIN_VERSION "2.3.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
@@ -29,6 +29,8 @@ const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
 const int TAG_ITEM_TYPE_RECAT = 12; // RECAT-CN
+const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
+const int TAG_ITEM_TYPE_SQ_DUPE = 14; // TODO: Duplicated squawk warning
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -40,6 +42,7 @@ const int TAG_ITEM_FUNCTION_RFL_MENU = 21; // Open RFL popup menu
 const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit (not registered)
 const int TAG_ITEM_FUNCTION_SC_LIST = 30; // Open similar callsign list
 const int TAG_ITEM_FUNCTION_SC_SELECT = 31; // Select in similar callsign list (not registered)
+const int TAG_ITEM_FUNCTION_RTE_INFO = 40; // Show route checker info
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -57,6 +60,7 @@ bool IsCFLAssigned(CFlightPlan FlightPlan);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
+const char* SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
 
 // CURSOR RELATED
 bool initCursor = true; // if cursor has not been set to custom / if using default cursor
@@ -88,11 +92,18 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
 	RegisterTagItemType("RECAT-CN", TAG_ITEM_TYPE_RECAT);
+	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
+	//RegisterTagItemType("Duplicated squawk warning", TAG_ITEM_TYPE_SQ_DUPE);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
 	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
+	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
+
+	DisplayUserMessage("MESSAGE", "MTEPlugin",
+		(string("MTEPlugin is loaded! For help please refer to ") + GITHUB_LINK).c_str(),
+		1, 0, 0, 0, 0);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
@@ -105,10 +116,17 @@ CMTEPlugIn::CMTEPlugIn(void)
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			"If custom cursor does not show on radar screen, please use \".mtep cursor on\" command.",
 			1, 0, 0, 0, 0);
+
+	m_RouteChecker = nullptr;
+	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
+	if (setrc != nullptr) {
+		LoadRouteChecker(setrc);
+	}
 }
 
 CMTEPlugIn::~CMTEPlugIn(void)
 {
+	delete m_RouteChecker;
 	CancelCustomCursor();
 }
 
@@ -286,6 +304,20 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 3, "-%c", m_ReCatMap.at(acType));
 
 		break; }
+	case TAG_ITEM_TYPE_RTE_CHECK: {
+		if (m_RouteChecker == nullptr || !m_RouteChecker->m_IsValid) break;
+		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
+		sprintf_s(sItemString, 2, "%c", rc);
+		if (rc != 'Y' && rc != ' ') {
+			*pColorCode = TAG_COLOR_RGB_DEFINED;
+			*pRGB = RGB(255, 255, 0); // yellow
+		}
+
+		break; }
+	case TAG_ITEM_TYPE_SQ_DUPE: {
+		// TODO
+
+		break; }
 	default:
 		break;
 	}
@@ -449,6 +481,20 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		SetASELAircraft(FlightPlanSelect(sItemString));
 
 		break; }
+	case TAG_ITEM_FUNCTION_RTE_INFO: {
+		if (m_RouteChecker == nullptr || !m_RouteChecker->m_IsValid) break;
+		string dep = FlightPlan.GetFlightPlanData().GetOrigin();
+		string arr = FlightPlan.GetFlightPlanData().GetDestination();
+		if (m_RouteChecker->CheckFlightPlan(FlightPlan) == 'Y') break; // no need to show ok routes
+		auto rinfo = m_RouteChecker->GetRouteInfo(dep, arr);
+		if (!rinfo.size())
+			DisplayUserMessage("MTEP-Route", (dep + "-" + arr).c_str(), "No route!", 1, 1, 0, 0, 0);
+		else {
+			DisplayUserMessage("MTEP-Route", (dep + "-" + arr).c_str(), (to_string(rinfo.size()) + " route(s):").c_str(), 1, 1, 0, 0, 0);
+			for (auto ri : rinfo)
+				DisplayUserMessage("MTEP-Route", nullptr, ri.c_str(), 1, 0, 0, 0, 0);
+		}
+		break; }
 	default:
 		break;
 	}
@@ -496,11 +542,19 @@ void CMTEPlugIn::OnTimer(int Counter)
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 	string cmd = sCommandLine;
-	for (size_t i = 0; i < cmd.size(); i++) { // make upper
-		cmd[i] = cmd[i] >= 'a' && cmd[i] <= 'z' ? cmd[i] + 'A' - 'a' : cmd[i];
-	}
+	smatch match; // all regular expressions will ignore cases
 
-	if (cmd == ".MTEP CURSOR ON") {
+	// custom cursor
+	regex rxcc0("^.MTEP CURSOR OFF$", regex_constants::icase);
+	regex rxcc1("^.MTEP CURSOR ON$", regex_constants::icase);
+	if (regex_match(cmd, match, rxcc0)) {
+		if (!customCursor) return true;
+		customCursor = false;
+		CancelCustomCursor();
+		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "0");
+		return true;
+	}
+	else if (regex_match(cmd, match, rxcc1)) {
 		if (customCursor) { // reset
 			CancelCustomCursor();
 			SetCustomCursor();
@@ -513,34 +567,27 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		return true;
 	}
 
-	if (cmd == ".MTEP CURSOR OFF") {
-		if (!customCursor) return true;
-		customCursor = false;
-		CancelCustomCursor();
-		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "0");
-		return true;
-	}
-
-	if (cmd.find("FR24") != string::npos || cmd.find("VARI") != string::npos) {
-		regex rxf(".MTEP FR24 ([A-Z]{4})");
-		regex rxv(".MTEP VARI ([A-Z]{4})");
-		smatch match;
+	// flightradar24 and variflight
+	regex rxfr("^.MTEP FR24 ([A-Z]{4})$", regex_constants::icase);
+	regex rxvr("^.MTEP VARI ([A-Z]{4})$", regex_constants::icase);
+	bool mf, mv;
+	mf = regex_match(cmd, match, rxfr);
+	if (!mf)
+		mv = regex_match(cmd, match, rxvr);
+	if (mf || mv) {
 		string airport, url_base, url_full;
-		bool mf, mv;
-		if (mf = regex_match(cmd, match, rxf)) {
+		airport = match[1].str();
+		if (mf) {
 			url_base = "https://www.flightradar24.com/";
-			airport = match[1].str();
 		}
-		else if (mv = regex_match(cmd, match, rxv)) {
+		else if (mv) {
 			url_base = "https://flightadsb.variflight.com/tracker/";
-			airport = match[1].str();
 		}
-		else {
-			return false;
-		}
+		regex rxap("^" + airport + "$", regex_constants::icase);
 		for (CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
 			se.IsValid(); se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT)) {
-			if (string(se.GetName()) == airport) {
+			string sen = se.GetName();
+			if (regex_match(sen, match, rxap)) {
 				CPosition pos;
 				se.GetPosition(&pos, 0);
 				if (mf)
@@ -552,6 +599,16 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 			}
 		}
 	}
+
+	// route checker
+	regex rxrc("^.MTEP RC (.+\\.CSV)$", regex_constants::icase);
+	if (regex_match(cmd, match, rxrc)) {
+		LoadRouteChecker(match[1].str());
+		if (m_RouteChecker != nullptr && m_RouteChecker->m_IsValid)
+			SaveDataToSettings(SETTING_ROUTE_CHECKER_CSV, "route checker csv file", match[1].str().c_str());
+		return true;
+	}
+
 	return false;
 }
 
@@ -580,6 +637,23 @@ void CMTEPlugIn::CancelCustomCursor(void)
 	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)gSourceProc);
 	initCursor = true;
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
+}
+
+void CMTEPlugIn::LoadRouteChecker(string filename)
+{
+	if (m_RouteChecker != nullptr)
+		delete m_RouteChecker;
+	m_RouteChecker = new RouteChecker(filename);
+	if (m_RouteChecker->m_IsValid) {
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Route Checker CSV file loaded successfully. File name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+	}
+	else {
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Route Checker CSV file failed to load. File name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+	}
 }
 
 int CalculateVerticalSpeed(CRadarTarget RadarTarget)

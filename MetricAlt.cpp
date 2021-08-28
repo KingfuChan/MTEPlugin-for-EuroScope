@@ -35,3 +35,13 @@ bool MetricAlt::RflFeettoM(const int feet, int& meter) {
 		return false;
 	}
 }
+
+string MetricAlt::LvlFeetEvenOdd(const int feet)
+{
+	int i = 1; // first one is odd
+	for (auto it = m_ftom.begin(); it != m_ftom.end(); it++, i++) {
+		if (it->first == feet)
+			return i % 2 ? "ODD" : "EVEN";
+	}
+	return string();
+}

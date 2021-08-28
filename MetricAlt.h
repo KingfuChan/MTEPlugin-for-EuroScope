@@ -6,9 +6,12 @@
 #include "framework.h"
 #include "resource.h"
 #include <map>
+#include <string>
+
+using namespace std;
 
 namespace MetricAlt {
-	const std::map<int, int> m_mtof = { // meter to feet map
+	const map<int, int> m_mtof = { // meter to feet map
 	{  300, 1000},
 	{  600, 2000},
 	{  900, 3000},
@@ -56,7 +59,7 @@ namespace MetricAlt {
 	{14900,48900},
 	{15500,50900},
 	};
-	const std::map<int, int> m_ftom = {  // feet to meter map
+	const map<int, int> m_ftom = {  // feet to meter map
 	{ 1000,  300},
 	{ 2000,  600},
 	{ 3000,  900},
@@ -109,4 +112,5 @@ namespace MetricAlt {
 	int LvlMtoFeet(const int meter);
 	int LvlFeettoM(const int feet);
 	bool RflFeettoM(const int feet, int& meter);
+	string LvlFeetEvenOdd(const int feet); // for RouteChecker
 }
