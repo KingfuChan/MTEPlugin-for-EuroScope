@@ -17,16 +17,17 @@
 using namespace std;
 
 struct RouteData {
+	string m_Name;
+	string m_EvenO; // accepts a combination of SE SO FE FO. S/F - m/ft, E/O - Even/Odd. No need for seperation marks
+	string m_FixAltStr; // accepts a combination of alt Sxxx(m*100) Fxxx(ft*100), seperated by '/'
+	string m_MinAlt; // in feet
 	string m_Route;
-	string m_EvenO;
-	string m_Restr;
+	string m_Remark;
 };
 
 class RouteChecker
 {
 public:
-	bool m_IsValid; // if something goes wrong when initializing, this will be false
-
 	RouteChecker(string filename);
 	~RouteChecker(void);
 
@@ -37,5 +38,5 @@ private:
 	unordered_map<string, list<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair
 
 	bool IsRouteValid(string planroute, string realroute);
-	bool IsLevelValid(int level, string evenodd, string restriction);
+	bool IsLevelValid(int planalt, string evenodd, string fixalt, string minalt);
 };

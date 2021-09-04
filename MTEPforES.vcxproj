@@ -12,7 +12,7 @@
     <Keyword>MFCDLLProj</Keyword>
     <RootNamespace>MTEPforES</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>MTEPlugIn</ProjectName>
+    <ProjectName>MTEPlugin</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -34,6 +34,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <TargetName>$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -69,7 +70,7 @@
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="MetricAlt.cpp" />
-    <ClCompile Include="MTEPlugIn.cpp" />
+    <ClCompile Include="MTEPlugin.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
@@ -87,7 +88,7 @@
     <ClInclude Include="SimilarCallsign.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="MetricAlt.h" />
-    <ClInclude Include="MTEPlugIn.h" />
+    <ClInclude Include="MTEPlugin.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />

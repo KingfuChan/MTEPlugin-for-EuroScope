@@ -21,7 +21,7 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="MTEPlugIn.cpp">
+    <ClCompile Include="MTEPlugin.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="MetricAlt.cpp">
@@ -53,7 +53,7 @@
     <ClInclude Include="pch.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="MTEPlugIn.h">
+    <ClInclude Include="MTEPlugin.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="targetver.h">

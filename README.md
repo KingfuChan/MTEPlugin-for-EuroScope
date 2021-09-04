@@ -1,6 +1,6 @@
 # MTEPforES
 
-Miscellaneous Tag Enhancement Plugin for EuroScope
+Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 
 ## Tag Item Types and Behaviours
 
@@ -29,7 +29,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope
 
 ## Custom Cursor Settings
 
-You may turn the default mouse arrow into a cross to simulate real-world radar screens.
+You may turn the default mouse arrow into a cross to simulate real-world radar screens. This only works with the original DLL file name (MTEPlugin.dll).
 
 Enter **.MTEP CURSOR ON** (case-insensitive) in your command line at the bottom of the screen to activate the cursor feature.
 
@@ -41,33 +41,40 @@ This setting will be saved in your EuroScope plugin settings.
 
 This module will automatically check route validity. Requires a CSV file in the format below:
 
-|Dep|Arr|EvenOdd|LevelRestr|Route|
-|:---:|:---:|:---:|:---:|:---:|
-|ZBAA|ZGGG|EVEN||OMDEK .... ATAGA|
-|ZBAA|ZSSS/ZSPD|ODD||ELKUR .... SASAN|
-|ZBAA/ZBAD|ZYHB|ODD||DOTRA .... PIGAM|
-|ZSSS|ZSOF|EVEN|157|POMOK .... MADUK|
-|ZSSS|VHHH|EVEN|276/256|NXD .... MAGOG|
+Dep|Arr|Name|EvenOdd|AltList|MinAlt|Route|Remarks
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|ZBAA/ZBAD|ZSSS/ZSPD|test|SE/SO/FE/FO|S81/S89/S107/F350/F450|9800|ELKUR .... SASAN|test only
 
 + ***Dep, Arr*** can be a list seperated by "/".
-+ ***EvenOdd*** can only be "EVEN" or "ODD" (uppercase), other values will be ignored.
-+ ***LevelRestr*** means level restriction, which can also be a list.
-  + Only exact altitudes will be valid. When ***LevelRestr*** is not empty, ***EvenOdd*** will be deprecated.
-  + Currently it only supports Chinese Metric RVSM but inside CSV file please use feet as the samples above.
++ ***Name*** no need to explain.
++ ***EvenOdd*** should be a combination of SE(metric, even) SO(metric, odd) FE(imperial, even) FO(imperial, odd). No seperation mark is required.
++ ***AltList*** means level restriction, which can also be a list seperated by "/".
+  + Only exact altitudes will be valid. When ***AltList*** is not empty, ***EvenOdd*** will be deprecated.
+  + For metric altitudes, use Sxxx, e.g. S81 for 8100m, S107 for 10700m.
+  + For imperial flight levels, use Fxxx, e.g. F350 for FL350.
++ ***MinAlt*** should be in feet. If the flight plan final altitude is lower than given value, it should be an invalid flight plan.
 + ***Route*** is not necessarily the full route but can be partial. One DEP and ARR pair can have multiple routes with different restrictions.
++ ***Remarks*** no need to explain.
 
-CSV files with incorrect format will not be loaded. However it's still possible to cause unpredicted issues if file is corrupted.
+CSV files with incorrect columns will not be loaded. Empty cells are accepted. However it's still possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
-You need to use a command line to load the CSV file: **.MTEP RC PATH** (case-insensitive). **PATH** should be replace by the CSV file path and file name. If you use relatvie path, please note it's based on working directory instead of the DLL path. The file setting will be saved in your EuroScope plugin settings.
+You need to use a command line to load the CSV file: **.MTEP RC PATH** (case-insensitive). **PATH** should be replace by the CSV file path and file name.
+
++ If you use relative path, please note it's based on working directory.
++ Or you can insert **@** to the front of the path to make it relative to the DLL file. This only works with the original DLL file name (MTEPlugin.dll).
++ The file setting will be saved in your EuroScope plugin settings.
 
 Tag item type **Route validity** shows:
 
 + **Y** - both route and final altitude is valid.
 + **L** - route is valid but final altitude is not.
-+ **N** - route is not valid.
-+ **A SPACE** - no route is found for this DEP-ARR.
++ **X** - route is not valid.
++ **?** - no route is found for this DEP-ARR.
++ shows nothing when clearance received flag is set or route checker is not configured.
 
-Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information regarding current DEP-ARR if current route is invalid.
+Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
+
+Command line function: **.MTEP RC DDDD AAAA** will show the valid routes for DDDD-AAAA if found.
 
 ## Other Command Line Features
 

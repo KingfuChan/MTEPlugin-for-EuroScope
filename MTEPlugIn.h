@@ -1,4 +1,4 @@
-﻿// MTEPlugIn.h
+﻿// MTEPlugin.h
 
 #pragma once
 
@@ -42,4 +42,6 @@ private:
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(string filename);
+	void UnloadRouteChecker(void);
+	string DisplayRouteMessage(string departure, string arrival);
 };

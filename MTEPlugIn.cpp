@@ -1,16 +1,17 @@
-﻿// MTEPlugIn.cpp
+﻿// MTEPlugin.cpp
 
 #include "pch.h"
 #include "framework.h"
 #include "resource.h"
-#include "MTEPlugIn.h"
+#include "MTEPlugin.h"
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "2.3.0"
+#define PLUGIN_FILE "MTEPlugin.dll"
+#define PLUGIN_VERSION "2.3.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
-#define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugIn-for-EuroScope"
+#define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
 #endif // !COPYRIGHTS
 
 using namespace std;
@@ -50,11 +51,12 @@ const char CHR_GS_ACC = 'A';
 const char CHR_GS_DEC = 'L';
 
 // COMPUTERISING RELATED
-const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determin accel/decel
+const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determine accel/decel
 constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
 constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
 constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
 constexpr int OVRFLW4(int t) { return abs(t) > 9999 ? 9999 : abs(t); }  // overflow pre-process 4 digits
+string MakeUpper(string str);
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 bool IsCFLAssigned(CFlightPlan FlightPlan);
 
@@ -69,8 +71,7 @@ WNDPROC gSourceProc;
 HWND pluginWindow;
 HCURSOR myCursor = nullptr;
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-#define CPCUR CopyCursor((HCURSOR)::LoadImage(GetModuleHandle("MTEPlugIn.dll"), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED))
-// Note that cursor setting will only be effective with it's original file name (MTEPlugIn.dll)
+// Note that cursor setting will only be effective with it's original file name (MTEPlugin.dll)
 
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
@@ -107,15 +108,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
-	myCursor = CPCUR;
-	if (customCursor && myCursor == nullptr)
-		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			"Cursor will not be set! Use original dll file name (MTEPlugIn.dll) to enable custom cursor.",
-			1, 0, 0, 0, 0);
-	else if (customCursor && myCursor != nullptr)
-		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			"If custom cursor does not show on radar screen, please use \".mtep cursor on\" command.",
-			1, 0, 0, 0, 0);
+	myCursor = CopyCursor((HCURSOR)::LoadImage(GetModuleHandle(PLUGIN_FILE), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
 
 	m_RouteChecker = nullptr;
 	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
@@ -126,7 +119,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 CMTEPlugIn::~CMTEPlugIn(void)
 {
-	delete m_RouteChecker;
+	UnloadRouteChecker();
 	CancelCustomCursor();
 }
 
@@ -305,10 +298,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
-		if (m_RouteChecker == nullptr || !m_RouteChecker->m_IsValid) break;
+		if (m_RouteChecker == nullptr) break;
 		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
 		sprintf_s(sItemString, 2, "%c", rc);
-		if (rc != 'Y' && rc != ' ') {
+		if (rc != 'Y' && rc != '?' && rc != ' ') {
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
 			*pRGB = RGB(255, 255, 0); // yellow
 		}
@@ -482,18 +475,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RTE_INFO: {
-		if (m_RouteChecker == nullptr || !m_RouteChecker->m_IsValid) break;
-		string dep = FlightPlan.GetFlightPlanData().GetOrigin();
-		string arr = FlightPlan.GetFlightPlanData().GetDestination();
-		if (m_RouteChecker->CheckFlightPlan(FlightPlan) == 'Y') break; // no need to show ok routes
-		auto rinfo = m_RouteChecker->GetRouteInfo(dep, arr);
-		if (!rinfo.size())
-			DisplayUserMessage("MTEP-Route", (dep + "-" + arr).c_str(), "No route!", 1, 1, 0, 0, 0);
-		else {
-			DisplayUserMessage("MTEP-Route", (dep + "-" + arr).c_str(), (to_string(rinfo.size()) + " route(s):").c_str(), 1, 1, 0, 0, 0);
-			for (auto ri : rinfo)
-				DisplayUserMessage("MTEP-Route", nullptr, ri.c_str(), 1, 0, 0, 0, 0);
-		}
+		if (m_RouteChecker == nullptr) break;
+		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
+		if (rc == 'Y' || rc == ' ') break; // no need to show ok routes and cleared routes
+		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
+
 		break; }
 	default:
 		break;
@@ -576,18 +562,16 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		mv = regex_match(cmd, match, rxvr);
 	if (mf || mv) {
 		string airport, url_base, url_full;
-		airport = match[1].str();
+		airport = MakeUpper(match[1].str());
 		if (mf) {
 			url_base = "https://www.flightradar24.com/";
 		}
 		else if (mv) {
 			url_base = "https://flightadsb.variflight.com/tracker/";
 		}
-		regex rxap("^" + airport + "$", regex_constants::icase);
 		for (CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
 			se.IsValid(); se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT)) {
-			string sen = se.GetName();
-			if (regex_match(sen, match, rxap)) {
+			if (airport == se.GetName()) {
 				CPosition pos;
 				se.GetPosition(&pos, 0);
 				if (mf)
@@ -600,13 +584,19 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		}
 	}
 
-	// route checker
+	// load route checker
 	regex rxrc("^.MTEP RC (.+\\.CSV)$", regex_constants::icase);
 	if (regex_match(cmd, match, rxrc)) {
 		LoadRouteChecker(match[1].str());
-		if (m_RouteChecker != nullptr && m_RouteChecker->m_IsValid)
-			SaveDataToSettings(SETTING_ROUTE_CHECKER_CSV, "route checker csv file", match[1].str().c_str());
-		return true;
+		SaveDataToSettings(SETTING_ROUTE_CHECKER_CSV, "route checker csv file", match[1].str().c_str());
+		return m_RouteChecker != nullptr;
+	}
+
+	// route checker get route info
+	regex rxrcod("^.MTEP RC ([A-Z]{4}) ([A-Z]{4})$", regex_constants::icase);
+	if (regex_match(cmd, match, rxrcod)) {
+		string msg = DisplayRouteMessage(MakeUpper(match[1].str()), MakeUpper(match[2].str()));
+		return msg.size();
 	}
 
 	return false;
@@ -641,19 +631,58 @@ void CMTEPlugIn::CancelCustomCursor(void)
 
 void CMTEPlugIn::LoadRouteChecker(string filename)
 {
-	if (m_RouteChecker != nullptr)
+	UnloadRouteChecker();
+	if (filename[0] == '@') {
+		// for relative directory to dll file, only works for original dll file name (MTEPlugin.dll)
+		HMODULE hMod = GetModuleHandle(PLUGIN_FILE);
+		if (hMod != NULL) {
+			TCHAR szBuffer[MAX_PATH] = { 0 };
+			GetModuleFileName(hMod, szBuffer, sizeof(szBuffer) / sizeof(TCHAR) - 1);
+			string nfname = szBuffer;
+			filename = nfname.substr(0, nfname.find(PLUGIN_FILE)) + filename.substr(1);
+		}
+	}
+	try {
+		m_RouteChecker = new RouteChecker(filename);
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Route Checker is loaded successfully. CSV file name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+	}
+	catch (string e) {
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Route Checker failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+		UnloadRouteChecker();
+	}
+}
+
+void CMTEPlugIn::UnloadRouteChecker(void)
+{
+	if (m_RouteChecker != nullptr) {
 		delete m_RouteChecker;
-	m_RouteChecker = new RouteChecker(filename);
-	if (m_RouteChecker->m_IsValid) {
-		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route Checker CSV file loaded successfully. File name: " + filename).c_str(),
-			1, 0, 0, 0, 0);
+		m_RouteChecker = nullptr;
+		DisplayUserMessage("MESSAGE", "MTEPlugin", "Route Checker is unloaded!", 1, 0, 0, 0, 0);
 	}
-	else {
-		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route Checker CSV file failed to load. File name: " + filename).c_str(),
-			1, 0, 0, 0, 0);
+}
+
+string CMTEPlugIn::DisplayRouteMessage(string departure, string arrival)
+{
+	if (m_RouteChecker == nullptr) return "";
+	auto rinfo = m_RouteChecker->GetRouteInfo(departure, arrival);
+	if (!rinfo.size()) return "";
+	string res = departure + "-" + arrival;
+	DisplayUserMessage("MTEP-Route", res.c_str(), (to_string(rinfo.size()) + " route(s):").c_str(), 1, 1, 0, 0, 0);
+	for (auto ri : rinfo) {
+		DisplayUserMessage("MTEP-Route", nullptr, ri.c_str(), 1, 0, 0, 0, 0);
+		res += "\n" + ri;
 	}
+	return res;
+}
+
+string MakeUpper(string str)
+{
+	for (auto& c : str) c = toupper(c);
+	return str;
 }
 
 int CalculateVerticalSpeed(CRadarTarget RadarTarget)

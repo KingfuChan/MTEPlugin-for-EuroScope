@@ -1,7 +1,7 @@
 ﻿// dllmain.cpp
 #include "pch.h"
 #include <EuroScopePlugIn.h>
-#include "MTEPlugIn.h"
+#include "MTEPlugin.h"
 
 // Interface for EuroScope plugin loading
 CMTEPlugIn* pMyPlugIn = nullptr;

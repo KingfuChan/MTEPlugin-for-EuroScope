@@ -11,35 +11,43 @@ RouteChecker::RouteChecker(string filename)
 	inFile.open(filename, ios::in);
 	if (!inFile.is_open()) // unable to open file
 	{
-		m_IsValid = false;
-		return;
+		throw string("unable to open file");
 	}
 	string line;
 	getline(inFile, line);
-	if (line != "Dep,Arr,EvenOdd,LevelRestr,Route") { // confirm header
+	if (line != "Dep,Arr,Name,EvenOdd,AltList,MinAlt,Route,Remarks") { // confirm header
 		inFile.close();
-		m_IsValid = false;
-		return;
+		throw string("invalid column names");
 	}
 	while (getline(inFile, line)) {
 		istringstream ssin(line);
 		RouteData rd;
-		string dep, arr;
+		string dep, arr, listeo, listalt, minalt;
+		string eo, la, ma;
 		getline(ssin, dep, ',');
 		getline(ssin, arr, ',');
+		getline(ssin, rd.m_Name, ',');
 		getline(ssin, rd.m_EvenO, ',');
-		getline(ssin, rd.m_Restr, ',');
-		getline(ssin, rd.m_Route);
-		string d, a;
+		getline(ssin, rd.m_FixAltStr, ',');
+		getline(ssin, rd.m_MinAlt, ',');
+		getline(ssin, rd.m_Route, ',');
+		getline(ssin, rd.m_Remark);
+
 		// split departure and arrival airpots and assign route
+		string d, a;
 		for (istringstream ssdep(dep); getline(ssdep, d, '/');) {
 			for (istringstream ssarr(arr); getline(ssarr, a, '/');) {
 				m_Data[d + a].push_back(rd);
 			}
 		}
+
+		// parse m_EvenOdd
+		for (istringstream sseo(listeo); getline(sseo, eo, '/');) {
+			if (eo == "SE" || eo == "SO" || eo == "FE" || eo == "FO") {
+			}
+		}
 	}
 	inFile.close();
-	m_IsValid = true;
 }
 
 RouteChecker::~RouteChecker(void)
@@ -59,10 +67,16 @@ list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 	}
 	for (auto rd : routes) {
 		string info = rd.m_Route;
-		if (rd.m_Restr.size())
-			info += "  @ (FL)" + rd.m_Restr;
+		if (rd.m_Name.size())
+			info = "(" + rd.m_Name + ")  " + info;
+		if (rd.m_FixAltStr.size())
+			info += "  @ " + rd.m_FixAltStr;
 		if (rd.m_EvenO.size())
 			info += "  @ " + rd.m_EvenO;
+		if (rd.m_MinAlt.size())
+			info += "  @ >= " + rd.m_MinAlt;
+		if (rd.m_Remark.size())
+			info += "  & RMK: " + rd.m_Remark;
 		res.push_back(info);
 	}
 	return res;
@@ -70,10 +84,13 @@ list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 
 char RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	// space - no route for OD pair
+	// ? - no route for OD pair
 	// Y - route and alt ok 
 	// L - route ok, alt not
-	// N - route not ok
+	// X - route not ok
+	// space - clearance received flag set
+	if (FlightPlan.GetClearenceFlag())
+		return ' ';
 	EuroScopePlugIn::CFlightPlanData fpd = FlightPlan.GetFlightPlanData();
 	string od = string(fpd.GetOrigin()) + string(fpd.GetDestination());
 	list<RouteData> routes;
@@ -81,17 +98,17 @@ char RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan)
 		routes = m_Data.at(od);
 	}
 	catch (out_of_range e) {
-		return ' ';
+		return '?';
 	}
 	for (auto rd : routes) {
-		bool lv = IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_Restr);
+		bool lv = IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt);
 		bool rv = IsRouteValid(fpd.GetRoute(), rd.m_Route);
 		if (lv && rv)
-			return 'Y'; // passed
+			return 'Y';
 		else if (!lv && rv)
-			return 'L'; // invalid RFL
+			return 'L';
 	}
-	return 'N'; // invalid route
+	return 'X';
 }
 
 bool RouteChecker::IsRouteValid(string planroute, string realroute)
@@ -122,27 +139,30 @@ bool RouteChecker::IsRouteValid(string planroute, string realroute)
 		buf1 = buf0;
 	}
 	newroute += buf2 + " " + buf1 + " ";
-	// find route, not both newroute and realroute starts and ends with space
+	// find route, note both newroute and realroute starts and ends with space
 	return newroute.find(" " + realroute + " ") != string::npos;
 }
 
-bool RouteChecker::IsLevelValid(int level, string evenodd, string restriction)
+bool RouteChecker::IsLevelValid(int planalt, string evenodd, string fixalt, string minalt)
 {
-	// considers even/odd and restriction. note RVSM airspace.
-	if (restriction.empty()) { // no restrictions
-		return evenodd.empty() || MetricAlt::LvlFeetEvenOdd(level) == evenodd;
+	// considers even/odd, fixed altitudes and restrictions
+	int malt = 0;
+	sscanf_s(minalt.c_str(), "%d", &malt); // it's ok to be empty
+	if (planalt < malt) return false;
+	if (fixalt.empty()) {
+		return !evenodd.size() || evenodd.find(MetricAlt::LvlFeetEvenOdd(planalt)) != string::npos;
 	}
 	else { // there is restrictions
-		istringstream ress(restriction);
-		try {
-			for (string r; getline(ress, r, '/');) {
-				if (level == stoi(r) * 100) {
-					return true;
-				}
+		istringstream fass(fixalt);
+		int falt = 0;
+		for (string r; getline(fass, r, '/');) {
+			if (sscanf_s(r.c_str(), "S%d", &falt))
+				falt = MetricAlt::LvlMtoFeet(falt * 100);
+			else if (sscanf_s(r.c_str(), "F%d", &falt)) {
+				falt = falt * 100;
 			}
-		}
-		catch (exception e) {
-			return false;
+			if (falt && falt == planalt)
+				return true;
 		}
 	}
 	return false;
