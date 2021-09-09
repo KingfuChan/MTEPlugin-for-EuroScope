@@ -8,7 +8,7 @@
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
 #define PLUGIN_FILE "MTEPlugin.dll"
-#define PLUGIN_VERSION "2.3.1"
+#define PLUGIN_VERSION "2.4.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
@@ -18,20 +18,20 @@ using namespace std;
 using namespace EuroScopePlugIn;
 
 // TAG ITEM TYPE
-const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with indicator
+const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with trend indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
-const int TAG_ITEM_TYPE_VS_FPM = 3; // V/S(fpm) in 4 digits
-const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb / Descend / Level indicator
+const int TAG_ITEM_TYPE_VS_FPM = 3; // Vertical speed (4-digit FPM)
+const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb/Descend/Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m)
-const int TAG_ITEM_TYPE_CFL_MTR = 6; // Cleared flight level (m)
-const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level (m/FL)
+const int TAG_ITEM_TYPE_CFL_MTR = 6; // Cleared flight level
+const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
 const int TAG_ITEM_TYPE_RECAT = 12; // RECAT-CN
 const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
-const int TAG_ITEM_TYPE_SQ_DUPE = 14; // TODO: Duplicated squawk warning
+const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -52,6 +52,7 @@ const char CHR_GS_DEC = 'L';
 
 // COMPUTERISING RELATED
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determine accel/decel
+const int TIMER_REFRESH_INTERVAL = 3; // OnTimer refresh interval (seconds)
 constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
 constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
 constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
@@ -81,20 +82,20 @@ CMTEPlugIn::CMTEPlugIn(void)
 		PLUGIN_COPYRIGHT)
 {
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
-	RegisterTagItemType("GS(KPH) with indicator", TAG_ITEM_TYPE_GS_W_IND);
+	RegisterTagItemType("GS(KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
-	RegisterTagItemType("VS(fpm) in 4 digits", TAG_ITEM_TYPE_VS_FPM);
-	RegisterTagItemType("Level indicator", TAG_ITEM_TYPE_LVL_IND);
+	RegisterTagItemType("Vertical speed (4-digit FPM)", TAG_ITEM_TYPE_VS_FPM);
+	RegisterTagItemType("Climb/Descend/Level indicator", TAG_ITEM_TYPE_LVL_IND);
 	RegisterTagItemType("Actual altitude (m)", TAG_ITEM_TYPE_AFL_MTR);
-	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
-	RegisterTagItemType("Final flight level (m/FL)", TAG_ITEM_TYPE_RFL_ICAO);
+	RegisterTagItemType("Cleared flight level", TAG_ITEM_TYPE_CFL_MTR);
+	RegisterTagItemType("Final flight level", TAG_ITEM_TYPE_RFL_ICAO);
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
 	RegisterTagItemType("RFL unit indicator", TAG_ITEM_TYPE_RFL_IND);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
 	RegisterTagItemType("RECAT-CN", TAG_ITEM_TYPE_RECAT);
 	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
-	//RegisterTagItemType("Duplicated squawk warning", TAG_ITEM_TYPE_SQ_DUPE);
+	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
@@ -280,15 +281,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_COMM_IND: {
-		// in map, false means not established
-		if (!(RadarTarget.GetPosition().GetTransponderC() && FlightPlan.GetTrackingControllerIsMe()))
-			break; // only valid for assumed flights
-		if (!m_ComEstbMap[RadarTarget.GetCallsign()]) { // comm not established
+		if (FlightPlan.GetTrackingControllerIsMe() && RadarTarget.GetPosition().GetTransponderC()
+			&& !m_ComEstbMap[RadarTarget.GetCallsign()]) {
 			sprintf_s(sItemString, 2, "C");
 			*pColorCode = TAG_COLOR_RGB_DEFINED;
 			*pRGB = RGB(255, 255, 255); // white
 		}
-
 		break; }
 	case TAG_ITEM_TYPE_RECAT: {
 		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
@@ -308,8 +306,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_SQ_DUPE: {
-		// TODO
-
+		if (m_SquawkDupeSet.find(RadarTarget.GetCallsign()) != m_SquawkDupeSet.end()) {
+			sprintf_s(sItemString, 5, "DUPE");
+			*pColorCode = TAG_COLOR_RGB_DEFINED;
+			*pRGB = RGB(255, 255, 0); // yellow
+		}
 		break; }
 	default:
 		break;
@@ -324,7 +325,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	switch (FunctionId)
 	{
 	case TAG_ITEM_FUNCTION_COMM_ESTAB: {
-		if (RadarTarget.GetPosition().GetTransponderC() && FlightPlan.GetTrackingControllerIsMe())
+		if (FlightPlan.GetTrackingControllerIsMe() && RadarTarget.GetPosition().GetTransponderC())
 			m_ComEstbMap[RadarTarget.GetCallsign()] = true;
 
 		break; }
@@ -364,7 +365,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
-		if (strlen(FlightPlan.GetTrackingControllerId()) && !FlightPlan.GetTrackingControllerIsMe()) {
+		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
 			break;
 		}
@@ -423,8 +424,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_MENU: {
-		// don't show list if other controller is tracking
-		if (strlen(FlightPlan.GetTrackingControllerId()) && !FlightPlan.GetTrackingControllerIsMe()) {
+		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+			// don't show list if other controller is tracking
 			break;
 		}
 		OpenPopupList(Area, "RFL Menu", 2);
@@ -502,21 +503,35 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 
 void CMTEPlugIn::OnTimer(int Counter)
 {
+	if (Counter % TIMER_REFRESH_INTERVAL) return;
+
 	if (initCursor && customCursor) SetCustomCursor(); // cursor
 
 	unordered_set<string> setCN, setEN;
+	unordered_map<string, string> mapSQ; // first string is squawk
+	m_SquawkDupeSet.clear();
 	for (CRadarTarget rt = RadarTargetSelectFirst(); rt.IsValid(); rt = RadarTargetSelectNext(rt)) {
 		CFlightPlan fp = rt.GetCorrelatedFlightPlan();
-		if (rt.GetPosition().GetTransponderC() && fp.GetTrackingControllerIsMe())
-		{ // for similar callsign
+		if (fp.GetTrackingControllerIsMe() && rt.GetPosition().GetTransponderC()) { // in the air and tracked by me
+			// for similar callsign
 			if (!fp.IsTextCommunication()) {
 				if (IsChineseCallsign(fp))
 					setCN.insert(rt.GetCallsign());
 				else
 					setEN.insert(rt.GetCallsign());
 			}
+			// for duplicated callsign
+			string sq = rt.GetPosition().GetSquawk();
+			if (mapSQ.find(sq) != mapSQ.end()) {
+				m_SquawkDupeSet.insert(mapSQ[sq]);
+				m_SquawkDupeSet.insert(rt.GetCallsign());
+			}
+			else {
+				mapSQ[sq] = rt.GetCallsign();
+			}
 		}
-		else { // for communication map and CFL confirm map
+		else {
+			// for communication map and CFL confirm map
 			m_ComEstbMap[rt.GetCallsign()] = false;
 			m_CFLConfirmMap[fp.GetCallsign()] = false;
 		}

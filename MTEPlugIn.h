@@ -33,9 +33,9 @@ public:
 
 private:
 	unordered_set<string> m_SimilarCallsignSet; // similar callsign set
+	unordered_set<string> m_SquawkDupeSet; // duplicated squawk set
 	unordered_map<string, bool> m_ComEstbMap; // true means communication established
 	unordered_map<string, bool> m_CFLConfirmMap; // true means CFL needs confirm
-	//unordered_map<string, string> m_SquawkMap; // second string is squawk
 	RouteChecker* m_RouteChecker;
 
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
