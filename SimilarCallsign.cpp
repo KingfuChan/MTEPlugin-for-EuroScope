@@ -9,18 +9,19 @@ using namespace std;
 
 const unordered_set<string> m_CHNCallsign = {
 	"ALP","AYE","BDJ","BFM","BGC","BJN","BNH","BSH","CAF","CAO",
-	"CBG","CBJ","CCA","CCD","CCO","CDC","CDG","CES","CFA","CFB",
-	"CFI","CFZ","CGH","CGN","CGZ","CHB","CHC","CHF","CHH","CJX",
-	"CKK","CNM","CNW","CQH","CQN","CSC","CSG","CSH","CSN","CSS",
-	"CSY","CSZ","CTH","CUA","CUH","CWR","CXA","CXN","CYH","CYN",
-	"CYZ","DBX","DER","DGA","DKH","DLC","DXH","EPA","EPB","FJT",
-	"FSJ","FTU","FZA","GCR","GDC","GSC","GWL","HAH","HBH","HFJ",
-	"HHG","HLF","HNJ","HSJ","HTK","HTU","HXA","HYN","HYT","ICU",
-	"JAE","JBE","JGJ","JHK","JOY","JSU","JYH","KJT","KNA","KPA",
-	"KXA","LHA","LKE","LLJ","LNM","MSF","MZT","NEJ","NMG","NSJ",
-	"NSY","OKA","OLD","OMA","OTC","OTT","PHF","QDA","QJT","QSR",
-	"RBW","RFH","RLH","SHQ","SNG","SZA","TBA","TXJ","UEA","UNA",
-	"UTP","VGA","WFH","WLF","WUA","XAI","XTH","YZR"
+	"CBG","CBJ","CCA","CCD","CCO","CCS","CDC","CDG","CES","CFA",
+	"CFB","CFI","CFZ","CGH","CGN","CGZ","CHB","CHC","CHF","CHH",
+	"CJX","CKK","CNM","CNW","CQH","CQN","CSC","CSG","CSH","CSN",
+	"CSS","CSY","CSZ","CTH","CTJ","CUA","CUH","CWR","CXA","CXN",
+	"CYH","CYN","CYZ","DER","DGA","DKH","DLC","DXH","EPA","EPB",
+	"FJT","FSJ","FTU","FZA","GCR","GDC","GSC","GWL","HAH","HBH",
+	"HFJ","HHG","HLF","HNJ","HSJ","HTK","HXA","HYN","HYT","ICU",
+	"JAE","JBE","JDL","JGJ","JHK","JOY","JSU","JYH","KJT","KNA",
+	"KPA","KXA","LHA","LKE","LLJ","LNM","MSF","MZT","NEJ","NMG",
+	"NSJ","NSY","OKA","OLD","OMA","OTC","OTT","PHF","QDA","QJT",
+	"QSR","RBW","RFH","RLH","SHQ","SNG","SXS","SZA","TBA","TXJ",
+	"UEA","UNA","UTP","VGA","VRE","WFH","WLF","WUA","XAI","XTH",
+	"YZR",
 };
 
 bool IsChineseCallsign(EuroScopePlugIn::CFlightPlan FlightPlan) {
@@ -31,7 +32,7 @@ bool IsChineseCallsign(EuroScopePlugIn::CFlightPlan FlightPlan) {
 
 bool CompareCallsign(string callsign1, string callsign2)
 {
-	// compares tow complete callsigns
+	// compares two complete callsigns
 	bool isSimilar = false;
 	char_list cs1 = ExtractNumfromCallsign(callsign1);
 	char_list cs2 = ExtractNumfromCallsign(callsign2);
@@ -83,7 +84,7 @@ char_list ExtractNumfromCallsign(const string callsign)
 	char_list csnum;
 	bool numbegin = false;
 	for (size_t i = 0; i < callsign.size(); i++) {
-		numbegin = numbegin || (callsign[i] >= '1' && callsign[i] <= '9');
+		numbegin = numbegin || (callsign[i] >= '1' && callsign[i] <= '9'); // excluding leading '0's
 		if (numbegin)
 			csnum.push_back(callsign[i]);
 	}
@@ -92,7 +93,7 @@ char_list ExtractNumfromCallsign(const string callsign)
 
 bool CompareFlightNum(char_list num1, char_list num2)
 {
-	// compares tow callsign, CharList in same size
+	// compares two callsign, char_list in same size
 	int size;
 	if ((size = num1.size()) != num2.size()) return false;
 	char_list::iterator p1, p2;

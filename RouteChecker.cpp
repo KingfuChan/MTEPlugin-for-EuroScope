@@ -40,12 +40,6 @@ RouteChecker::RouteChecker(string filename)
 				m_Data[d + a].push_back(rd);
 			}
 		}
-
-		// parse m_EvenOdd
-		for (istringstream sseo(listeo); getline(sseo, eo, '/');) {
-			if (eo == "SE" || eo == "SO" || eo == "FE" || eo == "FO") {
-			}
-		}
 	}
 	inFile.close();
 }
@@ -100,15 +94,16 @@ char RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan)
 	catch (out_of_range e) {
 		return '?';
 	}
+	char res = 'X';
 	for (auto rd : routes) {
-		bool lv = IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt);
-		bool rv = IsRouteValid(fpd.GetRoute(), rd.m_Route);
-		if (lv && rv)
-			return 'Y';
-		else if (!lv && rv)
-			return 'L';
+		if (IsRouteValid(fpd.GetRoute(), rd.m_Route)) {
+			if (IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt))
+				return 'Y';
+			else
+				res = 'L';
+		}
 	}
-	return 'X';
+	return res;
 }
 
 bool RouteChecker::IsRouteValid(string planroute, string realroute)

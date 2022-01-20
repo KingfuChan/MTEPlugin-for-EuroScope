@@ -8,9 +8,9 @@
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
 #define PLUGIN_FILE "MTEPlugin.dll"
-#define PLUGIN_VERSION "2.4.0"
+#define PLUGIN_VERSION "2.4.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
-#define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2021 Kingfu Chan"
+#define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
 #endif // !COPYRIGHTS
 
