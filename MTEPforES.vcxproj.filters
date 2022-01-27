@@ -33,6 +33,9 @@
     <ClCompile Include="RouteChecker.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="DepartureSequence.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\MTEPforES.rc2">
@@ -69,6 +72,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="RouteChecker.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="DepartureSequence.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

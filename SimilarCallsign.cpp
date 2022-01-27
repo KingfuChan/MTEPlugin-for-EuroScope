@@ -50,7 +50,7 @@ bool CompareCallsign(string callsign1, string callsign2)
 		cs1 = cs1.size() > cs2.size() ? cs1 : cs2;
 		cs2 = cst;
 		char_list csl, csr;
-		int i = 0;
+		size_t i = 0;
 		for (csl = cs2, csr = cs2; i < cs1.size() - cs2.size(); i++) {
 			// use space to fill digits
 			csl.push_back(' ');

@@ -8,7 +8,7 @@
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
 #define PLUGIN_FILE "MTEPlugin.dll"
-#define PLUGIN_VERSION "2.4.1"
+#define PLUGIN_VERSION "3.0.0"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
@@ -32,6 +32,7 @@ const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
 const int TAG_ITEM_TYPE_RECAT = 12; // RECAT-CN
 const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
 const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
+const int TAG_ITEM_TYPE_DEP_SEQ = 15; // Departure sequence
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -44,6 +45,11 @@ const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit (not registere
 const int TAG_ITEM_FUNCTION_SC_LIST = 30; // Open similar callsign list
 const int TAG_ITEM_FUNCTION_SC_SELECT = 31; // Select in similar callsign list (not registered)
 const int TAG_ITEM_FUNCTION_RTE_INFO = 40; // Show route checker info
+const int TAG_ITEM_FUNCTION_DSQ_MENU = 50; // Set departure sequence
+const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit (not registered)
+const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registerd)
+const int TAG_ITEM_FUNCTION_SPD_MENU = 61; // Open assigned speed menu
+const int TAG_ITEM_FUNCTION_SPD_EDIT = 62; // Open assigned speed edit (not registered)
 
 // GROUND SPEED TREND CHAR
 const char CHR_GS_NON = ' ';
@@ -55,6 +61,7 @@ const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determine accel/decel
 const int TIMER_REFRESH_INTERVAL = 3; // OnTimer refresh interval (seconds)
 constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
 constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
+constexpr int OVRFLW2(int t) { return abs(t) > 99 ? 99 : abs(t); } // overflow pre-process 2 digits
 constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
 constexpr int OVRFLW4(int t) { return abs(t) > 9999 ? 9999 : abs(t); }  // overflow pre-process 4 digits
 string MakeUpper(string str);
@@ -96,12 +103,15 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RECAT-CN", TAG_ITEM_TYPE_RECAT);
 	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
 	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
+	RegisterTagItemType("Departure sequence", TAG_ITEM_TYPE_DEP_SEQ);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
 	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
 	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
+	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
+	RegisterTagItemFunction("Open assigned speed menu", TAG_ITEM_FUNCTION_SPD_MENU);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
 		(string("MTEPlugin is loaded! For help please refer to ") + GITHUB_LINK).c_str(),
@@ -116,6 +126,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	if (setrc != nullptr) {
 		LoadRouteChecker(setrc);
 	}
+
+	m_DepartureSequence = nullptr;
 }
 
 CMTEPlugIn::~CMTEPlugIn(void)
@@ -312,6 +324,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			*pRGB = RGB(255, 255, 0); // yellow
 		}
 		break; }
+	case TAG_ITEM_TYPE_DEP_SEQ: {
+		if (m_DepartureSequence == nullptr) m_DepartureSequence = new DepartureSequence();
+		int seq = m_DepartureSequence->GetSequence(FlightPlan);
+		if (seq > 0)
+			sprintf_s(sItemString, 3, "%02d", OVRFLW2(seq));
+		else if (seq < 0) { // reconnected
+			sprintf_s(sItemString, 3, "--");
+			*pColorCode = TAG_COLOR_RGB_DEFINED;
+			*pRGB = RGB(255, 255, 0); // yellow
+		}
+
+		break; }
 	default:
 		break;
 	}
@@ -482,6 +506,32 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 
 		break; }
+	case TAG_ITEM_FUNCTION_DSQ_MENU: {
+		if (m_DepartureSequence == nullptr) break;
+		int seq = m_DepartureSequence->GetSequence(FlightPlan);
+		if (seq <= 0) { // reconnected or completely new
+			m_DepartureSequence->AddFlight(FlightPlan);
+		}
+		else {
+			OpenPopupEdit(Area, TAG_ITEM_FUNCTION_DSQ_EDIT, "");
+		}
+		break;	}
+	case TAG_ITEM_FUNCTION_DSQ_EDIT: {
+		int seq;
+		if (sscanf_s(sItemString, "%d", &seq) != 1) break;
+		if (seq >= 0) {
+			m_DepartureSequence->EditSequence(FlightPlan, seq);
+		}
+		break;	}
+	case TAG_ITEM_FUNCTION_SPD_SET: {
+
+		break; }
+	case TAG_ITEM_FUNCTION_SPD_MENU: {
+
+		break;	}
+	case TAG_ITEM_FUNCTION_SPD_EDIT: {
+
+		break; }
 	default:
 		break;
 	}
@@ -499,6 +549,17 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		// initiate CFL to be confirmed
 		m_CFLConfirmMap[FlightPlan.GetCallsign()] = true;
 	}
+	else if (DataType == CTR_DATA_TYPE_GROUND_STATE && m_DepartureSequence != nullptr) {
+		m_DepartureSequence->EditSequence(FlightPlan, 0);
+	}
+}
+
+void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
+{
+	// TODO: Departure Sequence
+	if (!FlightPlan.IsValid()) return;
+	if (m_DepartureSequence != nullptr)
+		m_DepartureSequence->EditSequence(FlightPlan, -1);
 }
 
 void CMTEPlugIn::OnTimer(int Counter)
@@ -614,6 +675,13 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		return msg.size();
 	}
 
+	// delete departure sequence
+	regex rxds("^.MTEP DS RESET$", regex_constants::icase);
+	if (regex_match(cmd, match, rxds)) {
+		DeleteDepartureSequence();
+		return true;
+	}
+
 	return false;
 }
 
@@ -660,12 +728,12 @@ void CMTEPlugIn::LoadRouteChecker(string filename)
 	try {
 		m_RouteChecker = new RouteChecker(filename);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route Checker is loaded successfully. CSV file name: " + filename).c_str(),
+			("Route checker is loaded successfully. CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route Checker failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			("Route checker failed to load (" + e + "). CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
 		UnloadRouteChecker();
 	}
@@ -676,7 +744,16 @@ void CMTEPlugIn::UnloadRouteChecker(void)
 	if (m_RouteChecker != nullptr) {
 		delete m_RouteChecker;
 		m_RouteChecker = nullptr;
-		DisplayUserMessage("MESSAGE", "MTEPlugin", "Route Checker is unloaded!", 1, 0, 0, 0, 0);
+		DisplayUserMessage("MESSAGE", "MTEPlugin", "Route checker is unloaded!", 1, 0, 0, 0, 0);
+	}
+}
+
+void CMTEPlugIn::DeleteDepartureSequence(void)
+{
+	if (m_DepartureSequence != nullptr) {
+		delete m_DepartureSequence;
+		m_DepartureSequence = nullptr;
+		DisplayUserMessage("MESSAGE", "MTEPlugin", "Departure sequence is deleted!", 1, 0, 0, 0, 0);
 	}
 }
 

@@ -14,6 +14,7 @@
 #include "ReCat.h"
 #include "SimilarCallsign.h"
 #include "RouteChecker.h"
+#include "DepartureSequence.h"
 
 using namespace EuroScopePlugIn;
 
@@ -28,6 +29,7 @@ public:
 		char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize);
 	virtual void OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area);
 	virtual void OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan, int DataType);
+	virtual void OnFlightPlanDisconnect(CFlightPlan FlightPlan);
 	virtual void OnTimer(int Counter);
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
@@ -37,11 +39,13 @@ private:
 	unordered_map<string, bool> m_ComEstbMap; // true means communication established
 	unordered_map<string, bool> m_CFLConfirmMap; // true means CFL needs confirm
 	RouteChecker* m_RouteChecker;
+	DepartureSequence* m_DepartureSequence;
 
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(string filename);
 	void UnloadRouteChecker(void);
+	void DeleteDepartureSequence(void);
 	string DisplayRouteMessage(string departure, string arrival);
 };

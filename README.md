@@ -18,6 +18,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 12. **RECAT-CN** - Re-categorization (Chinese) for H(eavy) aircrafts. Only includes **-B -C**.
 13. **Route validity** - route checker item, see detail below.
 14. **Tracked DUPE warning** - squawk DUPE warning only for in-air aircrafts tracked by myself.
+15. **Departure sequence** - departure sequence item, see detail below.
 
 ## Tag Item Functions
 
@@ -27,6 +28,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
    + Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc.
 4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one. Selecting one will set the ASEL aircraft, which works the same as a mouse click so it can be used along with command lines and function keys (open list first, then enter commands or keys, finally select in the list).
 5. **Show route checker info** - route checker function, see detail below.
+6. **Set departure sequence** - departure sequence function, see detail below.
 
 ## Custom Cursor Settings
 
@@ -76,6 +78,10 @@ Tag item type **Route validity** shows:
 Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
 
 Command line function: **.MTEP RC DDDD AAAA** will show the valid routes for DDDD-AAAA if found.
+
+## Departure Sequence
+
+This module is a simplified version from my GitHub repository [Departure-List-Sequencing-PlugIn](https://github.com/KingfuChan/Departure-List-Sequencing-PlugIn-for-EuroScope).
 
 ## Other Command Line Features
 
