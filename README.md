@@ -10,15 +10,21 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 4. **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator.
 5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
 6. **Cleared flight level** - shows Chinese metric RVSM levels if matches, or FLxxx, otherwise calculated meters.
+    + The color will be set by *Symbology Settings->Datablock->Redundant* if a new flight level is cleared but not confirmed.
 7. **Final flight level** - shows Chinese metric RVSM levels if matches, otherwise Flight Level in feet.
 8. **Similar callsign indicator** - shows **SC** if similar callsigns are detected. Flight plan status, /t and CN/EN are considered.
+    + The color is set by *Symbology Settings->Datablock->Information*.
 9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
-11. **COMM ESTB indicator** - shows a white **C** when assuming. Use **Set COMM ESTB** function to cancel this **C**.
+11. **COMM ESTB indicator** - shows a **C** when assuming. Use **Set COMM ESTB** function to cancel this **C**.T
+    + The color is set by *Symbology Settings->Datablock->Redundant*.
 12. **RECAT-CN** - Re-categorization (Chinese) for H(eavy) aircrafts. Only includes **-B -C**.
 13. **Route validity** - route checker item, see detail below.
 14. **Tracked DUPE warning** - squawk DUPE warning only for in-air aircrafts tracked by myself.
+    + The color is set by *Symbology Settings->Datablock->Information*.
 15. **Departure sequence** - departure sequence item, see detail below.
+16. **Radar vector indicator** - shows **RV** if a heading is assigned.
+    + The color is set by *Symbology Settings->Datablock->Information*.
 
 ## Tag Item Functions
 
@@ -26,9 +32,11 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 2. **Open CFL popup menu** - Chinese metric RVSM altitudes, along with ILS/VA/NONE options.
 3. **Open RFL popup menu** - Chinese metric RVSM altitudes.
    + Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc.
-4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one. Selecting one will set the ASEL aircraft, which works the same as a mouse click so it can be used along with command lines and function keys (open list first, then enter commands or keys, finally select in the list).
+4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
+   + Selecting one will set the ASEL aircraft, which works the same as a mouse click so it can be used along with command lines and function keys (open list first, then enter commands or keys, finally select in the list).
 5. **Show route checker info** - route checker function, see detail below.
 6. **Set departure sequence** - departure sequence function, see detail below.
+7. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
 
 ## Custom Cursor Settings
 
@@ -74,6 +82,7 @@ Tag item type **Route validity** shows:
 + **X** - route is not valid.
 + **?** - no route is found for this DEP-ARR.
 + shows nothing when clearance received flag is set or route checker is not configured.
++ The color of **L X** is set by *Symbology Settings->Datablock->Redundant*.
 
 Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
 
@@ -81,8 +90,33 @@ Command line function: **.MTEP RC DDDD AAAA** will show the valid routes for DDD
 
 ## Departure Sequence
 
-This module is a simplified version from my GitHub repository [Departure-List-Sequencing-PlugIn](https://github.com/KingfuChan/Departure-List-Sequencing-PlugIn-for-EuroScope).
+This module is a simplified version of my [Departure-List-Sequencing-PlugIn](https://github.com/KingfuChan/Departure-List-Sequencing-PlugIn-for-EuroScope) with different display method, no synchronization, but consistent with default EuroScope groud state.
+
+Tag item type **Departure sequence** shows:
+
++ **two digits number 01~99** - the sequence of the flight.
++ **--** - indicating a reconnected flight. The color is set by *Symbology Settings->Datablock->Information*.
+
+Tag item function **Set departure sequence** is used to:
+
++ initiate a sequence - if no previous sequence at all.
++ edit a sequence - if the flight has a active sequence.
++ re-activate a sequence - if the flight has just reconnected.
++ delete a sequence - entering 0 in the popup edit.
+
+There are 3 ways to remove a flight from the queue:
+
++ entering 0 in popup edit.
++ set any of the ground states (NSTS, STUP, PUSH, TAXI, DEPA).
++ setting clearance flag for flights without a ground state (NSTS).
+
+There are 2 ways to re-activate reconnected flights and restoring previous sequence:
+
++ resetting previous ground state.
++ use **Set departure sequence** for NSTS flights.
+
+Command line function: **.MTEP DS RESET** will completely reset the module.
 
 ## Other Command Line Features
 
-1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens ***www.flightradar24.com / flightadsb.variflight.com*** in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
+1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
