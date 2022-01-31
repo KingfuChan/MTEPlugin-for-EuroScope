@@ -33,6 +33,7 @@ const int TAG_ITEM_TYPE_RECAT = 12; // RECAT-CN
 const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
 const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
 const int TAG_ITEM_TYPE_DEP_SEQ = 15; // Departure sequence
+const int TAG_ITEM_TYPE_RVEC_IND = 16; // Radar vector indicator
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -48,13 +49,7 @@ const int TAG_ITEM_FUNCTION_RTE_INFO = 40; // Show route checker info
 const int TAG_ITEM_FUNCTION_DSQ_MENU = 50; // Set departure sequence
 const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit (not registered)
 const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registerd)
-const int TAG_ITEM_FUNCTION_SPD_MENU = 61; // Open assigned speed menu
-const int TAG_ITEM_FUNCTION_SPD_EDIT = 62; // Open assigned speed edit (not registered)
-
-// GROUND SPEED TREND CHAR
-const char CHR_GS_NON = ' ';
-const char CHR_GS_ACC = 'A';
-const char CHR_GS_DEC = 'L';
+const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 
 // COMPUTERISING RELATED
 const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determine accel/decel
@@ -104,6 +99,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
 	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
 	RegisterTagItemType("Departure sequence", TAG_ITEM_TYPE_DEP_SEQ);
+	RegisterTagItemType("Radar vector indicator", TAG_ITEM_TYPE_RVEC_IND);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
@@ -111,7 +107,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
 	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
 	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
-	RegisterTagItemFunction("Open assigned speed menu", TAG_ITEM_FUNCTION_SPD_MENU);
+	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
 		(string("MTEPlugin is loaded! For help please refer to ") + GITHUB_LINK).c_str(),
@@ -155,11 +151,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		double diff = KN_KPH(double(curgs) - double(pregs));
 		char gsTrend;
 		if (diff >= THRESHOLD_ACC_DEC)
-			gsTrend = CHR_GS_ACC;
+			gsTrend = 'A';
 		else if (diff <= -THRESHOLD_ACC_DEC)
-			gsTrend = CHR_GS_DEC;
+			gsTrend = 'L';
 		else
-			gsTrend = CHR_GS_NON;
+			gsTrend = ' ';
 
 		sprintf_s(sItemString, 5, "%03d%c", OVRFLW3(dspgs), gsTrend);
 
@@ -231,8 +227,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			break; }
 		}
 		if (FlightPlan.GetTrackingControllerIsMe() && m_CFLConfirmMap[FlightPlan.GetCallsign()]) {
-			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 255); // white
+			*pColorCode = TAG_COLOR_REDUNDANT;
 		}
 		break; }
 	case TAG_ITEM_TYPE_RFL_ICAO: {
@@ -251,12 +246,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_SC_IND: {
 		if (m_SimilarCallsignSet.find(RadarTarget.GetCallsign()) != m_SimilarCallsignSet.end()) { // there is similar
 			sprintf_s(sItemString, 3, "SC");
-			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 0); // yellow
+			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
+		if (!FlightPlan.GetTrackingControllerIsMe()) break;
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int _meter;
 		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
@@ -296,8 +291,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (FlightPlan.GetTrackingControllerIsMe() && RadarTarget.GetPosition().GetTransponderC()
 			&& !m_ComEstbMap[RadarTarget.GetCallsign()]) {
 			sprintf_s(sItemString, 2, "C");
-			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 255); // white
+			*pColorCode = TAG_COLOR_REDUNDANT;
 		}
 		break; }
 	case TAG_ITEM_TYPE_RECAT: {
@@ -312,16 +306,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
 		sprintf_s(sItemString, 2, "%c", rc);
 		if (rc != 'Y' && rc != '?' && rc != ' ') {
-			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 0); // yellow
+			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 
 		break; }
 	case TAG_ITEM_TYPE_SQ_DUPE: {
 		if (m_SquawkDupeSet.find(RadarTarget.GetCallsign()) != m_SquawkDupeSet.end()) {
 			sprintf_s(sItemString, 5, "DUPE");
-			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 0); // yellow
+			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 		break; }
 	case TAG_ITEM_TYPE_DEP_SEQ: {
@@ -331,10 +323,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 3, "%02d", OVRFLW2(seq));
 		else if (seq < 0) { // reconnected
 			sprintf_s(sItemString, 3, "--");
-			*pColorCode = TAG_COLOR_RGB_DEFINED;
-			*pRGB = RGB(255, 255, 0); // yellow
+			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 
+		break; }
+	case TAG_ITEM_TYPE_RVEC_IND: {
+		if (FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
+			sprintf_s(sItemString, 3, "RV");
+			*pColorCode = TAG_COLOR_INFORMATION;
+		}
 		break; }
 	default:
 		break;
@@ -358,10 +355,14 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		int tgtAlt = -1;
 		if (input == "NONE")
 			tgtAlt = 0;
-		else if (input == "ILS")
+		else if (input == "ILS") {
 			tgtAlt = 1;
-		else if (input == "VA")
+			FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
+		}
+		else if (input == "VA") {
 			tgtAlt = 2;
+			FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
+		}
 		else {
 			bool f = input[0] == 'F' || input[0] == 'f'; // whether 'F' is present and at first place
 			bool d = false; // whether '.'(dot) is present
@@ -524,13 +525,46 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break;	}
 	case TAG_ITEM_FUNCTION_SPD_SET: {
-
+		if (!strcmp(sItemString, "----"))
+			FlightPlan.GetControllerAssignedData().SetAssignedSpeed(0);
+		float m;
+		int s;
+		if (sscanf_s(sItemString, "M%f", &m) == 1) { // MACH
+			FlightPlan.GetControllerAssignedData().SetAssignedMach(m * 100);
+		}
+		else if (sscanf_s(sItemString, "N%d", &s) == 1) { // IAS
+			FlightPlan.GetControllerAssignedData().SetAssignedSpeed(s);
+		}
 		break; }
-	case TAG_ITEM_FUNCTION_SPD_MENU: {
-
-		break;	}
-	case TAG_ITEM_FUNCTION_SPD_EDIT: {
-
+	case TAG_ITEM_FUNCTION_SPD_LIST: {
+		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+			// don't show list if other controller is tracking
+			break;
+		}
+		int alt = MetricAlt::FeettoM(GetRadarDisplayAltitude(RadarTarget));
+		if (alt <= 7530) { // use IAS
+			int aspd = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
+			OpenPopupList(Area, "IAS", 2);
+			for (int s = 320; s >= 160; s -= 10) {
+				int k = round(KN_KPH(s));
+				char ias[5], kph[6];
+				sprintf_s(ias, 5, "N%d", s);
+				sprintf_s(kph, 6, " K%d", k);
+				AddPopupListElement(ias, kph, TAG_ITEM_FUNCTION_SPD_SET, aspd ? aspd == s : s == 240);
+			}
+			AddPopupListElement("----", " ----", TAG_ITEM_FUNCTION_SPD_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
+		}
+		else { // use MACH
+			int amac = FlightPlan.GetControllerAssignedData().GetAssignedMach();
+			OpenPopupList(Area, "MACH", 1);
+			AddPopupListElement("M2.0", nullptr, TAG_ITEM_FUNCTION_SPD_SET);
+			for (int m = 90; m >= 65; m -= 1) {
+				char mc[5];
+				sprintf_s(mc, 5, "M.%d", m);
+				AddPopupListElement(mc, nullptr, TAG_ITEM_FUNCTION_SPD_SET, amac ? amac == m : m == 80);
+			}
+			AddPopupListElement("----", nullptr, TAG_ITEM_FUNCTION_SPD_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
+		}
 		break; }
 	default:
 		break;
