@@ -9,21 +9,26 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 3. **Vertical speed (4-digit FPM)** - vertical speed in xxxx, will not display if vs<=100 fpm.
 4. **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator.
 5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
-6. **Cleared flight level** - shows Chinese metric RVSM levels if matches, or FLxxx, otherwise calculated meters.
+6. **Cleared flight level (m/FL)** - shows Chinese metric RVSM levels if matches, or FLxxx, otherwise calculated meters.
     + The color will be set by *Symbology Settings->Datablock->Redundant* if a new flight level is cleared but not confirmed.
-7. **Final flight level** - shows Chinese metric RVSM levels if matches, otherwise Flight Level in feet.
-8. **Similar callsign indicator** - shows **SC** if similar callsigns are detected. Flight plan status, /t and CN/EN are considered.
+7. **Final flight level (ICAO)** - shows Chinese metric RVSM levels if matches (Sxxx), otherwise flight Level (Fxxx).
+8. **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
+    + Considers Chinese/English crews and ignores those text-only. Enter *\*EN* in scratch pad to distinguish Chinese airlines speaking English.
     + The color is set by *Symbology Settings->Datablock->Information*.
 9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
-11. **COMM ESTB indicator** - shows a **C** when assuming. Use **Set COMM ESTB** function to cancel this **C**.T
+11. **COMM ESTB indicator** - shows a **C** when tracking. Use **Set COMM ESTB** function to cancel this **C**.T
     + The color is set by *Symbology Settings->Datablock->Redundant*.
 12. **RECAT-CN** - Re-categorization (Chinese) for H(eavy) aircrafts. Only includes **-B -C**.
 13. **Route validity** - route checker item, see detail below.
-14. **Tracked DUPE warning** - squawk DUPE warning only for in-air aircrafts tracked by myself.
+14. **Tracked DUPE warning** - squawk DUPE warning only for aircrafts tracked by myself.
     + The color is set by *Symbology Settings->Datablock->Information*.
 15. **Departure sequence** - departure sequence item, see detail below.
 16. **Radar vector indicator** - shows **RV** if a heading is assigned.
+    + The color is set by *Symbology Settings->Datablock->Information*.
+17. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, otherwise calculated meters.
+    + Similar to item 6, but won't show ILS/VA or Fxxx. More useful in a Sweatbox simulator session.
+18. **Reconnected indicator** - shows **r** if reconnected.
     + The color is set by *Symbology Settings->Datablock->Information*.
 
 ## Tag Item Functions
@@ -37,6 +42,8 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 5. **Show route checker info** - route checker function, see detail below.
 6. **Set departure sequence** - departure sequence function, see detail below.
 7. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
+8. **Restore assigned data** - restore previously assigned data for reconnected flights and start tracking.
+   + Only available if previously tracked by myself. Assigned data includes: *communication type, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, squawk, scratch pad*.
 
 ## Custom Cursor Settings
 
@@ -86,7 +93,7 @@ Tag item type **Route validity** shows:
 
 Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
 
-Command line function: **.MTEP RC DDDD AAAA** will show the valid routes for DDDD-AAAA if found.
+Command line function: **.MTEP RC DDDD AAAA** will display the valid routes from DDDD to AAAA and copy to clipboard.
 
 ## Departure Sequence
 
@@ -120,3 +127,4 @@ Command line function: **.MTEP DS RESET** will completely reset the module.
 ## Other Command Line Features
 
 1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
+2. **.MTEP TR RESET** - reset tracked recorder. Use this command if **Similar callsign indicator/COMM ESTB indicator/Tracked DUPE warning** is not working properly. Note that it also deletes all saved data for reconnected flights.

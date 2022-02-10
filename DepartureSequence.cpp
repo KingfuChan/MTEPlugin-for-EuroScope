@@ -1,11 +1,7 @@
 // DepartureSequence.cpp
 
 #include "pch.h"
-#include "framework.h"
-#include "resource.h"
 #include "DepartureSequence.h"
-
-using namespace std;
 
 DepartureSequence::DepartureSequence(void)
 {

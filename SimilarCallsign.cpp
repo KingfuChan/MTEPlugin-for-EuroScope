@@ -1,11 +1,12 @@
 // SimilarCallsign.cpp
 
 #include "pch.h"
-#include "framework.h"
-#include "resource.h"
 #include "SimilarCallsign.h"
 
-using namespace std;
+typedef list<char> char_list;
+
+char_list ExtractNumfromCallsign(const string callsign);
+bool CompareFlightNum(char_list num1, char_list num2);
 
 const unordered_set<string> m_CHNCallsign = {
 	"ALP","AYE","BDJ","BFM","BGC","BJN","BNH","BSH","CAF","CAO",
@@ -59,23 +60,6 @@ bool CompareCallsign(string callsign1, string callsign2)
 		isSimilar = CompareFlightNum(cs1, csl) || CompareFlightNum(cs1, csr);
 	}
 	return isSimilar;
-}
-
-unordered_set<string> ParseSimilarCallsignSet(unordered_set<string> callsigns)
-{
-	// input: callsigns, output: callsigns that are similar
-	unordered_set<string> res, tmp;
-	for (auto itn : callsigns) {
-		for (auto itt : tmp) {
-			if (CompareCallsign(itn, itt)) {
-				res.insert(itt);
-				res.insert(itn);
-				break;
-			}
-		}
-		tmp.insert(itn);
-	}
-	return res;
 }
 
 char_list ExtractNumfromCallsign(const string callsign)

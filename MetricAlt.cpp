@@ -1,8 +1,6 @@
 // MetricAlt.cpp
 
 #include "pch.h"
-#include "framework.h"
-#include "resource.h"
 #include "MetricAlt.h"
 
 int MetricAlt::MtoFeet(const int meter)

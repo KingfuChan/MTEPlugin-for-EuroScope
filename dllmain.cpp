@@ -1,6 +1,6 @@
 ﻿// dllmain.cpp
+
 #include "pch.h"
-#include <EuroScopePlugIn.h>
 #include "MTEPlugin.h"
 
 // Interface for EuroScope plugin loading

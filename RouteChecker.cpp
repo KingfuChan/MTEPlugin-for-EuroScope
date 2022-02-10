@@ -1,8 +1,6 @@
 // MTEPlugIn.cpp
 
 #include "pch.h"
-#include "framework.h"
-#include "resource.h"
 #include "RouteChecker.h"
 
 RouteChecker::RouteChecker(string filename)
