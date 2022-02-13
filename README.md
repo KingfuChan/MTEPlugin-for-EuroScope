@@ -15,7 +15,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 8. **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
     + Considers Chinese/English crews and ignores those text-only. Enter *\*EN* in scratch pad to distinguish Chinese airlines speaking English.
     + The color is set by *Symbology Settings->Datablock->Information*.
-9. **RFL unit indicator** - shows **#** if final altitude does not match Chinese metric RVSM levels.
+9. **RFL unit indicator** - shows **#** if final altitude of tracked aircraft does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
 11. **COMM ESTB indicator** - shows a **C** when tracking. Use **Set COMM ESTB** function to cancel this **C**.T
     + The color is set by *Symbology Settings->Datablock->Redundant*.
@@ -24,7 +24,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 14. **Tracked DUPE warning** - squawk DUPE warning only for aircrafts tracked by myself.
     + The color is set by *Symbology Settings->Datablock->Information*.
 15. **Departure sequence** - departure sequence item, see detail below.
-16. **Radar vector indicator** - shows **RV** if a heading is assigned.
+16. **Radar vector indicator** - shows **RV** for tracked aircraft with heading assigned.
     + The color is set by *Symbology Settings->Datablock->Information*.
 17. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, otherwise calculated meters.
     + Similar to item 6, but won't show ILS/VA or Fxxx. More useful in a Sweatbox simulator session.
@@ -34,15 +34,16 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 ## Tag Item Functions
 
 1. **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
-2. **Open CFL popup menu** - Chinese metric RVSM altitudes, along with ILS/VA/NONE options.
-3. **Open RFL popup menu** - Chinese metric RVSM altitudes.
-   + Supports keyboard entry: ***xxx*** for metric, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc.
-4. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
+2. **Open CFL popup menu** - Chinese metric RVSM altitudes. Includes ILS/VA/NONE options.
+3. **Open CFL popup edit** - Chinese metric RVSM altitudes.
+4. **Open RFL popup menu** - Chinese metric RVSM altitudes.
+   + These altitude functions provide popup edit: ***xxx*** for metric, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc.
+5. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
    + Selecting one will set the ASEL aircraft, which works the same as a mouse click so it can be used along with command lines and function keys (open list first, then enter commands or keys, finally select in the list).
-5. **Show route checker info** - route checker function, see detail below.
-6. **Set departure sequence** - departure sequence function, see detail below.
-7. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
-8. **Restore assigned data** - restore previously assigned data for reconnected flights and start tracking.
+6. **Show route checker info** - route checker function, see detail below.
+7. **Set departure sequence** - departure sequence function, see detail below.
+8. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
+9. **Restore assigned data** - restore previously assigned data for reconnected flights and start tracking.
    + Only available if previously tracked by myself. Assigned data includes: *communication type, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, squawk, scratch pad*.
 
 ## Custom Cursor Settings
@@ -74,7 +75,7 @@ Dep|Arr|Name|EvenOdd|AltList|MinAlt|Route|Remarks
 + ***Route*** is not necessarily the full route but can be partial. One DEP and ARR pair can have multiple routes with different restrictions.
 + ***Remarks*** no need to explain.
 
-CSV files with incorrect columns will not be loaded. Empty cells are accepted. However it's still possible to cause unpredicted issues if any cells doesn't follow the rules above.
+CSV files with incorrect column names or not in the given order, will not be loaded. Empty cells are accepted. However it's still possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
 You need to use a command line to load the CSV file: **.MTEP RC PATH** (case-insensitive). **PATH** should be replace by the CSV file path and file name.
 

@@ -6,7 +6,7 @@
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
 #define PLUGIN_FILE "MTEPlugin.dll"
-#define PLUGIN_VERSION "3.1.0"
+#define PLUGIN_VERSION "3.1.1"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
@@ -37,7 +37,7 @@ const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
 const int TAG_ITEM_FUNCTION_RCNT_RST = 2; // Restore assigned data
 const int TAG_ITEM_FUNCTION_CFL_SET = 10; // Set CFL (not registered)
 const int TAG_ITEM_FUNCTION_CFL_MENU = 11; // Open CFL popup menu
-const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit (not registered)
+const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit
 const int TAG_ITEM_FUNCTION_RFL_SET = 20; // Set RFL (not registered)
 const int TAG_ITEM_FUNCTION_RFL_MENU = 21; // Open RFL popup menu
 const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit (not registered)
@@ -82,6 +82,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 		PLUGIN_COPYRIGHT)
 {
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
+
 	RegisterTagItemType("GS(KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("Vertical speed (4-digit FPM)", TAG_ITEM_TYPE_VS_FPM);
@@ -104,6 +105,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
+	RegisterTagItemFunction("Open CFL popup edit", TAG_ITEM_FUNCTION_CFL_EDIT);
 	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
 	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
@@ -306,8 +308,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_RECAT: {
 		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
 		string acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
-		if (categ == 'H' && m_ReCatMap.count(acType))
-			sprintf_s(sItemString, 3, "-%c", m_ReCatMap.at(acType));
+		auto rc = m_ReCatMap.find(acType);
+		if (categ == 'H' && rc != m_ReCatMap.end())
+			sprintf_s(sItemString, 3, "-%c", rc->second);
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
@@ -446,22 +449,28 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_EDIT: {
+		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+			// don't show list if other controller is tracking
+			break;
+		}
+		else if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
+			// confirm previous CFL first
+			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign());
+			break;
+		}
 		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_CFL_SET, "");
 
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_SET: {
-		CFlightPlanData fplData = FlightPlan.GetFlightPlanData();
 		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
 		if (strlen(sItemString)) {
 			int alt;
 			if (sscanf_s(sItemString, "F%3d", &alt) || sscanf_s(sItemString, "f%3d", &alt)) { // FL in feet
 				alt = alt * 100;
-				fplData.SetFinalAltitude(alt);
 				ctrData.SetFinalAltitude(alt);
 			}
 			else if (sscanf_s(sItemString, "%3d", &alt)) { // otherwise Metric
 				alt = MetricAlt::LvlMtoFeet(alt * 100);
-				fplData.SetFinalAltitude(alt);
 				ctrData.SetFinalAltitude(alt);
 			}
 		}

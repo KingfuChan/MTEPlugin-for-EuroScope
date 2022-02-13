@@ -44,7 +44,6 @@ RouteChecker::RouteChecker(string filename)
 
 RouteChecker::~RouteChecker(void)
 {
-
 }
 
 list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
@@ -57,7 +56,7 @@ list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 	catch (out_of_range e) {
 		return res;
 	}
-	for (auto rd : routes) {
+	for (auto& rd : routes) {
 		string info = rd.m_Route;
 		if (rd.m_Name.size())
 			info = "(" + rd.m_Name + ")  " + info;
@@ -93,7 +92,7 @@ char RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan)
 		return '?';
 	}
 	char res = 'X';
-	for (auto rd : routes) {
+	for (auto& rd : routes) {
 		if (IsRouteValid(fpd.GetRoute(), rd.m_Route)) {
 			if (IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt))
 				return 'Y';

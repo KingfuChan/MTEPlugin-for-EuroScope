@@ -140,7 +140,6 @@ void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 			asd.SetDirectToPointName(r->second.m_DCTName.c_str());
 		asd.SetClearedAltitude(r->second.m_ClearedAlt);
 		asd.SetFinalAltitude(r->second.m_FinalAlt);
-		FlightPlan.GetFlightPlanData().SetFinalAltitude(r->second.m_FinalAlt);
 		if (r->second.m_Speed < 100)
 			asd.SetAssignedMach(r->second.m_Speed);
 		else
