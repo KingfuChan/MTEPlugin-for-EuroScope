@@ -32,7 +32,6 @@ public:
 	virtual void OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan, int DataType);
 	virtual void OnFlightPlanDisconnect(CFlightPlan FlightPlan);
 	virtual void OnRadarTargetPositionUpdate(CRadarTarget RadarTarget);
-	virtual void OnTimer(int Counter);
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:

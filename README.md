@@ -17,7 +17,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
     + The color is set by *Symbology Settings->Datablock->Information*.
 9. **RFL unit indicator** - shows **#** if final altitude of tracked aircraft does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
-11. **COMM ESTB indicator** - shows a **C** when tracking. Use **Set COMM ESTB** function to cancel this **C**.T
+11. **COMM ESTB indicator** - shows a **C** when tracking. Use **Set COMM ESTB** function to cancel this **C**.
     + The color is set by *Symbology Settings->Datablock->Redundant*.
 12. **RECAT-CN** - Re-categorization (Chinese) for H(eavy) aircrafts. Only includes **-B -C**.
 13. **Route validity** - route checker item, see detail below.
@@ -37,9 +37,11 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 2. **Open CFL popup menu** - Chinese metric RVSM altitudes. Includes ILS/VA/NONE options.
 3. **Open CFL popup edit** - Chinese metric RVSM altitudes.
 4. **Open RFL popup menu** - Chinese metric RVSM altitudes.
-   + These altitude functions provide popup edit: ***xxx*** for metric, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc.
+   + CFL popup edit supports (standalone or in-menu): ***xxx*** for metric RVSM levels, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc. Enter ***0*** to clear CFL.
+   + RFL popup edit (in-menu) supports: ***xxx*** for metric, ***Fxxx*** for FLxxx. Enter ***0*** to reset RFL to the final altitude in flight plan.
+   + Enter a ***F*** or ***M*** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit.
 5. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
-   + Selecting one will set the ASEL aircraft, which works the same as a mouse click so it can be used along with command lines and function keys (open list first, then enter commands or keys, finally select in the list).
+   + Selecting one will toggle native ***.find*** command.
 6. **Show route checker info** - route checker function, see detail below.
 7. **Set departure sequence** - departure sequence function, see detail below.
 8. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.

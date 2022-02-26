@@ -19,6 +19,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 	trd.m_Reconnected = false;
 	trd.m_CommEstbed = false;
 	trd.m_CFLConfirmed = true;
+	trd.m_ForceFeet = false;
 	trd.m_CallsignType = FlightPlan.IsTextCommunication() ? -1 : IsChineseCallsign(FlightPlan);
 
 	auto asd = FlightPlan.GetControllerAssignedData();
@@ -44,9 +45,10 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 		if (FlightPlan.GetTrackingControllerIsMe()) {
 			// recorded, tracking, not reconnected
 			bool rfsh = trd.m_CallsignType != r->second.m_CallsignType;
+			trd.m_Reconnected = !online;
 			trd.m_CommEstbed = r->second.m_CommEstbed;
 			trd.m_CFLConfirmed = r->second.m_CFLConfirmed;
-			trd.m_Reconnected = !online;
+			trd.m_ForceFeet = r->second.m_ForceFeet;
 			r->second = trd;
 			if (rfsh)
 				RefreshSimilarCallsign();
@@ -89,6 +91,22 @@ void TrackedRecorder::SetCFLConfirmed(string callsign, bool confirmed)
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_CFLConfirmed = confirmed;
+}
+
+bool TrackedRecorder::IsForceFeet(string callsign)
+{
+	auto r = m_TrackedMap.find(callsign);
+	if (r != m_TrackedMap.end())
+		return r->second.m_ForceFeet;
+	else
+		return false;
+}
+
+void TrackedRecorder::SetAltitudeUnit(string callsign, bool feet)
+{
+	auto r = m_TrackedMap.find(callsign);
+	if (r != m_TrackedMap.end())
+		r->second.m_ForceFeet = feet;
 }
 
 bool TrackedRecorder::IsSquawkDUPE(string callsign)

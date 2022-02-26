@@ -25,6 +25,8 @@ public:
 	void SetCommEstablished(string callsign);
 	bool IsCFLConfirmed(string callsign);
 	void SetCFLConfirmed(string callsign, bool confirmed = true);
+	bool IsForceFeet(string callsign);
+	void SetAltitudeUnit(string callsign, bool feet);
 	bool IsSquawkDUPE(string callsign);
 	bool IsReconnected(string callsign);
 	bool IsSimilarCallsign(string callsign);
@@ -36,6 +38,7 @@ private:
 		bool m_Reconnected;
 		bool m_CommEstbed;
 		bool m_CFLConfirmed;
+		bool m_ForceFeet;
 		int m_CallsignType; // -1: Text, 0: ENG, 1: CHN
 		// assigned data
 		char m_CommType;
