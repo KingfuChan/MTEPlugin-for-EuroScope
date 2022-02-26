@@ -120,7 +120,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
 	myCursor = CopyCursor(LoadImage(GetModuleHandle(PLUGIN_FILE), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
 	pluginWindow = FindWindow("#32770", "EuroScope v3.2a(r33)");
-	SetCustomCursor();
+	if (customCursor)
+		SetCustomCursor();
 
 	m_RouteChecker = nullptr;
 	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
