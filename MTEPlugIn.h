@@ -39,6 +39,8 @@ private:
 	RouteChecker* m_RouteChecker;
 	DepartureSequence* m_DepartureSequence;
 	TrackedRecorder* m_TrackedRecorder;
+	bool m_CustomCursor;
+	int m_AutoRetrack;
 
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
 	void SetCustomCursor(void);

@@ -30,7 +30,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 	trd.m_Speed = asd.GetAssignedSpeed() + asd.GetAssignedMach(); // speed:(100,inf), mach:(0:100]
 	trd.m_Rate = asd.GetAssignedRate();
 	trd.m_DCTName = asd.GetDirectToPointName();
-	trd.m_Squawk = asd.GetSquawk();
+	trd.m_Squawk = FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetSquawk();
 	trd.m_ScratchPad = asd.GetScratchPadString();
 
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
@@ -115,7 +115,7 @@ bool TrackedRecorder::IsSquawkDUPE(string callsign)
 	if (r == m_TrackedMap.end())
 		return false;
 	for (auto& r1 : m_TrackedMap) {
-		if (r->first != r1.first && r->second.m_Squawk == r1.second.m_Squawk)
+		if (!r1.second.m_Reconnected && r->first != r1.first && r->second.m_Squawk == r1.second.m_Squawk)
 			return true;
 	}
 	return false;

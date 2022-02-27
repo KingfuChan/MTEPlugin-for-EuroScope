@@ -39,9 +39,9 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 4. **Open RFL popup menu** - Chinese metric RVSM altitudes.
    + CFL popup edit supports (standalone or in-menu): ***xxx*** for metric RVSM levels, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc. Enter ***0*** to clear CFL.
    + RFL popup edit (in-menu) supports: ***xxx*** for metric, ***Fxxx*** for FLxxx. Enter ***0*** to reset RFL to the final altitude in flight plan.
-   + Enter a ***F*** or ***M*** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit.
+   + Enter a ***F*** or ***M*** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit, only for tracekd aircrafts.
 5. **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
-   + Selecting one will toggle native ***.find*** command.
+   + Selecting one will toggle native ***.find*** command, available only with the newest Euroscope version (v3.2a r33).
 6. **Show route checker info** - route checker function, see detail below.
 7. **Set departure sequence** - departure sequence function, see detail below.
 8. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
@@ -50,7 +50,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 
 ## Custom Cursor Settings
 
-You may turn the default mouse arrow into a cross to simulate real-world radar screens. This only works with the original DLL file name (MTEPlugin.dll).
+You may turn the default mouse arrow into a cross to simulate real-world radar screens. This only works with the original DLL file name (MTEPlugin.dll) and the newest Euroscope version (v3.2a r33).
 
 Enter **.MTEP CURSOR ON** (case-insensitive) in your command line at the bottom of the screen to activate the cursor feature.
 
@@ -130,4 +130,5 @@ Command line function: **.MTEP DS RESET** will completely reset the module.
 ## Other Command Line Features
 
 1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
-2. **.MTEP TR RESET** - reset tracked recorder. Use this command if **Similar callsign indicator/COMM ESTB indicator/Tracked DUPE warning** is not working properly. Note that it also deletes all saved data for reconnected flights.
+2. **.MTEP TR RESET** - resets tracked recorder. Use this command if **Similar callsign indicator/COMM ESTB indicator/Tracked DUPE warning** is not working properly. Note that it also deletes all saved data for reconnected flights.
+3. **.MTEP TR 1/2/3** - set auto retrack mode: (1) no auto retrack; (2) auto retrack, no notifications; (3) auto retrack, notified through *MTEP-Recorder* message. This setting will be saved in your EuroScope plugin settings.

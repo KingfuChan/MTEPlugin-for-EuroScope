@@ -6,7 +6,7 @@
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
 #define PLUGIN_FILE "MTEPlugin.dll"
-#define PLUGIN_VERSION "3.1.2"
+#define PLUGIN_VERSION "3.1.3"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
@@ -63,16 +63,14 @@ bool IsCFLAssigned(CFlightPlan FlightPlan);
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
 const char* SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
+const char* SETTING_AUTO_RETRACK = "AutoRetrack"; // 0: off, 1: on (no notification), 2: on (notification) (TODO)
 
 // CURSOR RELATED
-const int STARTUP_CURSOR_DELAY = 3; // seconds from startup to set custom cursor
-bool initCursor = true; // if cursor has not been set to custom / if using default cursor
-bool customCursor = false; // if cursor need to be set to custom
-WNDPROC gSourceProc;
-HWND pluginWindow;
-HCURSOR myCursor = nullptr;
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-// Note that cursor setting will only be effective with it's original file name (MTEPlugin.dll)
+WNDPROC prevWndFunc = nullptr;
+HWND pluginWnd = nullptr;
+HCURSOR pluginCursor = nullptr;
+LRESULT CALLBACK SetCursorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+// Note that cursor setting will only be effective with it's original file name (MTEPlugin.dll), and corresponding EuroScope version.
 
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
@@ -81,6 +79,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
 {
+	pluginWnd = FindWindow("#32770", "EuroScope v3.2a(r33)");
+
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
 	RegisterTagItemType("GS(KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
@@ -117,10 +117,9 @@ CMTEPlugIn::CMTEPlugIn(void)
 		1, 0, 0, 0, 0);
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
-	customCursor = setcc == nullptr ? false : !strcmp(setcc, "1"); // 1 means true
-	myCursor = CopyCursor(LoadImage(GetModuleHandle(PLUGIN_FILE), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
-	pluginWindow = FindWindow("#32770", "EuroScope v3.2a(r33)");
-	if (customCursor)
+	pluginCursor = CopyCursor(LoadImage(GetModuleHandle(PLUGIN_FILE), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
+	m_CustomCursor = false;
+	if (setcc == nullptr ? false : stoi(setcc))
 		SetCustomCursor();
 
 	m_RouteChecker = nullptr;
@@ -130,7 +129,10 @@ CMTEPlugIn::CMTEPlugIn(void)
 	}
 
 	m_DepartureSequence = nullptr;
+
 	m_TrackedRecorder = new TrackedRecorder();
+	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
+	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
 }
 
 CMTEPlugIn::~CMTEPlugIn(void)
@@ -165,7 +167,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			gsTrend = 'L';
 		else
 			gsTrend = ' ';
-
 		sprintf_s(sItemString, 5, "%03d%c", OVRFLW3(dspgs), gsTrend);
 
 		break; }
@@ -267,14 +268,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			rflAlt = round(rflAlt / 100.0);
 			sprintf_s(sItemString, 5, "F%03d", OVRFLW3(rflAlt));
 		}
-
 		break; }
 	case TAG_ITEM_TYPE_SC_IND: {
 		if (m_TrackedRecorder->IsSimilarCallsign(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 3, "SC");
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
-
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
 		if (!FlightPlan.GetTrackingControllerIsMe()) break;
@@ -334,7 +333,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (rc != 'Y' && rc != '?' && rc != ' ') {
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
-
 		break; }
 	case TAG_ITEM_TYPE_SQ_DUPE: {
 		if (m_TrackedRecorder->IsSquawkDUPE(FlightPlan.GetCallsign())) {
@@ -351,7 +349,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 3, "--");
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
-
 		break; }
 	case TAG_ITEM_TYPE_RVEC_IND: {
 		if (FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
@@ -361,8 +358,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_RCNT_IND: {
 		if (m_TrackedRecorder->IsReconnected(FlightPlan.GetCallsign())) {
-			sprintf_s(sItemString, 2, "r");
-			*pColorCode = TAG_COLOR_INFORMATION;
+			if (m_AutoRetrack) {
+				m_TrackedRecorder->SetTrackedData(FlightPlan);
+				if (m_AutoRetrack == 2) {
+					string msg = string(FlightPlan.GetCallsign()) + " reconnected and is re-tracked.";
+					DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
+				}
+			}
+			else {
+				sprintf_s(sItemString, 2, "r");
+				*pColorCode = TAG_COLOR_INFORMATION;
+			}
 		}
 		break; }
 	default:
@@ -566,8 +572,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_SC_SELECT: {
-		if (pluginWindow != nullptr) {
-			HWND editWnd = FindWindowEx(pluginWindow, nullptr, "Edit", nullptr);
+		if (pluginWnd != nullptr) {
+			HWND editWnd = FindWindowEx(pluginWnd, nullptr, "Edit", nullptr);
 			if (editWnd != nullptr)
 				SendMessage(editWnd, WM_SETTEXT, NULL, (LPARAM)(LPCSTR)".find ");
 		}
@@ -686,22 +692,14 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 	regex rxcc0("^.MTEP CURSOR OFF$", regex_constants::icase);
 	regex rxcc1("^.MTEP CURSOR ON$", regex_constants::icase);
 	if (regex_match(cmd, match, rxcc0)) {
-		if (!customCursor) return true;
-		customCursor = false;
 		CancelCustomCursor();
 		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "0");
 		return true;
 	}
 	else if (regex_match(cmd, match, rxcc1)) {
-		if (customCursor) { // reset
-			CancelCustomCursor();
-			SetCustomCursor();
-		}
-		else {
-			customCursor = true;
-			SetCustomCursor();
-			SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "1");
-		}
+		CancelCustomCursor();
+		SetCustomCursor();
+		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "1");
 		return true;
 	}
 
@@ -776,6 +774,28 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		return true;
 	}
 
+	regex rxtrrt("^.MTEP TR ([0-2])$", regex_constants::icase);
+	if (regex_match(cmd, match, rxtrrt)) {
+		string res = match[1].str();
+		const char* descr = "auto retrack mode";
+		if (res == "1") {
+			m_AutoRetrack = 1;
+			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "1");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack mode 1 (silent) is set", 1, 0, 0, 0, 0);
+		}
+		else if (res == "2") {
+			m_AutoRetrack = 2;
+			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "2");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack mode 2 (notify) is set", 1, 0, 0, 0, 0);
+		}
+		else if (res == "0") {
+			m_AutoRetrack = 0;
+			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "0");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack is off", 1, 0, 0, 0, 0);
+		}
+		return true;
+	}
+
 	return false;
 }
 
@@ -789,20 +809,18 @@ int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
 
 void CMTEPlugIn::SetCustomCursor(void)
 {
-	// correlate cursor
-	if (myCursor == nullptr || pluginWindow == nullptr) return;
-	gSourceProc = (WNDPROC)SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)WindowProc);
-	initCursor = false;
+	if (m_CustomCursor || pluginWnd == nullptr || pluginCursor == nullptr) return;
+	prevWndFunc = (WNDPROC)SetWindowLong(pluginWnd, GWL_WNDPROC, (LONG)SetCursorWndProc);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is set!", 1, 0, 0, 0, 0);
+	m_CustomCursor = true;
 }
 
 void CMTEPlugIn::CancelCustomCursor(void)
 {
-	// uncorrelate cursor
-	if (myCursor == nullptr || pluginWindow == nullptr) return;
-	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)gSourceProc);
-	initCursor = true;
+	if (!m_CustomCursor || pluginWnd == nullptr || pluginCursor == nullptr) return;
+	SetWindowLong(pluginWnd, GWL_WNDPROC, (LONG)prevWndFunc);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
+	m_CustomCursor = false;
 }
 
 void CMTEPlugIn::LoadRouteChecker(string filename)
@@ -911,14 +929,13 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 	return noCfl;
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK SetCursorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	switch (uMsg)
-	{
-	case WM_SETCURSOR:
-		SetCursor(myCursor);
+	if (uMsg == WM_SETCURSOR && pluginCursor != nullptr) {
+		SetCursor(pluginCursor);
 		return true;
-	default:
-		return CallWindowProc(gSourceProc, hwnd, uMsg, wParam, lParam);
+	}
+	else {
+		return CallWindowProc(prevWndFunc, hwnd, uMsg, wParam, lParam);
 	}
 }
