@@ -5,7 +5,6 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_FILE "MTEPlugin.dll"
 #define PLUGIN_VERSION "3.1.3"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
@@ -50,7 +49,6 @@ const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registerd)
 const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 
 // COMPUTERISING RELATED
-const float THRESHOLD_ACC_DEC = 2.5; // threshold (kph) to determine accel/decel
 constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
 constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
 constexpr int OVRFLW2(int t) { return abs(t) > 99 ? 99 : abs(t); } // overflow pre-process 2 digits
@@ -63,14 +61,15 @@ bool IsCFLAssigned(CFlightPlan FlightPlan);
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
 const char* SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
-const char* SETTING_AUTO_RETRACK = "AutoRetrack"; // 0: off, 1: on (no notification), 2: on (notification) (TODO)
+const char* SETTING_AUTO_RETRACK = "AutoRetrack";
 
-// CURSOR RELATED
+// WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
-HWND pluginWnd = nullptr;
+HWND pluginWindow = nullptr;
+HMODULE pluginModule = nullptr;
 HCURSOR pluginCursor = nullptr;
-LRESULT CALLBACK SetCursorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-// Note that cursor setting will only be effective with it's original file name (MTEPlugin.dll), and corresponding EuroScope version.
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
@@ -79,7 +78,26 @@ CMTEPlugIn::CMTEPlugIn(void)
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
 {
-	pluginWnd = FindWindow("#32770", "EuroScope v3.2a(r33)");
+	AFX_MANAGE_STATE(AfxGetStaticModuleState());
+	DWORD dwCurPID = GetCurrentProcessId();
+	EnumWindows(EnumWindowsProc, (LPARAM)&dwCurPID); // to set pluginWindow
+	pluginModule = AfxGetInstanceHandle();
+
+	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
+	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
+	m_CustomCursor = false;
+	if (setcc == nullptr ? false : stoi(setcc))
+		SetCustomCursor();
+
+	m_RouteChecker = nullptr;
+	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
+	if (setrc != nullptr)
+		LoadRouteChecker(setrc);
+
+	m_DepartureSequence = nullptr;
+	m_TrackedRecorder = new TrackedRecorder();
+	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
+	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
@@ -113,26 +131,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
-		(string("MTEPlugin is loaded! For help please refer to ") + GITHUB_LINK).c_str(),
+		(string("MTEPlugin finished loading! For help please refer to ") + GITHUB_LINK).c_str(),
 		1, 0, 0, 0, 0);
-
-	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
-	pluginCursor = CopyCursor(LoadImage(GetModuleHandle(PLUGIN_FILE), MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
-	m_CustomCursor = false;
-	if (setcc == nullptr ? false : stoi(setcc))
-		SetCustomCursor();
-
-	m_RouteChecker = nullptr;
-	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
-	if (setrc != nullptr) {
-		LoadRouteChecker(setrc);
-	}
-
-	m_DepartureSequence = nullptr;
-
-	m_TrackedRecorder = new TrackedRecorder();
-	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
-	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
 }
 
 CMTEPlugIn::~CMTEPlugIn(void)
@@ -155,25 +155,24 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_GS_W_IND: {
 		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-		int curgs = curpos.GetReportedGS(); // current GS
-		int dspgs = round(KN_KPH(curgs) / 10.0); // display GS
-		dspgs = dspgs ? dspgs : RadarTarget.GetGS(); // If reported GS is 0 then uses the calculated one.
-		int pregs = prepos.GetReportedGS(); // previous GS
-		double diff = KN_KPH(double(curgs) - double(pregs));
+		int curgs = curpos.GetReportedGS();
+		int pregs = prepos.GetReportedGS();
+		double diff = KN_KPH((double)(curgs - pregs));
 		char gsTrend;
-		if (diff >= THRESHOLD_ACC_DEC)
+		if (diff >= 5)
 			gsTrend = 'A';
-		else if (diff <= -THRESHOLD_ACC_DEC)
+		else if (diff <= -5)
 			gsTrend = 'L';
 		else
 			gsTrend = ' ';
+		int dspgs = curgs ? curgs : RadarTarget.GetGS();
+		dspgs = (int)round(KN_KPH((double)dspgs) / 10.0);
 		sprintf_s(sItemString, 5, "%03d%c", OVRFLW3(dspgs), gsTrend);
 
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
 		string remarks;
 		remarks = FlightPlan.GetFlightPlanData().GetRemarks();
-		// remarks.MakeUpper(); // could crash by some special characters in certain system environment
 		if (remarks.find("RMK/") != string::npos || remarks.find("STS/") != string::npos)
 			sprintf_s(sItemString, 2, "*");
 		else
@@ -200,11 +199,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int rdrAlt = GetRadarDisplayAltitude(RadarTarget);
 		int dspAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
-			dspAlt = round(MetricAlt::FeettoM(rdrAlt) / 10.0);
+			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
 			sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
 		}
 		else {
-			dspAlt = round(rdrAlt / 100.0);
+			dspAlt = (int)round(rdrAlt / 100.0);
 			sprintf_s(sItemString, 5, "F%3d", OVRFLW3(dspAlt));
 		}
 		break; }
@@ -265,7 +264,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 6, "%c%04d", trsMrk, OVRFLW4(dspMtr / 10));
 		}
 		else {
-			rflAlt = round(rflAlt / 100.0);
+			rflAlt = (int)round(rflAlt / 100.0);
 			sprintf_s(sItemString, 5, "F%03d", OVRFLW3(rflAlt));
 		}
 		break; }
@@ -452,7 +451,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// metric
-			int minDif(1e6), minAlt(0); // a big enough number
+			int minDif(100000), minAlt(0); // a big enough number
 			for (auto it = MetricAlt::m_ftom.begin(); it != MetricAlt::m_ftom.end(); it++) {
 				int dif = abs(it->first - cmpAlt);
 				if (dif < minDif) {
@@ -527,7 +526,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// metric
 			// pre-select altitude
-			int minDif(1e6), minAlt(0); // a big enough number
+			int minDif(100000), minAlt(0); // a big enough number
 			for (auto it = MetricAlt::m_ftom.begin(); it != MetricAlt::m_ftom.end(); it++) {
 				int dif = abs(it->first - rflAlt);
 				if (dif < minDif) {
@@ -572,8 +571,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_SC_SELECT: {
-		if (pluginWnd != nullptr) {
-			HWND editWnd = FindWindowEx(pluginWnd, nullptr, "Edit", nullptr);
+		if (pluginWindow != nullptr) {
+			HWND editWnd = FindWindowEx(pluginWindow, nullptr, "Edit", nullptr);
 			if (editWnd != nullptr)
 				SendMessage(editWnd, WM_SETTEXT, NULL, (LPARAM)(LPCSTR)".find ");
 		}
@@ -610,7 +609,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		float m;
 		int s;
 		if (sscanf_s(sItemString, "M%f", &m) == 1) { // MACH
-			FlightPlan.GetControllerAssignedData().SetAssignedMach(m * 100);
+			FlightPlan.GetControllerAssignedData().SetAssignedMach((int)(m * 100.0));
 		}
 		else if (sscanf_s(sItemString, "N%d", &s) == 1) { // IAS
 			FlightPlan.GetControllerAssignedData().SetAssignedSpeed(s);
@@ -626,7 +625,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			int aspd = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
 			OpenPopupList(Area, "IAS", 2);
 			for (int s = 320; s >= 160; s -= 10) {
-				int k = round(KN_KPH(s));
+				int k = (int)round(KN_KPH((double)s));
 				char ias[5], kph[6];
 				sprintf_s(ias, 5, "N%d", s);
 				sprintf_s(kph, 6, " K%d", k);
@@ -809,16 +808,16 @@ int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
 
 void CMTEPlugIn::SetCustomCursor(void)
 {
-	if (m_CustomCursor || pluginWnd == nullptr || pluginCursor == nullptr) return;
-	prevWndFunc = (WNDPROC)SetWindowLong(pluginWnd, GWL_WNDPROC, (LONG)SetCursorWndProc);
+	if (m_CustomCursor || pluginWindow == nullptr || pluginCursor == nullptr) return;
+	prevWndFunc = (WNDPROC)SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)WindowProc);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is set!", 1, 0, 0, 0, 0);
 	m_CustomCursor = true;
 }
 
 void CMTEPlugIn::CancelCustomCursor(void)
 {
-	if (!m_CustomCursor || pluginWnd == nullptr || pluginCursor == nullptr) return;
-	SetWindowLong(pluginWnd, GWL_WNDPROC, (LONG)prevWndFunc);
+	if (!m_CustomCursor || pluginWindow == nullptr || pluginCursor == nullptr) return;
+	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)prevWndFunc);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
 	m_CustomCursor = false;
 }
@@ -827,13 +826,11 @@ void CMTEPlugIn::LoadRouteChecker(string filename)
 {
 	UnloadRouteChecker();
 	if (filename[0] == '@') {
-		// for relative directory to dll file, only works for original dll file name (MTEPlugin.dll)
-		HMODULE hMod = GetModuleHandle(PLUGIN_FILE);
-		if (hMod != NULL) {
-			TCHAR szBuffer[MAX_PATH] = { 0 };
-			GetModuleFileName(hMod, szBuffer, sizeof(szBuffer) / sizeof(TCHAR) - 1);
-			string nfname = szBuffer;
-			filename = nfname.substr(0, nfname.find(PLUGIN_FILE)) + filename.substr(1);
+		if (pluginModule != nullptr) {
+			TCHAR pBuffer[MAX_PATH] = { 0 };
+			GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
+			string currentPath = pBuffer;
+			filename = currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + filename.substr(1);
 		}
 	}
 	try {
@@ -906,7 +903,7 @@ int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 	double curT = curpos.GetReceivedTime();
 	double deltaT = preT - curT;
 	deltaT = deltaT ? deltaT : INFINITE;
-	return round((curAlt - preAlt) / deltaT * 60.0);
+	return (int)round((curAlt - preAlt) / deltaT * 60.0);
 }
 
 bool IsCFLAssigned(CFlightPlan FlightPlan)
@@ -929,13 +926,30 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 	return noCfl;
 }
 
-LRESULT CALLBACK SetCursorWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
 {
-	if (uMsg == WM_SETCURSOR && pluginCursor != nullptr) {
+	DWORD dwTarProcessId = *((DWORD*)lParam);
+	DWORD dwEnumProcessId = 0;
+	GetWindowThreadProcessId(hwnd, &dwEnumProcessId);
+	const char* tarWindowText = "EuroScope v3.2";
+	char enumWindowtext[15] = {};
+	GetWindowText(hwnd, enumWindowtext, 15);
+	if (!strcmp(enumWindowtext, tarWindowText) && dwTarProcessId == dwEnumProcessId) {
+		pluginWindow = hwnd;
+		return false;
+	}
+	return true;
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	switch (uMsg)
+	{
+	case WM_SETCURSOR: {
 		SetCursor(pluginCursor);
 		return true;
 	}
-	else {
+	default:
 		return CallWindowProc(prevWndFunc, hwnd, uMsg, wParam, lParam);
 	}
 }

@@ -163,7 +163,6 @@ void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 		else
 			asd.SetAssignedSpeed(r->second.m_Speed);
 		asd.SetAssignedRate(r->second.m_Rate);
-		asd.SetSquawk(r->second.m_Squawk.c_str());
 		asd.SetScratchPadString(r->second.m_ScratchPad.c_str());
 		r->second.m_Reconnected = false;
 		FlightPlan.StartTracking();
