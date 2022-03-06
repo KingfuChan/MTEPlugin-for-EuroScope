@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <regex>
+#include "Version.h"
 #include "MetricAlt.h"
 #include "ReCat.h"
 #include "SimilarCallsign.h"

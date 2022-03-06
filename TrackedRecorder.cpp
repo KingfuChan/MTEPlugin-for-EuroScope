@@ -14,7 +14,8 @@ TrackedRecorder::~TrackedRecorder(void)
 void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online)
 {
 	// pass online=false to deactivate
-
+	if (!FlightPlan.IsValid())
+		return;
 	TRData trd{};
 	trd.m_Reconnected = false;
 	trd.m_CommEstbed = false;
@@ -30,7 +31,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 	trd.m_Speed = asd.GetAssignedSpeed() + asd.GetAssignedMach(); // speed:(100,inf), mach:(0:100]
 	trd.m_Rate = asd.GetAssignedRate();
 	trd.m_DCTName = asd.GetDirectToPointName();
-	trd.m_Squawk = FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetSquawk();
+	trd.m_Squawk = FlightPlan.GetCorrelatedRadarTarget().IsValid() ? FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetSquawk() : FlightPlan.GetCallsign();
 	trd.m_ScratchPad = asd.GetScratchPadString();
 
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());

@@ -5,12 +5,12 @@
 
 int MetricAlt::MtoFeet(const int meter)
 {
-	return round(meter * 3.28084);
+	return (int)round(meter * 3.28084);
 }
 
 int MetricAlt::FeettoM(const int feet)
 {
-	return round(feet / 3.28084);
+	return (int)round(feet / 3.28084);
 }
 
 int MetricAlt::LvlMtoFeet(const int meter)

@@ -83,6 +83,9 @@
     <ClInclude Include="TrackedRecorder.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Version.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MTEPforES.rc">

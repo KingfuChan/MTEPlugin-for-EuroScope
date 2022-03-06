@@ -5,11 +5,34 @@
 
 #ifndef COPYRIGHTS
 #define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_VERSION "3.1.3"
 #define PLUGIN_AUTHOR "Kingfu Chan"
 #define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
 #endif // !COPYRIGHTS
+
+// VERSION INFO
+const char VERSION_MAIN[] = {
+	VERSION_MAJOR_INIT,
+	'.',
+	VERSION_MINOR_INIT,
+	'.',
+	VERSION_REVISION_INIT,
+};
+#ifdef _DEBUG
+const char VERSION_BUILD[] = ".DEBUG";
+#else
+const char VERSION_BUILD[] =
+{
+	'.',
+	BUILD_YEAR_CH2, BUILD_YEAR_CH3,
+	BUILD_MONTH_CH0, BUILD_MONTH_CH1,
+	BUILD_DAY_CH0, BUILD_DAY_CH1,
+	BUILD_HOUR_CH0, BUILD_HOUR_CH1,
+	BUILD_MIN_CH0, BUILD_MIN_CH1,
+	'\0'
+};
+#endif
+
 
 // TAG ITEM TYPE
 const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with trend indicator
@@ -74,7 +97,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
 		PLUGIN_NAME,
-		PLUGIN_VERSION,
+		VERSION_MAIN,
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
 {
@@ -84,7 +107,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	pluginModule = AfxGetInstanceHandle();
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
-	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSOR1), IMAGE_CURSOR, 0, 0, LR_SHARED));
+	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, 0, 0, LR_SHARED));
 	m_CustomCursor = false;
 	if (setcc == nullptr ? false : stoi(setcc))
 		SetCustomCursor();
@@ -131,7 +154,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
-		(string("MTEPlugin finished loading! For help please refer to ") + GITHUB_LINK).c_str(),
+		(string("MTEPlugin finished loading (v") + VERSION_MAIN + VERSION_BUILD + string(")! For help please refer to ") + GITHUB_LINK).c_str(),
 		1, 0, 0, 0, 0);
 }
 
@@ -357,17 +380,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_RCNT_IND: {
 		if (m_TrackedRecorder->IsReconnected(FlightPlan.GetCallsign())) {
-			if (m_AutoRetrack) {
-				m_TrackedRecorder->SetTrackedData(FlightPlan);
-				if (m_AutoRetrack == 2) {
-					string msg = string(FlightPlan.GetCallsign()) + " reconnected and is re-tracked.";
-					DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
-				}
-			}
-			else {
-				sprintf_s(sItemString, 2, "r");
-				*pColorCode = TAG_COLOR_INFORMATION;
-			}
+			sprintf_s(sItemString, 2, "r");
+			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 		break; }
 	default:
@@ -609,7 +623,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		float m;
 		int s;
 		if (sscanf_s(sItemString, "M%f", &m) == 1) { // MACH
-			FlightPlan.GetControllerAssignedData().SetAssignedMach((int)(m * 100.0));
+			FlightPlan.GetControllerAssignedData().SetAssignedMach((int)round(m * 100.0));
 		}
 		else if (sscanf_s(sItemString, "N%d", &s) == 1) { // IAS
 			FlightPlan.GetControllerAssignedData().SetAssignedSpeed(s);
@@ -654,17 +668,16 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 {
 	if (!FlightPlan.IsValid())
 		return;
-	if (FlightPlan.GetTrackingControllerIsMe())
+	if (FlightPlan.GetTrackingControllerIsMe()) {
 		m_TrackedRecorder->UpdateFlight(FlightPlan);
-	if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE &&
-		FlightPlan.GetTrackingControllerIsMe() &&
-		FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
-		(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())
-		) {
-		// initiate CFL to be confirmed
-		m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
+		if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE &&
+			FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
+			(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())) {
+			// initiate CFL to be confirmed
+			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
+		}
 	}
-	else if (DataType == CTR_DATA_TYPE_GROUND_STATE && m_DepartureSequence != nullptr) {
+	if (DataType == CTR_DATA_TYPE_GROUND_STATE && m_DepartureSequence != nullptr) {
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
 }
@@ -680,7 +693,17 @@ void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
 
 void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 {
-	m_TrackedRecorder->UpdateFlight(RadarTarget.GetCorrelatedFlightPlan());
+	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+	if (!FlightPlan.IsValid())
+		return;
+	m_TrackedRecorder->UpdateFlight(FlightPlan);
+	if (m_AutoRetrack && m_TrackedRecorder->IsReconnected(FlightPlan.GetCallsign())) {
+		m_TrackedRecorder->SetTrackedData(FlightPlan);
+		if (m_AutoRetrack == 2) {
+			string msg = string(FlightPlan.GetCallsign()) + " reconnected and is re-tracked.";
+			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
+		}
+	}
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
@@ -910,20 +933,13 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 {
 	// tell when cleared altitude is 0, is CFL not assigned or assigned to RFL
 	// true means CFL is assigned to RFL, false means no CFL
-	bool noCfl;
 	if (strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
 		CRadarTargetPositionData rdpos = FlightPlan.GetCorrelatedRadarTarget().GetPosition();
 		string squawk = rdpos.GetSquawk();
-		if (squawk == "7700" || squawk == "7600" || squawk == "7500" || !rdpos.GetTransponderC())
-			// emergency or on the ground
-			noCfl = false;
-		else // in air no emergency
-			noCfl = true;
+		if (!(squawk == "7700" || squawk == "7600" || squawk == "7500" || !rdpos.GetTransponderC()))
+			return true;
 	}
-	else { // not tracked
-		noCfl = false;
-	}
-	return noCfl;
+	return false;
 }
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)

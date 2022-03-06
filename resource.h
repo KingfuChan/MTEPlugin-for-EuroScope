@@ -1,8 +1,8 @@
 ﻿//{{NO_DEPENDENCIES}}
-// Microsoft Visual C++ 生成的包含文件。
-// 供 MTEPforES.rc 使用
+// Microsoft Visual C++ 產生的 Include 檔案。
+// 由 MTEPforES.rc 使用
 //
-#define IDC_CURSOR1                     1004
+#define IDC_CURSORCROSS                 1004
 
 // Next default values for new objects
 // 
