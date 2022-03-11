@@ -3,8 +3,9 @@
 #include "pch.h"
 #include "TrackedRecorder.h"
 
-TrackedRecorder::TrackedRecorder(void)
+TrackedRecorder::TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin)
 {
+	m_PluginPtr = plugin;
 }
 
 TrackedRecorder::~TrackedRecorder(void)
@@ -13,52 +14,71 @@ TrackedRecorder::~TrackedRecorder(void)
 
 void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online)
 {
-	// pass online=false to deactivate
-	if (!FlightPlan.IsValid())
-		return;
-	TRData trd{};
-	trd.m_Reconnected = false;
-	trd.m_CommEstbed = false;
-	trd.m_CFLConfirmed = true;
-	trd.m_ForceFeet = false;
-	trd.m_CallsignType = FlightPlan.IsTextCommunication() ? -1 : IsChineseCallsign(FlightPlan);
-
-	auto asd = FlightPlan.GetControllerAssignedData();
-	trd.m_CommType = asd.GetCommunicationType();
-	trd.m_Heading = asd.GetAssignedHeading();
-	trd.m_ClearedAlt = asd.GetClearedAltitude();
-	trd.m_FinalAlt = asd.GetFinalAltitude();
-	trd.m_Speed = asd.GetAssignedSpeed() + asd.GetAssignedMach(); // speed:(100,inf), mach:(0:100]
-	trd.m_Rate = asd.GetAssignedRate();
-	trd.m_DCTName = asd.GetDirectToPointName();
-	trd.m_Squawk = FlightPlan.GetCorrelatedRadarTarget().IsValid() ? FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetSquawk() : FlightPlan.GetCallsign();
-	trd.m_ScratchPad = asd.GetScratchPadString();
-
+	// Pass online=false to deactivate when disconnecting.
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
-	if (r == m_TrackedMap.end()) {
+	if (r != m_TrackedMap.end()) {
 		if (FlightPlan.GetTrackingControllerIsMe()) {
-			// tracking but not recorded
-			m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
-			RefreshSimilarCallsign();
-		}
-	}
-	else if (!r->second.m_Reconnected) {
-		if (FlightPlan.GetTrackingControllerIsMe()) {
-			// recorded, tracking, not reconnected
-			bool rfsh = trd.m_CallsignType != r->second.m_CallsignType;
-			trd.m_Reconnected = !online;
-			trd.m_CommEstbed = r->second.m_CommEstbed;
-			trd.m_CFLConfirmed = r->second.m_CFLConfirmed;
-			trd.m_ForceFeet = r->second.m_ForceFeet;
-			r->second = trd;
-			if (rfsh)
+			// recorded, tracking. update
+			auto tad = ExtractAssignedData(FlightPlan);
+			bool rfsc = !(
+				tad.m_ScratchPad == r->second.m_AssignedData.m_ScratchPad &&
+				tad.m_CommType == r->second.m_AssignedData.m_CommType &&
+				r->second.m_Offline != online
+				);
+			r->second.m_AssignedData = tad;
+			r->second.m_Offline = !online;
+			if (rfsc)
 				RefreshSimilarCallsign();
 		}
-		else {
-			// recorded, not tracking, not reconnected
+		else if (!r->second.m_Offline) {
+			// recorded, not tracking, not offline. remove
 			m_TrackedMap.erase(r);
 			RefreshSimilarCallsign();
 		}
+	}
+	else if (FlightPlan.GetTrackingControllerIsMe()) {
+		// not recorded but tracking. add
+		TrackedData trd{};
+		trd.m_SystemID = FlightPlan.GetCorrelatedRadarTarget().GetSystemID();
+		trd.m_Offline = false;
+		trd.m_CommEstbed = false;
+		trd.m_CFLConfirmed = false;
+		trd.m_ForceFeet = false;
+		trd.m_AssignedData = ExtractAssignedData(FlightPlan);
+		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
+		RefreshSimilarCallsign();
+	}
+}
+
+void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	// Only useful if correlated.
+	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+	if (!FlightPlan.IsValid())
+		return;
+	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
+	if (r != m_TrackedMap.end()) {
+		if (FlightPlan.GetTrackingControllerIsMe()) {
+			// recorded, tracking. update
+			r->second.m_SystemID = RadarTarget.GetSystemID();
+		}
+		else if (!r->second.m_Offline) {
+			// recorded, not tracking, not offline. remove
+			m_TrackedMap.erase(r);
+			RefreshSimilarCallsign();
+		}
+	}
+	else if (FlightPlan.GetTrackingControllerIsMe()) {
+		// not recorded, tracking. add
+		TrackedData trd{};
+		trd.m_SystemID = RadarTarget.GetSystemID();
+		trd.m_Offline = false;
+		trd.m_CommEstbed = false;
+		trd.m_CFLConfirmed = false;
+		trd.m_ForceFeet = false;
+		trd.m_AssignedData = ExtractAssignedData(FlightPlan);
+		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
+		RefreshSimilarCallsign();
 	}
 }
 
@@ -112,23 +132,36 @@ void TrackedRecorder::SetAltitudeUnit(string callsign, bool feet)
 
 bool TrackedRecorder::IsSquawkDUPE(string callsign)
 {
-	auto r = m_TrackedMap.find(callsign);
-	if (r == m_TrackedMap.end())
+	auto r1 = m_TrackedMap.find(callsign);
+	if (r1 == m_TrackedMap.end())
 		return false;
-	for (auto& r1 : m_TrackedMap) {
-		if (!r1.second.m_Reconnected && r->first != r1.first && r->second.m_Squawk == r1.second.m_Squawk)
+	for (auto& r2 : m_TrackedMap) {
+		if (!r2.second.m_Offline &&
+			r1->first != r2.first &&
+			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk)
 			return true;
 	}
 	return false;
 }
 
-bool TrackedRecorder::IsReconnected(string callsign)
+bool TrackedRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	auto r = m_TrackedMap.find(callsign);
+	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
 	if (r != m_TrackedMap.end())
-		return r->second.m_Reconnected;
+		return !r->second.m_Offline;
 	else
-		return false;
+		return true;
+}
+
+bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+	if (FlightPlan.IsValid())
+		return IsActive(FlightPlan);
+	else {
+		auto r = GetTrackedDataBySystemID(RadarTarget.GetSystemID());
+		return r != m_TrackedMap.end() ? !r->second.m_Offline : true;
+	}
 }
 
 bool TrackedRecorder::IsSimilarCallsign(string callsign)
@@ -147,27 +180,78 @@ unordered_set<string> TrackedRecorder::GetSimilarCallsigns(string callsign)
 
 void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
-	if (r == m_TrackedMap.end())
+	auto trd = m_TrackedMap.find(FlightPlan.GetCallsign());
+	if (trd == m_TrackedMap.end())
 		return;
-	if (r->second.m_Reconnected) {
-		auto asd = FlightPlan.GetControllerAssignedData();
-		asd.SetCommunicationType(r->second.m_CommType);
-		if (r->second.m_Heading)
-			asd.SetAssignedHeading(r->second.m_Heading);
-		else if (r->second.m_DCTName.size())
-			asd.SetDirectToPointName(r->second.m_DCTName.c_str());
-		asd.SetClearedAltitude(r->second.m_ClearedAlt);
-		asd.SetFinalAltitude(r->second.m_FinalAlt);
-		if (r->second.m_Speed < 100)
-			asd.SetAssignedMach(r->second.m_Speed);
-		else
-			asd.SetAssignedSpeed(r->second.m_Speed);
-		asd.SetAssignedRate(r->second.m_Rate);
-		asd.SetScratchPadString(r->second.m_ScratchPad.c_str());
-		r->second.m_Reconnected = false;
-		FlightPlan.StartTracking();
+	// flight plan
+	trd->second.m_Offline = true; // prevent following assigns removing
+	TrackedRecorder::AssignedData tad = trd->second.m_AssignedData;
+	auto asd = FlightPlan.GetControllerAssignedData();
+	asd.SetSquawk(tad.m_Squawk.c_str());
+	asd.SetFinalAltitude(tad.m_FinalAlt);
+	asd.SetClearedAltitude(tad.m_ClearedAlt);
+	asd.SetCommunicationType(tad.m_CommType);
+	asd.SetScratchPadString(tad.m_ScratchPad.c_str());
+	if (tad.m_Speed)
+		asd.SetAssignedSpeed(tad.m_Speed);
+	else if (tad.m_Mach)
+		asd.SetAssignedMach(tad.m_Mach);
+	asd.SetAssignedRate(tad.m_Rate);
+	if (tad.m_Heading)
+		asd.SetAssignedHeading(tad.m_Heading);
+	else if (tad.m_DCTName.size())
+		asd.SetDirectToPointName(tad.m_DCTName.c_str());
+	FlightPlan.StartTracking();
+	trd->second.m_Offline = false;
+	// radar target
+	if (!FlightPlan.GetCorrelatedRadarTarget().IsValid() && trd->second.m_SystemID.size()) {
+		auto corrRT = m_PluginPtr->RadarTargetSelect(trd->second.m_SystemID.c_str());
+		if (corrRT.IsValid()) {
+			FlightPlan.CorrelateWithRadarTarget(corrRT);
+		}
 	}
+}
+
+void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+	if (FlightPlan.IsValid()) {
+		SetTrackedData(FlightPlan);
+	}
+	else {
+		auto trp = GetTrackedDataBySystemID(RadarTarget.GetSystemID());
+		if (trp != m_TrackedMap.end()) {
+			auto corrFP = m_PluginPtr->FlightPlanSelect(trp->first.c_str());
+			if (corrFP.IsValid()) {
+				SetTrackedData(corrFP);
+			}
+		}
+	}
+}
+
+TrackedRecorder::AssignedData TrackedRecorder::ExtractAssignedData(EuroScopePlugIn::CFlightPlan FlightPlan)
+{
+	AssignedData tad{};
+	tad.m_Squawk = FlightPlan.GetControllerAssignedData().GetSquawk();
+	tad.m_FinalAlt = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
+	tad.m_ClearedAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+	tad.m_CommType = FlightPlan.IsTextCommunication() ? 'T' : FlightPlan.GetControllerAssignedData().GetCommunicationType();
+	tad.m_ScratchPad = FlightPlan.GetControllerAssignedData().GetScratchPadString();
+	tad.m_Speed = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
+	tad.m_Mach = FlightPlan.GetControllerAssignedData().GetAssignedMach();
+	tad.m_Rate = FlightPlan.GetControllerAssignedData().GetAssignedRate();
+	tad.m_Heading = FlightPlan.GetControllerAssignedData().GetAssignedHeading();
+	tad.m_DCTName = FlightPlan.GetControllerAssignedData().GetDirectToPointName();
+	return tad;
+}
+
+unordered_map<string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(string systemID)
+{
+	for (auto trd = m_TrackedMap.begin(); trd != m_TrackedMap.end(); trd++) {
+		if (trd->second.m_SystemID == systemID)
+			return trd;
+	}
+	return m_TrackedMap.end();
 }
 
 void TrackedRecorder::RefreshSimilarCallsign(void)
@@ -175,10 +259,11 @@ void TrackedRecorder::RefreshSimilarCallsign(void)
 	m_SCSetMap.clear();
 	unordered_set<string> setENG, setCHN;
 	for (auto& r : m_TrackedMap) {
-		if (r.second.m_Reconnected) continue;
-		if (r.second.m_CallsignType == 1)
+		if (r.second.m_Offline || r.second.m_AssignedData.m_CommType == 'T') continue; // offline or text
+		string cal = r.first.substr(0, 3);
+		if (m_CHNCallsign.find(cal) != m_CHNCallsign.end() && r.second.m_AssignedData.m_ScratchPad.find("*EN") == string::npos)
 			setCHN.insert(r.first);
-		else if (r.second.m_CallsignType == 0)
+		else
 			setENG.insert(r.first);
 	}
 	for (auto& cset : { setENG,setCHN }) {

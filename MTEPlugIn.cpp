@@ -10,30 +10,6 @@
 #define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
 #endif // !COPYRIGHTS
 
-// VERSION INFO
-const char VERSION_MAIN[] = {
-	VERSION_MAJOR_INIT,
-	'.',
-	VERSION_MINOR_INIT,
-	'.',
-	VERSION_REVISION_INIT,
-};
-#ifdef _DEBUG
-const char VERSION_BUILD[] = ".DEBUG";
-#else
-const char VERSION_BUILD[] =
-{
-	'.',
-	BUILD_YEAR_CH2, BUILD_YEAR_CH3,
-	BUILD_MONTH_CH0, BUILD_MONTH_CH1,
-	BUILD_DAY_CH0, BUILD_DAY_CH1,
-	BUILD_HOUR_CH0, BUILD_HOUR_CH1,
-	BUILD_MIN_CH0, BUILD_MIN_CH1,
-	'\0'
-};
-#endif
-
-
 // TAG ITEM TYPE
 const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with trend indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
@@ -97,7 +73,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
 		PLUGIN_NAME,
-		VERSION_MAIN,
+		VERSION_FILE_STR,
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
 {
@@ -118,7 +94,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 		LoadRouteChecker(setrc);
 
 	m_DepartureSequence = nullptr;
-	m_TrackedRecorder = new TrackedRecorder();
+	m_TrackedRecorder = new TrackedRecorder(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
 	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
 
@@ -154,7 +130,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
-		(string("MTEPlugin finished loading (v") + VERSION_MAIN + VERSION_BUILD + string(")! For help please refer to ") + GITHUB_LINK).c_str(),
+		(string("MTEPlugin loaded! For help please refer to ") + GITHUB_LINK).c_str(),
 		1, 0, 0, 0, 0);
 }
 
@@ -170,12 +146,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	int ItemCode, int TagData, char sItemString[16],
 	int* pColorCode, COLORREF* pRGB, double* pFontSize)
 {
-	if (!(FlightPlan.IsValid() || RadarTarget.IsValid()))
+	if (!FlightPlan.IsValid() && !RadarTarget.IsValid())
 		return;
 
 	switch (ItemCode)
 	{
 	case TAG_ITEM_TYPE_GS_W_IND: {
+		if (!RadarTarget.IsValid()) break;
 		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 		int curgs = curpos.GetReportedGS();
@@ -194,6 +171,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
+		if (!FlightPlan.IsValid()) break;
 		string remarks;
 		remarks = FlightPlan.GetFlightPlanData().GetRemarks();
 		if (remarks.find("RMK/") != string::npos || remarks.find("STS/") != string::npos)
@@ -231,14 +209,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
+		if (!FlightPlan.IsValid()) break;
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		switch (cflAlt)
 		{
 		case 2: // cleared for visual approach
-			sprintf_s(sItemString, 3, "VA");
+			sprintf_s(sItemString, 5, "VA  ");
 			break;
 		case 1: // cleared for ILS approach
-			sprintf_s(sItemString, 4, "ILS");
+			sprintf_s(sItemString, 5, "ILS ");
 			break;
 		case 0: { // no cleared level or CFL==RFL
 			if (!IsCFLAssigned(FlightPlan)) {
@@ -273,12 +252,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {
+		if (!FlightPlan.IsValid()) break;
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		int dspAlt = MetricAlt::LvlFeettoM(cflAlt);
 		sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt / 10));
 
 		break; }
 	case TAG_ITEM_TYPE_RFL_ICAO: {
+		if (!FlightPlan.IsValid()) break;
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int dspMtr;
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr) && !m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
@@ -292,13 +273,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_SC_IND: {
+		if (!FlightPlan.IsValid()) break;
 		if (m_TrackedRecorder->IsSimilarCallsign(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 3, "SC");
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
-		if (!FlightPlan.GetTrackingControllerIsMe()) break;
+		if (!FlightPlan.IsValid() || !FlightPlan.GetTrackingControllerIsMe()) break;
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int _meter;
 		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
@@ -306,6 +288,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RVSM_IND: {
+		if (!FlightPlan.IsValid()) break;
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
 		string acinf = fpdata.GetAircraftInfo();
 		if (!strcmp(fpdata.GetPlanType(), "V"))
@@ -335,12 +318,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_COMM_IND: {
-		if (!m_TrackedRecorder->IsCommEstablished(RadarTarget.GetCallsign())) {
+		if (!FlightPlan.IsValid()) break;
+		if (!m_TrackedRecorder->IsCommEstablished(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 2, "C");
 			*pColorCode = TAG_COLOR_REDUNDANT;
 		}
 		break; }
 	case TAG_ITEM_TYPE_RECAT: {
+		if (!FlightPlan.IsValid()) break;
 		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
 		string acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
 		auto rc = m_ReCatMap.find(acType);
@@ -349,6 +334,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
+		if (!FlightPlan.IsValid()) break;
 		if (m_RouteChecker == nullptr) break;
 		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
 		sprintf_s(sItemString, 2, "%c", rc);
@@ -357,12 +343,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_SQ_DUPE: {
+		if (!FlightPlan.IsValid()) break;
 		if (m_TrackedRecorder->IsSquawkDUPE(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 5, "DUPE");
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 		break; }
 	case TAG_ITEM_TYPE_DEP_SEQ: {
+		if (!FlightPlan.IsValid()) break;
 		if (m_DepartureSequence == nullptr) m_DepartureSequence = new DepartureSequence();
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq > 0)
@@ -373,13 +361,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_RVEC_IND: {
-		if (FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
+		if (FlightPlan.IsValid() && FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
 			sprintf_s(sItemString, 3, "RV");
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
 		break; }
 	case TAG_ITEM_TYPE_RCNT_IND: {
-		if (m_TrackedRecorder->IsReconnected(FlightPlan.GetCallsign())) {
+		if (!FlightPlan.IsValid()) break;
+		if (!m_TrackedRecorder->IsActive(FlightPlan)) {
 			sprintf_s(sItemString, 2, "r");
 			*pColorCode = TAG_COLOR_INFORMATION;
 		}
@@ -397,14 +386,17 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	switch (FunctionId)
 	{
 	case TAG_ITEM_FUNCTION_COMM_ESTAB: {
+		if (!FlightPlan.IsValid()) break;
 		m_TrackedRecorder->SetCommEstablished(FlightPlan.GetCallsign());
 
 		break; }
 	case TAG_ITEM_FUNCTION_RCNT_RST: {
+		if (!FlightPlan.IsValid()) break;
 		m_TrackedRecorder->SetTrackedData(FlightPlan);
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET: {
+		if (!FlightPlan.IsValid()) break;
 		string input = sItemString;
 		if (MakeUpper(input) == "F") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
@@ -449,6 +441,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
+		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
 			break;
@@ -497,6 +490,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_EDIT: {
+		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
 			break;
@@ -510,6 +504,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_SET: {
+		if (!FlightPlan.IsValid()) break;
 		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
 		string input = sItemString;
 		if (MakeUpper(input) == "F") {
@@ -531,6 +526,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_MENU: {
+		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
 			break;
@@ -573,7 +569,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_SC_LIST: {
-		string cs = RadarTarget.GetCallsign();
+		if (!FlightPlan.IsValid()) break;
+		string cs = FlightPlan.GetCallsign();
 		if (!m_TrackedRecorder->IsSimilarCallsign(cs)) // not a SC
 			break;
 		OpenPopupList(Area, "SC List", 1);
@@ -594,6 +591,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RTE_INFO: {
+		if (!FlightPlan.IsValid()) break;
 		if (m_RouteChecker == nullptr) break;
 		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
 		if (rc == 'Y' || rc == ' ') break; // no need to show ok routes and cleared routes
@@ -601,6 +599,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_DSQ_MENU: {
+		if (!FlightPlan.IsValid()) break;
 		if (m_DepartureSequence == nullptr) break;
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq <= 0) { // reconnected or completely new
@@ -611,6 +610,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break;	}
 	case TAG_ITEM_FUNCTION_DSQ_EDIT: {
+		if (!FlightPlan.IsValid()) break;
 		int seq;
 		if (sscanf_s(sItemString, "%d", &seq) != 1) break;
 		if (seq >= 0) {
@@ -618,6 +618,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break;	}
 	case TAG_ITEM_FUNCTION_SPD_SET: {
+		if (!FlightPlan.IsValid()) break;
 		if (!strcmp(sItemString, "----"))
 			FlightPlan.GetControllerAssignedData().SetAssignedSpeed(0);
 		float m;
@@ -630,6 +631,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break; }
 	case TAG_ITEM_FUNCTION_SPD_LIST: {
+		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
 			break;
@@ -668,8 +670,8 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 {
 	if (!FlightPlan.IsValid())
 		return;
+	m_TrackedRecorder->UpdateFlight(FlightPlan);
 	if (FlightPlan.GetTrackingControllerIsMe()) {
-		m_TrackedRecorder->UpdateFlight(FlightPlan);
 		if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE &&
 			FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
 			(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())) {
@@ -693,14 +695,15 @@ void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
 
 void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 {
-	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
-	if (!FlightPlan.IsValid())
+	if (!RadarTarget.IsValid())
 		return;
-	m_TrackedRecorder->UpdateFlight(FlightPlan);
-	if (m_AutoRetrack && m_TrackedRecorder->IsReconnected(FlightPlan.GetCallsign())) {
-		m_TrackedRecorder->SetTrackedData(FlightPlan);
+	if (m_TrackedRecorder->IsActive(RadarTarget)) {
+		m_TrackedRecorder->UpdateFlight(RadarTarget);
+	}
+	else if (m_AutoRetrack) {
+		m_TrackedRecorder->SetTrackedData(RadarTarget);
 		if (m_AutoRetrack == 2) {
-			string msg = string(FlightPlan.GetCallsign()) + " reconnected and is re-tracked.";
+			string msg = string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
 			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
 		}
 	}
@@ -823,6 +826,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 
 int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
 	// Radar Display Altitude, will consider transition level/altitude
+	if (!RadarTarget.IsValid()) return 0;
 	int trsAlt = GetTransitionAltitude(); // should be transition level
 	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
 	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
@@ -892,7 +896,7 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 {
 	if (m_TrackedRecorder != nullptr)
 		delete m_TrackedRecorder;
-	m_TrackedRecorder = new TrackedRecorder();
+	m_TrackedRecorder = new TrackedRecorder(this);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 
@@ -918,6 +922,7 @@ string MakeUpper(string str)
 
 int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 {
+	if (!RadarTarget.IsValid()) return 0;
 	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 	double curAlt = curpos.GetPressureAltitude();
@@ -933,11 +938,13 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 {
 	// tell when cleared altitude is 0, is CFL not assigned or assigned to RFL
 	// true means CFL is assigned to RFL, false means no CFL
-	if (strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
-		CRadarTargetPositionData rdpos = FlightPlan.GetCorrelatedRadarTarget().GetPosition();
-		string squawk = rdpos.GetSquawk();
-		if (!(squawk == "7700" || squawk == "7600" || squawk == "7500" || !rdpos.GetTransponderC()))
-			return true;
+	if (FlightPlan.IsValid() && strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
+		CRadarTarget RadarTarget = FlightPlan.GetCorrelatedRadarTarget();
+		if (RadarTarget.IsValid()) {
+			string squawk = RadarTarget.GetPosition().GetSquawk();
+			if (!(squawk == "7700" || squawk == "7600" || squawk == "7500" || !RadarTarget.GetPosition().GetTransponderC()))
+				return true;
+		}
 	}
 	return false;
 }

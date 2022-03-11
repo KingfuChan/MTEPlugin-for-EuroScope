@@ -18,9 +18,10 @@ class TrackedRecorder
 {
 
 public:
-	TrackedRecorder(void);
+	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
 	~TrackedRecorder(void);
 	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online = true);
+	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
 	bool IsCommEstablished(string callsign);
 	void SetCommEstablished(string callsign);
 	bool IsCFLConfirmed(string callsign);
@@ -28,33 +29,42 @@ public:
 	bool IsForceFeet(string callsign);
 	void SetAltitudeUnit(string callsign, bool feet);
 	bool IsSquawkDUPE(string callsign);
-	bool IsReconnected(string callsign);
+	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
+	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
 	bool IsSimilarCallsign(string callsign);
 	unordered_set<string> GetSimilarCallsigns(string callsign);
 	void SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
+	void SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 private:
-	struct TRData {
-		bool m_Reconnected;
+	struct AssignedData {
+		// in the order of SDK
+		string m_Squawk;
+		int m_FinalAlt;
+		int m_ClearedAlt;
+		char m_CommType;
+		string m_ScratchPad;
+		int m_Speed;
+		int m_Mach;
+		int m_Rate;
+		int m_Heading;
+		string m_DCTName;
+	};
+	struct TrackedData {
+		string m_SystemID;
+		bool m_Offline;
 		bool m_CommEstbed;
 		bool m_CFLConfirmed;
 		bool m_ForceFeet;
-		int m_CallsignType; // -1: Text, 0: ENG, 1: CHN
-		// assigned data
-		char m_CommType;
-		int m_Heading;
-		int m_ClearedAlt;
-		int m_FinalAlt;
-		int m_Speed;
-		int m_Rate;
-		string m_DCTName; // should only be valid if no heading
-		string m_Squawk;
-		string m_ScratchPad;
+		AssignedData m_AssignedData;
 	};
 
-	unordered_map<string, TRData> m_TrackedMap;
-	unordered_map<string, unordered_set<string>> m_SCSetMap;
+	EuroScopePlugIn::CPlugIn* m_PluginPtr;
+	unordered_map<string, TrackedData> m_TrackedMap; // callsign
+	unordered_map<string, unordered_set<string>> m_SCSetMap; // callsign
 
+	AssignedData ExtractAssignedData(EuroScopePlugIn::CFlightPlan FlightPlan);
+	unordered_map<string, TrackedData>::iterator GetTrackedDataBySystemID(string systemID);
 	void RefreshSimilarCallsign(void);
 
 };
