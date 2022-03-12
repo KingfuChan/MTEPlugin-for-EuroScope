@@ -9,6 +9,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 3. **Vertical speed (4-digit FPM)** - vertical speed in xxxx, will not display if vs<=100 fpm.
 4. **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator. Threshold is 100 fpm.
 5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
+    + Allows custom number mapping if below transition level. See command line features below
 6. **Cleared flight level (m/FL)** - shows Chinese metric RVSM levels if matches, or FLxxx, otherwise calculated meters.
 7. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, otherwise calculated meters.
     + Similar to item 6, but won't show ILS/VA or Fxxx. More useful in a Sweatbox simulator session.
@@ -158,3 +159,4 @@ All command line functions are case-insensitive, including those mentioned above
 
 1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
 2. **.MTEP CURSOR ON/OFF** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. This setting will be saved in your EuroScope plugin settings.
+3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Note that not all characters are available, use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings.

@@ -19,7 +19,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 	if (r != m_TrackedMap.end()) {
 		if (FlightPlan.GetTrackingControllerIsMe()) {
 			// recorded, tracking. update
-			auto tad = ExtractAssignedData(FlightPlan);
+			auto tad = AssignedData(FlightPlan);
 			bool rfsc = !(
 				tad.m_ScratchPad == r->second.m_AssignedData.m_ScratchPad &&
 				tad.m_CommType == r->second.m_AssignedData.m_CommType &&
@@ -38,13 +38,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded but tracking. add
-		TrackedData trd{};
-		trd.m_SystemID = FlightPlan.GetCorrelatedRadarTarget().GetSystemID();
-		trd.m_Offline = false;
-		trd.m_CommEstbed = false;
-		trd.m_CFLConfirmed = false;
-		trd.m_ForceFeet = false;
-		trd.m_AssignedData = ExtractAssignedData(FlightPlan);
+		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan) };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		RefreshSimilarCallsign();
 	}
@@ -70,13 +64,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded, tracking. add
-		TrackedData trd{};
-		trd.m_SystemID = RadarTarget.GetSystemID();
-		trd.m_Offline = false;
-		trd.m_CommEstbed = false;
-		trd.m_CFLConfirmed = false;
-		trd.m_ForceFeet = false;
-		trd.m_AssignedData = ExtractAssignedData(FlightPlan);
+		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan) };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		RefreshSimilarCallsign();
 	}
@@ -178,14 +166,22 @@ unordered_set<string> TrackedRecorder::GetSimilarCallsigns(string callsign)
 		return unordered_set<string>();
 }
 
-void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
+bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
+	// returns true if success
 	auto trd = m_TrackedMap.find(FlightPlan.GetCallsign());
 	if (trd == m_TrackedMap.end())
-		return;
+		return false;
+	// radar target
+	if (!FlightPlan.GetCorrelatedRadarTarget().IsValid() && trd->second.m_SystemID.size()) {
+		auto corrRT = m_PluginPtr->RadarTargetSelect(trd->second.m_SystemID.c_str());
+		if (corrRT.IsValid()) {
+			FlightPlan.CorrelateWithRadarTarget(corrRT);
+		}
+	}
 	// flight plan
 	trd->second.m_Offline = true; // prevent following assigns removing
-	TrackedRecorder::AssignedData tad = trd->second.m_AssignedData;
+	AssignedData tad(trd->second.m_AssignedData);
 	auto asd = FlightPlan.GetControllerAssignedData();
 	asd.SetSquawk(tad.m_Squawk.c_str());
 	asd.SetFinalAltitude(tad.m_FinalAlt);
@@ -201,48 +197,27 @@ void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 		asd.SetAssignedHeading(tad.m_Heading);
 	else if (tad.m_DCTName.size())
 		asd.SetDirectToPointName(tad.m_DCTName.c_str());
-	FlightPlan.StartTracking();
 	trd->second.m_Offline = false;
-	// radar target
-	if (!FlightPlan.GetCorrelatedRadarTarget().IsValid() && trd->second.m_SystemID.size()) {
-		auto corrRT = m_PluginPtr->RadarTargetSelect(trd->second.m_SystemID.c_str());
-		if (corrRT.IsValid()) {
-			FlightPlan.CorrelateWithRadarTarget(corrRT);
-		}
-	}
+	return FlightPlan.StartTracking();
 }
 
-void TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
+	// returns true if success
 	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
 	if (FlightPlan.IsValid()) {
-		SetTrackedData(FlightPlan);
+		return SetTrackedData(FlightPlan);
 	}
 	else {
 		auto trp = GetTrackedDataBySystemID(RadarTarget.GetSystemID());
 		if (trp != m_TrackedMap.end()) {
 			auto corrFP = m_PluginPtr->FlightPlanSelect(trp->first.c_str());
 			if (corrFP.IsValid()) {
-				SetTrackedData(corrFP);
+				RadarTarget.CorrelateWithFlightPlan(corrFP); // set data at next radar refresh
 			}
 		}
 	}
-}
-
-TrackedRecorder::AssignedData TrackedRecorder::ExtractAssignedData(EuroScopePlugIn::CFlightPlan FlightPlan)
-{
-	AssignedData tad{};
-	tad.m_Squawk = FlightPlan.GetControllerAssignedData().GetSquawk();
-	tad.m_FinalAlt = FlightPlan.GetControllerAssignedData().GetFinalAltitude();
-	tad.m_ClearedAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-	tad.m_CommType = FlightPlan.IsTextCommunication() ? 'T' : FlightPlan.GetControllerAssignedData().GetCommunicationType();
-	tad.m_ScratchPad = FlightPlan.GetControllerAssignedData().GetScratchPadString();
-	tad.m_Speed = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
-	tad.m_Mach = FlightPlan.GetControllerAssignedData().GetAssignedMach();
-	tad.m_Rate = FlightPlan.GetControllerAssignedData().GetAssignedRate();
-	tad.m_Heading = FlightPlan.GetControllerAssignedData().GetAssignedHeading();
-	tad.m_DCTName = FlightPlan.GetControllerAssignedData().GetDirectToPointName();
-	return tad;
+	return false;
 }
 
 unordered_map<string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(string systemID)

@@ -61,6 +61,7 @@ bool IsCFLAssigned(CFlightPlan FlightPlan);
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
 const char* SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
 const char* SETTING_AUTO_RETRACK = "AutoRetrack";
+const char* SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -97,6 +98,15 @@ CMTEPlugIn::CMTEPlugIn(void)
 	m_TrackedRecorder = new TrackedRecorder(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
 	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
+
+	const char* setnm = GetDataFromSettings(SETTING_CUSTOM_NUMBER_MAP);
+	m_CustomNumMap = "012345679";
+	if (setnm != nullptr) {
+		if (strlen(setnm) == 10) {
+			m_CustomNumMap = setnm;
+			DisplayUserMessage("MESSAGE", "MTEPlugin", ("Numbers are mapped to (0-9): " + m_CustomNumMap).c_str(), 1, 0, 0, 0, 0);
+		}
+	}
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
@@ -202,6 +212,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
 			sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
+			if (rdrAlt < GetTransitionAltitude()) {
+				// use custom number mapping
+				for (size_t i = 0; i < 4; i++)
+					*(sItemString + i) = m_CustomNumMap[(int)(*(sItemString + i) - '0')];
+			}
 		}
 		else {
 			dspAlt = (int)round(rdrAlt / 100.0);
@@ -214,10 +229,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		switch (cflAlt)
 		{
 		case 2: // cleared for visual approach
-			sprintf_s(sItemString, 5, "VA  ");
+			sprintf_s(sItemString, 3, "VA");
 			break;
 		case 1: // cleared for ILS approach
-			sprintf_s(sItemString, 5, "ILS ");
+			sprintf_s(sItemString, 4, "ILS");
 			break;
 		case 0: { // no cleared level or CFL==RFL
 			if (!IsCFLAssigned(FlightPlan)) {
@@ -701,8 +716,8 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 		m_TrackedRecorder->UpdateFlight(RadarTarget);
 	}
 	else if (m_AutoRetrack) {
-		m_TrackedRecorder->SetTrackedData(RadarTarget);
-		if (m_AutoRetrack == 2) {
+		bool r = m_TrackedRecorder->SetTrackedData(RadarTarget);
+		if (r && m_AutoRetrack == 2) {
 			string msg = string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
 			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
 		}
@@ -799,6 +814,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		return true;
 	}
 
+	// set auto retrack
 	regex rxtrrt("^.MTEP TR ([0-2])$", regex_constants::icase);
 	if (regex_match(cmd, match, rxtrrt)) {
 		string res = match[1].str();
@@ -818,6 +834,15 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack is off", 1, 0, 0, 0, 0);
 		}
+		return true;
+	}
+
+	// set custom number mapping
+	regex rxnm("^.MTEP NUM ([\\S]{10})$", regex_constants::icase);
+	if (regex_match(cmd, match, rxnm)) {
+		m_CustomNumMap = match[1].str();
+		SaveDataToSettings(SETTING_CUSTOM_NUMBER_MAP, "custom number mapping (0-9)", m_CustomNumMap.c_str());
+		DisplayUserMessage("MESSAGE", "MTEPlugin", ("Numbers are mapped to (0-9): " + m_CustomNumMap).c_str(), 1, 0, 0, 0, 0);
 		return true;
 	}
 

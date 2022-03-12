@@ -42,6 +42,7 @@ private:
 	TrackedRecorder* m_TrackedRecorder;
 	bool m_CustomCursor;
 	int m_AutoRetrack; // 0: off; 1: silent; 2: notified.
+	string m_CustomNumMap; // 0-9
 
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
 	void SetCustomCursor(void);

@@ -33,8 +33,8 @@ public:
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
 	bool IsSimilarCallsign(string callsign);
 	unordered_set<string> GetSimilarCallsigns(string callsign);
-	void SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
-	void SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
+	bool SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
+	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 private:
 	struct AssignedData {
@@ -49,6 +49,19 @@ private:
 		int m_Rate;
 		int m_Heading;
 		string m_DCTName;
+
+		AssignedData(EuroScopePlugIn::CFlightPlan _fp) :
+			m_Squawk(_fp.GetControllerAssignedData().GetSquawk()),
+			m_FinalAlt(_fp.GetFinalAltitude()),
+			m_ClearedAlt(_fp.GetControllerAssignedData().GetClearedAltitude()),
+			m_CommType(_fp.IsTextCommunication() ? 'T' : _fp.GetControllerAssignedData().GetCommunicationType()),
+			m_ScratchPad(_fp.GetControllerAssignedData().GetScratchPadString()),
+			m_Speed(_fp.GetControllerAssignedData().GetAssignedSpeed()),
+			m_Mach(_fp.GetControllerAssignedData().GetAssignedMach()),
+			m_Rate(_fp.GetControllerAssignedData().GetAssignedRate()),
+			m_Heading(_fp.GetControllerAssignedData().GetAssignedHeading()),
+			m_DCTName(_fp.GetControllerAssignedData().GetDirectToPointName())
+		{};
 	};
 	struct TrackedData {
 		string m_SystemID;
@@ -57,14 +70,18 @@ private:
 		bool m_CFLConfirmed;
 		bool m_ForceFeet;
 		AssignedData m_AssignedData;
+
+		TrackedData(string _sID, AssignedData _asd) :
+			m_SystemID(_sID),
+			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true), m_ForceFeet(false),
+			m_AssignedData(_asd)
+		{};
 	};
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	unordered_map<string, TrackedData> m_TrackedMap; // callsign
 	unordered_map<string, unordered_set<string>> m_SCSetMap; // callsign
 
-	AssignedData ExtractAssignedData(EuroScopePlugIn::CFlightPlan FlightPlan);
 	unordered_map<string, TrackedData>::iterator GetTrackedDataBySystemID(string systemID);
 	void RefreshSimilarCallsign(void);
-
 };
