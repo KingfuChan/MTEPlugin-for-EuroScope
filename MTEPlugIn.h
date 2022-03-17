@@ -32,6 +32,7 @@ public:
 	virtual void OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area);
 	virtual void OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan, int DataType);
 	virtual void OnFlightPlanDisconnect(CFlightPlan FlightPlan);
+	virtual void OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan);
 	virtual void OnRadarTargetPositionUpdate(CRadarTarget RadarTarget);
 	virtual bool OnCompileCommand(const char* sCommandLine);
 

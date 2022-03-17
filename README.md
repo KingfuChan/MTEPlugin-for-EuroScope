@@ -135,7 +135,7 @@ Tag item functions:
 + **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
   + Selecting one will toggle native ***.find*** command.
 + **Restore assigned data** - restore previously assigned data for reconnected flights and start tracking.
-  + Assigned data includes: *communication type, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, scratch pad*.
+  + Assigned data includes: *communication type, squawk, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, scratch pad*.
 
 Related command line functions:
 
@@ -159,4 +159,4 @@ All command line functions are case-insensitive, including those mentioned above
 
 1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
 2. **.MTEP CURSOR ON/OFF** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. This setting will be saved in your EuroScope plugin settings.
-3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Note that not all characters are available, use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings.
+3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings should work.

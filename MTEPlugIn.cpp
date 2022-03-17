@@ -608,7 +608,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_RTE_INFO: {
 		if (!FlightPlan.IsValid()) break;
 		if (m_RouteChecker == nullptr) break;
-		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
+		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true); // force a refresh here to avoid error
 		if (rc == 'Y' || rc == ' ') break; // no need to show ok routes and cleared routes
 		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 
@@ -694,6 +694,9 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
 		}
 	}
+	if (DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() && m_RouteChecker != nullptr) {
+		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
+	}
 	if (DataType == CTR_DATA_TYPE_GROUND_STATE && m_DepartureSequence != nullptr) {
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
@@ -701,11 +704,23 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 
 void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
 {
-	if (!FlightPlan.IsValid()) return;
+	if (!FlightPlan.IsValid())
+		return;
+	if (m_RouteChecker != nullptr)
+		m_RouteChecker->RemoveCache(FlightPlan);
 	if (m_DepartureSequence != nullptr)
 		m_DepartureSequence->EditSequence(FlightPlan, -1);
 	if (FlightPlan.GetTrackingControllerIsMe())
 		m_TrackedRecorder->UpdateFlight(FlightPlan, false);
+}
+
+void CMTEPlugIn::OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan)
+{
+	if (!FlightPlan.IsValid())
+		return;
+	if (m_RouteChecker != nullptr) {
+		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
+	}
 }
 
 void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)

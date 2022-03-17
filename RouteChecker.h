@@ -22,7 +22,8 @@ public:
 	~RouteChecker(void);
 
 	list<string> GetRouteInfo(string departure, string arrival); // for string display
-	char CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan);
+	char CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh = false);
+	void RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan);
 
 private:
 	struct RouteData {
@@ -35,6 +36,7 @@ private:
 	};
 
 	unordered_map<string, list<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair
+	unordered_map<string, char> m_Cache; // callsign -> check result
 
 	bool IsRouteValid(string planroute, string realroute);
 	bool IsLevelValid(int planalt, string evenodd, string fixalt, string minalt);

@@ -73,34 +73,50 @@ list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 	return res;
 }
 
-char RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan)
+char RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh)
 {
 	// ? - no route for OD pair
 	// Y - route and alt ok 
 	// L - route ok, alt not
 	// X - route not ok
 	// space - clearance received flag set
+	// pass refresh=true to force refresh, otherwise will look up in record
 	if (FlightPlan.GetClearenceFlag())
 		return ' ';
-	EuroScopePlugIn::CFlightPlanData fpd = FlightPlan.GetFlightPlanData();
-	string od = string(fpd.GetOrigin()) + string(fpd.GetDestination());
-	list<RouteData> routes;
-	try {
-		routes = m_Data.at(od);
-	}
-	catch (out_of_range e) {
-		return '?';
-	}
-	char res = 'X';
-	for (auto& rd : routes) {
-		if (IsRouteValid(fpd.GetRoute(), rd.m_Route)) {
-			if (IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt))
-				return 'Y';
-			else
-				res = 'L';
+	if (!refresh) {
+		auto r = m_Cache.find(FlightPlan.GetCallsign());
+		if (r != m_Cache.end()) {
+			return r->second;
 		}
 	}
+	char res;
+	EuroScopePlugIn::CFlightPlanData fpd = FlightPlan.GetFlightPlanData();
+	string od = string(fpd.GetOrigin()) + string(fpd.GetDestination());
+	auto rteit = m_Data.find(od);
+	if (rteit == m_Data.end()) {
+		res = '?';
+	}
+	else {
+		res = 'X';
+		for (auto& rd : rteit->second) {
+			if (IsRouteValid(fpd.GetRoute(), rd.m_Route)) {
+				if (IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt)) {
+					res = 'Y';
+					break;
+				}
+				else {
+					res = 'L';
+				}
+			}
+		}
+	}
+	m_Cache[FlightPlan.GetCallsign()] = res;
 	return res;
+}
+
+void RouteChecker::RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan)
+{
+	m_Cache.erase(FlightPlan.GetCallsign());
 }
 
 bool RouteChecker::IsRouteValid(string planroute, string realroute)
