@@ -39,6 +39,9 @@
     <ClCompile Include="TrackedRecorder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="TransitionLevel.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\MTEPforES.rc2">
@@ -84,6 +87,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Version.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="TransitionLevel.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -74,7 +74,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
 		PLUGIN_NAME,
-		VERSION_FILE_STR,
+#ifdef DEBUG
+		VERSION_FILE_STR " DEBUG",
+#else
+		VERSION_FILE_STR
+#endif // DEBUG
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
 {
@@ -212,15 +216,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
 			sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
-			if (rdrAlt < GetTransitionAltitude()) {
-				// use custom number mapping
-				for (size_t i = 0; i < 4; i++)
-					*(sItemString + i) = m_CustomNumMap[(int)(*(sItemString + i) - '0')];
-			}
 		}
 		else {
 			dspAlt = (int)round(rdrAlt / 100.0);
-			sprintf_s(sItemString, 5, "F%3d", OVRFLW3(dspAlt));
+			sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
+		}
+		if (rdrAlt < GetTransitionAltitude()) { // TODO: add setting customization here
+			// use custom number mapping
+			for (size_t i = 0; i < strlen(sItemString); i++)
+				*(sItemString + i) = m_CustomNumMap[(int)(*(sItemString + i) - '0')];
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
@@ -259,7 +263,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			}
 			// FL xx0, show FL in feet
 			dspAlt = cflAlt / 100;
-			sprintf_s(sItemString, 5, "F%03d", OVRFLW3(dspAlt));
+			sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
 			break; }
 		}
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {

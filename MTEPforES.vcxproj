@@ -136,6 +136,7 @@
     <ClCompile Include="RouteChecker.cpp" />
     <ClCompile Include="SimilarCallsign.cpp" />
     <ClCompile Include="TrackedRecorder.cpp" />
+    <ClCompile Include="TransitionLevel.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cross.cur" />
@@ -154,6 +155,7 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TrackedRecorder.h" />
+    <ClInclude Include="TransitionLevel.h" />
     <ClInclude Include="Version.h" />
   </ItemGroup>
   <ItemGroup>

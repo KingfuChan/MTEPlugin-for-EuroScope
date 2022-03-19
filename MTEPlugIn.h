@@ -16,6 +16,7 @@
 #include "RouteChecker.h"
 #include "DepartureSequence.h"
 #include "TrackedRecorder.h"
+#include "TransitionLevel.h"
 
 using namespace std;
 using namespace EuroScopePlugIn;
