@@ -42,16 +42,18 @@ private:
 	RouteChecker* m_RouteChecker;
 	DepartureSequence* m_DepartureSequence;
 	TrackedRecorder* m_TrackedRecorder;
+	TransitionLevel* m_TransitionLevel;
 	bool m_CustomCursor;
 	int m_AutoRetrack; // 0: off; 1: silent; 2: notified.
 	string m_CustomNumMap; // 0-9
 
-	int GetRadarDisplayAltitude(CRadarTarget RadarTarget);
+	int GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(string filename);
 	void UnloadRouteChecker(void);
 	void DeleteDepartureSequence(void);
 	void ResetTrackedRecorder(void);
+	bool LoadTransitionLevel(string filename);
 	string DisplayRouteMessage(string departure, string arrival);
 };

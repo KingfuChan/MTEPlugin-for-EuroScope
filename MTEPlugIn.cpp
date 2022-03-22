@@ -54,6 +54,7 @@ constexpr int OVRFLW2(int t) { return abs(t) > 99 ? 99 : abs(t); } // overflow p
 constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
 constexpr int OVRFLW4(int t) { return abs(t) > 9999 ? 9999 : abs(t); }  // overflow pre-process 4 digits
 string MakeUpper(string str);
+string GetAbsolutePath(string relativePath);
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 bool IsCFLAssigned(CFlightPlan FlightPlan);
 
@@ -62,6 +63,7 @@ const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
 const char* SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
 const char* SETTING_AUTO_RETRACK = "AutoRetrack";
 const char* SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9";
+const char* SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -77,7 +79,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 #ifdef DEBUG
 		VERSION_FILE_STR " DEBUG",
 #else
-		VERSION_FILE_STR
+		VERSION_FILE_STR,
 #endif // DEBUG
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
@@ -99,9 +101,15 @@ CMTEPlugIn::CMTEPlugIn(void)
 		LoadRouteChecker(setrc);
 
 	m_DepartureSequence = nullptr;
+
 	m_TrackedRecorder = new TrackedRecorder(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
 	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
+
+	m_TransitionLevel = new TransitionLevel(this);
+	const char* settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
+	if (settl != nullptr)
+		LoadTransitionLevel(settl);
 
 	const char* setnm = GetDataFromSettings(SETTING_CUSTOM_NUMBER_MAP);
 	m_CustomNumMap = "012345679";
@@ -150,10 +158,10 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 CMTEPlugIn::~CMTEPlugIn(void)
 {
-	UnloadRouteChecker();
 	CancelCustomCursor();
-	if (m_TrackedRecorder != nullptr)
-		delete m_TrackedRecorder;
+	UnloadRouteChecker();
+	delete m_TrackedRecorder;
+	delete m_TransitionLevel;
 }
 
 void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
@@ -211,7 +219,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_AFL_MTR: {
-		int rdrAlt = GetRadarDisplayAltitude(RadarTarget);
+		int transLvl;
+		int rdrAlt = GetRadarDisplayAltitude(RadarTarget, transLvl);
 		int dspAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
@@ -221,7 +230,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			dspAlt = (int)round(rdrAlt / 100.0);
 			sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
 		}
-		if (rdrAlt < GetTransitionAltitude()) { // TODO: add setting customization here
+		if (rdrAlt < transLvl) {
 			// use custom number mapping
 			for (size_t i = 0; i < strlen(sItemString); i++)
 				*(sItemString + i) = m_CustomNumMap[(int)(*(sItemString + i) - '0')];
@@ -283,7 +292,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int dspMtr;
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr) && !m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// is metric RVSM and not forced feet
-			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
+			char trsMrk = rflAlt >= m_TransitionLevel->GetTransitionLevel(FlightPlan) ? 'S' : 'M';
 			sprintf_s(sItemString, 6, "%c%04d", trsMrk, OVRFLW4(dspMtr / 10));
 		}
 		else {
@@ -473,7 +482,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "CFL Menu", 2);
 		// pre-select altitude
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-		int rdrAlt = GetRadarDisplayAltitude(RadarTarget);
+		int _lvl;
+		int rdrAlt = GetRadarDisplayAltitude(RadarTarget, _lvl);
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// metric
@@ -655,8 +665,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			// don't show list if other controller is tracking
 			break;
 		}
-		int alt = MetricAlt::FeettoM(GetRadarDisplayAltitude(RadarTarget));
-		if (alt <= 7530) { // use IAS
+		int transLvl;
+		int alt = MetricAlt::FeettoM(GetRadarDisplayAltitude(RadarTarget, transLvl));
+		if (alt <= 7530 || alt < transLvl) { // use IAS
 			int aspd = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
 			OpenPopupList(Area, "IAS", 2);
 			for (int s = 320; s >= 160; s -= 10) {
@@ -856,6 +867,13 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 		return true;
 	}
 
+	// load transition level
+	regex rxtl("^.MTEP TL (.+\\.CSV)$", regex_constants::icase);
+	if (regex_match(cmd, match, rxtl)) {
+		SaveDataToSettings(SETTING_TRANS_LVL_CSV, "transition levels csv file", match[1].str().c_str());
+		return LoadTransitionLevel(match[1].str());
+	}
+
 	// set custom number mapping
 	regex rxnm("^.MTEP NUM ([\\S]{10})$", regex_constants::icase);
 	if (regex_match(cmd, match, rxnm)) {
@@ -868,13 +886,13 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 	return false;
 }
 
-int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget) {
-	// Radar Display Altitude, will consider transition level/altitude
+int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel) {
+	// returns radar display altitude, stores transition level
 	if (!RadarTarget.IsValid()) return 0;
-	int trsAlt = GetTransitionAltitude(); // should be transition level
+	TransLevel = m_TransitionLevel->GetTransitionLevel(RadarTarget);
 	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
 	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
-	return stdAlt >= trsAlt ? stdAlt : qnhAlt;
+	return stdAlt >= TransLevel ? stdAlt : qnhAlt;
 }
 
 void CMTEPlugIn::SetCustomCursor(void)
@@ -897,12 +915,7 @@ void CMTEPlugIn::LoadRouteChecker(string filename)
 {
 	UnloadRouteChecker();
 	if (filename[0] == '@') {
-		if (pluginModule != nullptr) {
-			TCHAR pBuffer[MAX_PATH] = { 0 };
-			GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
-			string currentPath = pBuffer;
-			filename = currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + filename.substr(1);
-		}
+		filename = GetAbsolutePath(filename.substr(1));
 	}
 	try {
 		m_RouteChecker = new RouteChecker(filename);
@@ -944,6 +957,28 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 
+bool CMTEPlugIn::LoadTransitionLevel(string filename)
+{
+	if (filename[0] == '@') {
+		filename = GetAbsolutePath(filename.substr(1));
+	}
+	try {
+		m_TransitionLevel->LoadCSV(filename);
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Transition levels are loaded successfully. CSV file name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+	}
+	catch (string e) {
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Transition levels failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+		delete m_TransitionLevel;
+		m_TransitionLevel = new TransitionLevel(this);
+		return false;
+	}
+	return true;
+}
+
 string CMTEPlugIn::DisplayRouteMessage(string departure, string arrival)
 {
 	if (m_RouteChecker == nullptr) return "";
@@ -962,6 +997,18 @@ string MakeUpper(string str)
 {
 	for (auto& c : str) c = toupper(c);
 	return str;
+}
+
+string GetAbsolutePath(string relativePath)
+{
+	// add DLL directory before relative path
+	if (pluginModule != nullptr) {
+		TCHAR pBuffer[MAX_PATH] = { 0 };
+		GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
+		string currentPath = pBuffer;
+		return currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + relativePath;
+	}
+	return string();
 }
 
 int CalculateVerticalSpeed(CRadarTarget RadarTarget)

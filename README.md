@@ -10,10 +10,12 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 4. **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator. Threshold is 100 fpm.
 5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
     + Allows custom number mapping if below transition level. See command line features below
-6. **Cleared flight level (m/FL)** - shows Chinese metric RVSM levels if matches, or FLxxx, otherwise calculated meters.
+    + Transition level can be customized, see Transition Level below.
+6. **Cleared flight level (m/FL)** - shows Chinese metric RVSM levels if matches (4 digits), or FLxxx (3 digits), otherwise calculated meters (4 digits).
 7. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, otherwise calculated meters.
-    + Similar to item 6, but won't show ILS/VA or Fxxx. More useful in a Sweatbox simulator session.
-8. **Final flight level (ICAO)** - shows Chinese metric RVSM levels if matches (Sxxx), otherwise flight Level (Fxxx).
+    + Similar to item 6, but won't show ILS/VA. More useful in a Sweatbox simulator session.
+8. **Final flight level (ICAO)** - shows Chinese metric RVSM levels if matches, otherwise flight level.
+    + Sxxx (above transition level), Mxxx (below transition level), Fxxx (regardless of transition level).
 9. **RFL unit indicator** - shows **#** if final altitude of tracked aircraft does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
 11. **RECAT-CN** - Re-categorization (Chinese) for H(eavy) aircrafts. Only includes **-B -C**.
@@ -145,13 +147,24 @@ Related command line functions:
   + **(2)** auto retrack, notified through *MTEP-Recorder* message.
 + **.MTEP TR RESET** - resets tracked recorder. Use this command if this module is not working properly. Note that it also deletes all saved data for reconnected flights.
 
-## Custom Cursor Settings
+## Transition Level
 
-You may turn the default mouse arrow into a cross to simulate real-world radar screens.
+EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL and RFL originally use QNH altitudes when below transition altitude and use QNE altittudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results.
 
-Enter **.MTEP CURSOR ON** (case-insensitive) in your command line at the bottom of the screen to activate the cursor feature. Enter **.MTEP CURSOR OFF** to de-activate.
+Transition levels can be customized for different airports. A CSV file is required for the customization, in the format below.
 
-This setting will be saved in your EuroScope plugin settings.
+|Airport|Level|
+|:---:|:---:|
+|ZGSD/ZGSZ|S33|
+|ZPPP|S60|
+|VHHH|F110|
+
++ ***Airport*** can be a list seperated by "/".
++ ***Level*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft.
+
+CSV files with incorrect column names or not in the given order, will not be loaded. It's possible to cause unpredicted issues if any cells doesn't follow the rules above.
+
+You need to use a command line to load the CSV file: **.MTEP TL PATH** (case-insensitive). **PATH** should be replace by the CSV file path and file name. Rules for **Route Checker** also applies.
 
 ## Other Command Line Features
 

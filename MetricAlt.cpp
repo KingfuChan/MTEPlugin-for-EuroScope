@@ -15,18 +15,21 @@ int MetricAlt::FeettoM(const int feet)
 
 int MetricAlt::LvlMtoFeet(const int meter)
 {
-	return m_mtof.count(meter) ? m_mtof.at(meter) : MtoFeet(meter);
+	auto m = m_mtof.find(meter);
+	return m != m_mtof.end() ? m->second : MtoFeet(meter);
 }
 
 int MetricAlt::LvlFeettoM(const int feet)
 {
-	return m_ftom.count(feet) ? m_ftom.at(feet) : FeettoM(feet);
+	auto m = m_ftom.find(feet);
+	return m != m_ftom.end() ? m->second : FeettoM(feet);
 }
 
 bool MetricAlt::RflFeettoM(const int feet, int& meter) {
 	// matches to int& meter
-	if (m_ftom.count(feet)) {
-		meter = m_ftom.at(feet);
+	auto m = m_ftom.find(feet);
+	if (m != m_ftom.end()) {
+		meter = m->second;
 		return true;
 	}
 	else {
