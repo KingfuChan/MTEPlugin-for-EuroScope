@@ -666,8 +666,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			break;
 		}
 		int transLvl;
-		int alt = MetricAlt::FeettoM(GetRadarDisplayAltitude(RadarTarget, transLvl));
-		if (alt <= 7530 || alt < transLvl) { // use IAS
+		int alt = GetRadarDisplayAltitude(RadarTarget, transLvl);
+		if (MetricAlt::FeettoM(alt) <= 7530 || alt < transLvl) { // use IAS
 			int aspd = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
 			OpenPopupList(Area, "IAS", 2);
 			for (int s = 320; s >= 160; s -= 10) {
