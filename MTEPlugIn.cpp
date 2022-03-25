@@ -112,7 +112,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 		LoadTransitionLevel(settl);
 
 	const char* setnm = GetDataFromSettings(SETTING_CUSTOM_NUMBER_MAP);
-	m_CustomNumMap = "012345679";
+	m_CustomNumMap = "0123456789";
 	if (setnm != nullptr) {
 		if (strlen(setnm) == 10) {
 			m_CustomNumMap = setnm;
@@ -232,8 +232,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		if (rdrAlt < transLvl) {
 			// use custom number mapping
-			for (size_t i = 0; i < strlen(sItemString); i++)
-				*(sItemString + i) = m_CustomNumMap[(int)(*(sItemString + i) - '0')];
+			for (char* p = sItemString; *p != '\0'; p++) {
+				*p = m_CustomNumMap[int(*p - '0')];
+			}
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
