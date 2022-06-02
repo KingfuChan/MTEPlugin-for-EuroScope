@@ -29,6 +29,7 @@ const int TAG_ITEM_TYPE_DEP_SEQ = 15; // Departure sequence
 const int TAG_ITEM_TYPE_RVEC_IND = 16; // Radar vector indicator
 const int TAG_ITEM_TYPE_CFL_MTR = 17; // Cleared flight level (m)
 const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
+const int TAG_TIEM_TYPE_DEP_STS = 19; // Departure status
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -140,6 +141,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Radar vector indicator", TAG_ITEM_TYPE_RVEC_IND);
 	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
 	RegisterTagItemType("Reconnected indicator", TAG_ITEM_TYPE_RCNT_IND);
+	RegisterTagItemType("Departure status", TAG_TIEM_TYPE_DEP_STS);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -160,6 +162,7 @@ CMTEPlugIn::~CMTEPlugIn(void)
 {
 	CancelCustomCursor();
 	UnloadRouteChecker();
+	DeleteDepartureSequence();
 	delete m_TrackedRecorder;
 	delete m_TransitionLevel;
 }
@@ -309,7 +312,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
-		if (!FlightPlan.IsValid() || !FlightPlan.GetTrackingControllerIsMe()) break;
+		if (!FlightPlan.IsValid() ||
+			!FlightPlan.GetTrackingControllerIsMe() ||
+			m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign()))
+			break;
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int _meter;
 		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
@@ -387,6 +393,19 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else if (seq < 0) { // reconnected
 			sprintf_s(sItemString, 3, "--");
 			*pColorCode = TAG_COLOR_INFORMATION;
+		}
+		break; }
+	case TAG_TIEM_TYPE_DEP_STS: {
+		if (!FlightPlan.IsValid()) break;
+		string gsts = FlightPlan.GetGroundState();
+		if (gsts.size()) {
+			sprintf_s(sItemString, gsts.size() + 1, gsts.c_str());
+			if (!FlightPlan.GetClearenceFlag()) {
+				*pColorCode = TAG_COLOR_INFORMATION;
+			}
+		}
+		else if (FlightPlan.GetClearenceFlag()) {
+			sprintf_s(sItemString, 5, "CLRD");
 		}
 		break; }
 	case TAG_ITEM_TYPE_RVEC_IND: {
@@ -710,10 +729,12 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
 		}
 	}
-	if (DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() && m_RouteChecker != nullptr) {
+	if (m_RouteChecker != nullptr &&
+		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
 		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
-	if (DataType == CTR_DATA_TYPE_GROUND_STATE && m_DepartureSequence != nullptr) {
+	if (m_DepartureSequence != nullptr &&
+		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
 }

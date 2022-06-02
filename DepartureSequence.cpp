@@ -19,7 +19,6 @@ void DepartureSequence::AddFlight(EuroScopePlugIn::CFlightPlan FlightPlan)
 	}
 	else if (fsd.sequence == 0) {
 		string state = GetFPGroundState(FlightPlan);
-		if (state == "NSTS" && FlightPlan.GetClearenceFlag()) return;
 		string callsign = FlightPlan.GetCallsign();
 		m_SequenceListMap[state].push_back(SeqData{ callsign, true });
 	}
@@ -28,11 +27,6 @@ void DepartureSequence::AddFlight(EuroScopePlugIn::CFlightPlan FlightPlan)
 int DepartureSequence::GetSequence(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	FlightSeqData fsd = FindData(FlightPlan);
-	if (fsd.state == "NSTS" && FlightPlan.GetClearenceFlag()) {
-		// delete cleared flights on NSTS
-		m_SequenceListMap[fsd.state].erase(fsd.iterator);
-		return 0;
-	}
 	if (fsd.state == "NONE" || fsd.state == GetFPGroundState(FlightPlan))
 		return fsd.sequence;
 	else // reconnected and state not restored
@@ -65,9 +59,8 @@ FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CFlightPlan FlightPla
 {
 	// sequence == -1: inactive, 0: not found
 	for (auto& itm : m_SequenceListMap) {
-		seq_list::iterator itl;
 		int seq = 0;
-		for (itl = itm.second.begin(); itl != itm.second.end(); itl++) {
+		for (auto itl = itm.second.begin(); itl != itm.second.end(); itl++) {
 			seq += itl->active;
 			if (itl->callsign == FlightPlan.GetCallsign()) {
 				seq = itl->active ? seq : -1;
@@ -81,6 +74,6 @@ FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CFlightPlan FlightPla
 string DepartureSequence::GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	string s = FlightPlan.GetGroundState();
-	s = s.length() ? s : "NSTS";
+	s = s.length() ? s : FlightPlan.GetClearenceFlag() ? "CLRD" : "NSTS";
 	return s;
 }
