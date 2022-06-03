@@ -9,9 +9,9 @@
 
 // typical RECAT-CN rules
 const std::unordered_map<std::string, char> m_ReCatMap = {
-	//{"A388",	'J'},
-	//{"A225",	'J'},
-	//{"SLCN",	'J'},
+	{"A388",	'J'},
+	{"A225",	'J'},
+	{"SLCN",	'J'},
 	{"A124",	'B'},
 	{"A332",	'B'},
 	{"A333",	'B'},

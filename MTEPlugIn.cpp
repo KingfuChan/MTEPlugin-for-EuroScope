@@ -22,7 +22,7 @@ const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
-const int TAG_ITEM_TYPE_RECAT = 12; // RECAT-CN
+const int TAG_ITEM_TYPE_RECAT_BC = 12; // RECAT-CN (H-B/C)
 const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
 const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
 const int TAG_ITEM_TYPE_DEP_SEQ = 15; // Departure sequence
@@ -30,6 +30,7 @@ const int TAG_ITEM_TYPE_RVEC_IND = 16; // Radar vector indicator
 const int TAG_ITEM_TYPE_CFL_MTR = 17; // Cleared flight level (m)
 const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_TIEM_TYPE_DEP_STS = 19; // Departure status
+const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -134,7 +135,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RFL unit indicator", TAG_ITEM_TYPE_RFL_IND);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
-	RegisterTagItemType("RECAT-CN", TAG_ITEM_TYPE_RECAT);
+	RegisterTagItemType("RECAT-CN (H-B/C)", TAG_ITEM_TYPE_RECAT_BC);
 	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
 	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
 	RegisterTagItemType("Departure sequence", TAG_ITEM_TYPE_DEP_SEQ);
@@ -142,6 +143,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
 	RegisterTagItemType("Reconnected indicator", TAG_ITEM_TYPE_RCNT_IND);
 	RegisterTagItemType("Departure status", TAG_TIEM_TYPE_DEP_STS);
+	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -359,13 +361,19 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			*pColorCode = TAG_COLOR_REDUNDANT;
 		}
 		break; }
-	case TAG_ITEM_TYPE_RECAT: {
+	case TAG_ITEM_TYPE_RECAT_BC: {
 		if (!FlightPlan.IsValid()) break;
-		char categ = FlightPlan.GetFlightPlanData().GetAircraftWtc();
-		string acType = FlightPlan.GetFlightPlanData().GetAircraftFPType();
-		auto rc = m_ReCatMap.find(acType);
-		if (categ == 'H' && rc != m_ReCatMap.end())
-			sprintf_s(sItemString, 3, "-%c", rc->second);
+		if (FlightPlan.GetFlightPlanData().GetAircraftWtc() == 'H') {
+			auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
+			if (rc != m_ReCatMap.end() && rc->second != 'J')
+				sprintf_s(sItemString, 3, "-%c", rc->second);
+		}
+		break; }
+	case TAG_TIEM_TYPE_RECAT_WTC: {
+		if (!FlightPlan.IsValid()) break;
+		auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
+		sprintf_s(sItemString, 2, "%c",
+			rc != m_ReCatMap.end() ? rc->second : FlightPlan.GetFlightPlanData().GetAircraftWtc());
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
