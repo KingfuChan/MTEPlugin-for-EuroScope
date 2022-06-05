@@ -145,6 +145,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DepartureSequence.h" />
+    <ClInclude Include="MTEPScreen.h" />
     <ClInclude Include="ReCat.h" />
     <ClInclude Include="RouteChecker.h" />
     <ClInclude Include="SimilarCallsign.h" />

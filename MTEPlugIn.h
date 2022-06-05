@@ -8,8 +8,10 @@
 #include <string>
 #include <unordered_set>
 #include <unordered_map>
+#include <stack>
 #include <regex>
 #include "Version.h"
+#include "MTEPScreen.h"
 #include "MetricAlt.h"
 #include "ReCat.h"
 #include "SimilarCallsign.h"
@@ -35,10 +37,12 @@ public:
 	virtual void OnFlightPlanDisconnect(CFlightPlan FlightPlan);
 	virtual void OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan);
 	virtual void OnRadarTargetPositionUpdate(CRadarTarget RadarTarget);
+	virtual CRadarScreen* OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated);
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
 
+	stack<CMTEPScreen*> m_ScreenStack; // for StartTagFunction
 	RouteChecker* m_RouteChecker;
 	DepartureSequence* m_DepartureSequence;
 	TrackedRecorder* m_TrackedRecorder;
@@ -48,6 +52,7 @@ private:
 	string m_CustomNumMap; // 0-9
 
 	int GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel);
+	void CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(string filename);

@@ -46,7 +46,8 @@ const int TAG_ITEM_FUNCTION_SC_SELECT = 31; // Select in similar callsign list (
 const int TAG_ITEM_FUNCTION_RTE_INFO = 40; // Show route checker info
 const int TAG_ITEM_FUNCTION_DSQ_MENU = 50; // Set departure sequence
 const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit (not registered)
-const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registerd)
+const int TAG_ITEM_FUNCTION_DSQ_STS = 52; // Set departure status
+const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registered)
 const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 
 // COMPUTERISING RELATED
@@ -153,6 +154,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
 	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
 	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
+	RegisterTagItemFunction("Set departure status", TAG_ITEM_FUNCTION_DSQ_STS);
 	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
@@ -434,7 +436,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 }
 
-void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area) {
+void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT Pt, RECT Area)
+{
 	CRadarTarget RadarTarget = RadarTargetSelectASEL();
 	CFlightPlan FlightPlan = FlightPlanSelectASEL();
 	if (!RadarTarget.IsValid() && !FlightPlan.IsValid()) return;
@@ -674,6 +677,17 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			m_DepartureSequence->EditSequence(FlightPlan, seq);
 		}
 		break;	}
+	case TAG_ITEM_FUNCTION_DSQ_STS: {
+		if (!FlightPlan.IsValid()) break;
+		if (!FlightPlan.GetClearenceFlag()) {
+			// set cleared flag
+			CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, Pt, Area);
+		}
+		else {
+			// set status
+			CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_GROUND_STATUS, Pt, Area);
+		}
+		break; }
 	case TAG_ITEM_FUNCTION_SPD_SET: {
 		if (!FlightPlan.IsValid()) break;
 		if (!strcmp(sItemString, "----"))
@@ -745,6 +759,11 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
+	if (DataType == CTR_DATA_TYPE_GROUND_STATE &&
+		FlightPlan.GetClearenceFlag() &&
+		!strlen(FlightPlan.GetGroundState())) {
+		CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
+	}
 }
 
 void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
@@ -784,7 +803,15 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 	}
 }
 
-bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
+CRadarScreen* CMTEPlugIn::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)
+{
+	CMTEPScreen* screen = new CMTEPScreen();
+	m_ScreenStack.push(screen);
+	return screen;
+}
+
+bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
+{
 	string cmd = sCommandLine;
 	smatch match; // all regular expressions will ignore cases
 
@@ -916,13 +943,27 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine) {
 	return false;
 }
 
-int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel) {
+int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel)
+{
 	// returns radar display altitude, stores transition level
 	if (!RadarTarget.IsValid()) return 0;
 	TransLevel = m_TransitionLevel->GetTransitionLevel(RadarTarget);
 	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
 	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
 	return stdAlt >= TransLevel ? stdAlt : qnhAlt;
+}
+
+void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area)
+{
+	while (!m_ScreenStack.empty()) {
+		auto s = m_ScreenStack.top();
+		if (s->m_Opened)
+			return s->StartTagFunction(sCallsign, nullptr, 0, nullptr, nullptr, FunctionId, Pt, Area);
+		else {
+			delete s;
+			m_ScreenStack.pop();
+		}
+	}
 }
 
 void CMTEPlugIn::SetCustomCursor(void)
