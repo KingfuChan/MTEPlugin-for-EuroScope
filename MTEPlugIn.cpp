@@ -379,12 +379,36 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
-		if (!FlightPlan.IsValid()) break;
-		if (m_RouteChecker == nullptr) break;
-		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan);
-		sprintf_s(sItemString, 2, "%c", rc);
-		if (rc != 'Y' && rc != '?' && rc != ' ') {
+		if (m_RouteChecker == nullptr ||
+			!FlightPlan.IsValid() ||
+			FlightPlan.GetClearenceFlag())
+			break;
+		switch (m_RouteChecker->CheckFlightPlan(FlightPlan))
+		{
+		case RouteCheckerConstants::NOT_FOUND:
+			sprintf_s(sItemString, 3, "? ");
+			break;
+		case RouteCheckerConstants::INVALID:
+			sprintf_s(sItemString, 3, "X ");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			break;
+		case RouteCheckerConstants::PARTIAL_NO_LEVEL:
+			sprintf_s(sItemString, 3, "PL");
+			*pColorCode = TAG_COLOR_REDUNDANT;
+			break;
+		case RouteCheckerConstants::COMPLETE_NO_LEVEL:
+			sprintf_s(sItemString, 3, "YL");
+			*pColorCode = TAG_COLOR_REDUNDANT;
+			break;
+		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
+			sprintf_s(sItemString, 3, "P ");
+			*pColorCode = TAG_COLOR_REDUNDANT;
+			break;
+		case RouteCheckerConstants::COMPLETE_OK_LEVEL:
+			sprintf_s(sItemString, 3, "Y ");
+			break;
+		default:
+			break;
 		}
 		break; }
 	case TAG_ITEM_TYPE_SQ_DUPE: {
@@ -651,10 +675,12 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RTE_INFO: {
-		if (!FlightPlan.IsValid()) break;
-		if (m_RouteChecker == nullptr) break;
-		char rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true); // force a refresh here to avoid error
-		if (rc == 'Y' || rc == ' ') break; // no need to show ok routes and cleared routes
+		if (m_RouteChecker == nullptr ||
+			!FlightPlan.IsValid() ||
+			FlightPlan.GetClearenceFlag())
+			break;
+		int rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true); // force a refresh here to avoid error
+		if (rc == RouteCheckerConstants::COMPLETE_OK_LEVEL || rc == RouteCheckerConstants::NOT_FOUND) break;
 		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 
 		break; }
@@ -989,7 +1015,7 @@ void CMTEPlugIn::LoadRouteChecker(string filename)
 		filename = GetAbsolutePath(filename.substr(1));
 	}
 	try {
-		m_RouteChecker = new RouteChecker(filename);
+		m_RouteChecker = new RouteChecker(this, filename);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Route checker is loaded successfully. CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);

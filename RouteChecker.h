@@ -8,21 +8,32 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <list>
 #include <regex>
+#include <list>
+#include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include "MetricAlt.h"
 
 using namespace std;
 
+namespace RouteCheckerConstants {
+	const int NOT_FOUND = -1;
+	const int INVALID = 0;
+	const int PARTIAL_NO_LEVEL = 1;
+	const int COMPLETE_NO_LEVEL = 2;
+	const int PARTIAL_OK_LEVEL = 11;
+	const int COMPLETE_OK_LEVEL = 12;
+}
+
 class RouteChecker
 {
 public:
-	RouteChecker(string filename);
+	RouteChecker(EuroScopePlugIn::CPlugIn* plugin, string filename);
 	~RouteChecker(void);
 
 	list<string> GetRouteInfo(string departure, string arrival); // for string display
-	char CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh = false);
+	int CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh = false);
 	void RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan);
 
 private:
@@ -35,9 +46,11 @@ private:
 		string m_Remark;
 	};
 
+	unordered_map<string, unordered_set<string>> m_SIDSTAR; // ICAO -> set <SID & STAR>
 	unordered_map<string, list<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair
-	unordered_map<string, char> m_Cache; // callsign -> check result
+	unordered_map<string, int> m_Cache; // callsign -> check result
 
-	bool IsRouteValid(string planroute, string realroute);
+	bool IsRouteValid(string FProute, string DBroute);
+	int IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, string DBroute);
 	bool IsLevelValid(int planalt, string evenodd, string fixalt, string minalt);
 };
