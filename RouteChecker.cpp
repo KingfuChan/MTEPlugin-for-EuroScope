@@ -82,12 +82,7 @@ list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh)
 {
 	/*
-	-1	no route for OD pair
-	00	route not ok
-	10	route partially ok, alt not ok
-	11	route partially ok, alt ok
-	20	route completely ok, alt not ok
-	21	route completely ok, alt ok
+	see RouteCheckerConstants:: for returns
 	:refresh = true will force refresh, otherwise will look up in cache
 	*/
 
