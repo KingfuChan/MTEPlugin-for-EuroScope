@@ -6,7 +6,6 @@
 #include "resource.h"
 #include <EuroScopePlugIn.h>
 #include <string>
-#include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include "SimilarCallsign.h"
