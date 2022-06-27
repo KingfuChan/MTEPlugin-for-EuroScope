@@ -98,10 +98,10 @@ int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool 
 	else {
 		res = 0;
 		for (auto& rd : rteit->second) {
-			int rvalid = IsRouteValid(fpd.GetRoute(), rd.m_Route) ? 2 : IsRouteValid(FlightPlan.GetExtractedRoute(), rd.m_Route);
+			int rvalid = IsRouteValid(fpd.GetRoute(), rd.m_Route) ? 3 : IsRouteValid(FlightPlan.GetExtractedRoute(), rd.m_Route);
 			bool lvalid = rvalid ? IsLevelValid(FlightPlan.GetFinalAltitude(), rd.m_EvenO, rd.m_FixAltStr, rd.m_MinAlt) : false;
 			res = max(rvalid + (int)lvalid * 10, res); // corresponds RouteCheckerConstants
-			if (res == RouteCheckerConstants::COMPLETE_OK_LEVEL)
+			if (res == RouteCheckerConstants::TEXT_OK_LEVEL)
 				break;
 		}
 	}
@@ -150,16 +150,17 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 {
 	// returns: 0-not valid, 1-partially valid, 2-valid
 	bool partial = false;
-	int i(1), m(ExtractedRoute.GetPointsNumber());
-	int j(0), n(0);
+	string dep = ExtractedRoute.GetPointName(0);
+	string arr = ExtractedRoute.GetPointName(ExtractedRoute.GetPointsNumber() - 1);
 
 	// load Extracted route
 	typedef struct { string via_; string to_; int cls_; }_plnpoint;
 	vector<_plnpoint> plnvec;
-	for (i = 1; i < m; i++) {
+	for (int i = 1; i < ExtractedRoute.GetPointsNumber() - 1; i++) {
 		plnvec.push_back({ ExtractedRoute.GetPointAirwayName(i), ExtractedRoute.GetPointName(i), ExtractedRoute.GetPointAirwayClassification(i) });
 	}
-	m = plnvec.size();
+	int i = 0;
+	int m = plnvec.size();
 
 	// parse database route
 	vector<string> rtevec;
@@ -167,11 +168,12 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	string strt = "";
 	while (ssrt >> strt) {
 		rtevec.push_back(strt);
-		n++;
 	}
+	int j = 0;
+	int n = rtevec.size();
 
 	// make point i the 1st waypoint of route (out of SID)
-	auto setsid = m_SIDSTAR.find(ExtractedRoute.GetPointName(0));
+	auto setsid = m_SIDSTAR.find(dep);
 	if (setsid != m_SIDSTAR.end()) {
 		for (i = 0; i < m &&
 			setsid->second.find(plnvec[i].via_) != setsid->second.end();
@@ -191,8 +193,9 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	}
 	while (i < m && j < n) {
 		if (rtevec[j] == plnvec[i].via_) {
-			if (j + 1 < n && rtevec[j + 1] == plnvec[i].to_)
+			if (j + 1 < n && rtevec[j + 1] == plnvec[i].to_) {
 				j += 2;
+			}
 			i++;
 		}
 		else if (rtevec[j] == plnvec[i].to_) {
@@ -210,7 +213,7 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 		return 1;
 	}
 	else {
-		auto setstar = m_SIDSTAR.find(ExtractedRoute.GetPointName(m));// check STAR
+		auto setstar = m_SIDSTAR.find(arr);// check STAR
 		if (setstar != m_SIDSTAR.end() &&
 			setstar->second.find(plnvec[i].via_) != setstar->second.end()) {
 			return partial ? 1 : 2;

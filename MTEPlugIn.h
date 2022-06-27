@@ -51,7 +51,6 @@ private:
 	int m_AutoRetrack; // 0: off; 1: silent; 2: notified.
 	string m_CustomNumMap; // 0-9
 
-	int GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel);
 	void CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);

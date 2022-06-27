@@ -106,3 +106,20 @@ int TransitionLevel::GetTransitionLevel(EuroScopePlugIn::CRadarTarget RadarTarge
 	}
 	return m_PluginPtr->GetTransitionAltitude();
 }
+
+int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference)
+{
+	// returns radar display altitude and assign reference AltitudeReference::ALT_REF_xxx
+	if (!RadarTarget.IsValid()) return 0;
+	int translvl = GetTransitionLevel(RadarTarget);
+	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
+	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
+	if (stdAlt >= translvl) {
+		reference = AltitudeReference::ALT_REF_QNE;
+		return stdAlt;
+	}
+	else {
+		reference = AltitudeReference::ALT_REF_QNH;
+		return qnhAlt;
+	}
+}

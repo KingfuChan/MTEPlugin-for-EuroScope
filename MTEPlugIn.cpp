@@ -226,8 +226,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_AFL_MTR: {
-		int transLvl;
-		int rdrAlt = GetRadarDisplayAltitude(RadarTarget, transLvl);
+		int altref;
+		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
 		int dspAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
@@ -237,11 +237,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			dspAlt = (int)round(rdrAlt / 100.0);
 			sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
 		}
-		if (rdrAlt < transLvl) {
+		if (altref != AltitudeReference::ALT_REF_QNE) {
 			// use custom number mapping
 			for (char* p = sItemString; *p != '\0'; p++) {
 				*p = m_CustomNumMap[int(*p - '0')];
 			}
+			if (altref == AltitudeReference::ALT_REF_QFE)
+				*pColorCode = TAG_COLOR_REDUNDANT;
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
@@ -396,15 +398,22 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 3, "PL");
 			*pColorCode = TAG_COLOR_REDUNDANT;
 			break;
-		case RouteCheckerConstants::COMPLETE_NO_LEVEL:
+		case RouteCheckerConstants::STRUCT_NO_LEVEL:
 			sprintf_s(sItemString, 3, "YL");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			break;
+		case RouteCheckerConstants::TEXT_NO_LEVEL:
+			sprintf_s(sItemString, 3, "YL");
 			break;
 		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
 			sprintf_s(sItemString, 3, "P ");
 			*pColorCode = TAG_COLOR_REDUNDANT;
 			break;
-		case RouteCheckerConstants::COMPLETE_OK_LEVEL:
+		case RouteCheckerConstants::STRUCT_OK_LEVEL:
+			sprintf_s(sItemString, 3, "Y ");
+			*pColorCode = TAG_COLOR_REDUNDANT;
+			break;
+		case RouteCheckerConstants::TEXT_OK_LEVEL:
 			sprintf_s(sItemString, 3, "Y ");
 			break;
 		default:
@@ -519,6 +528,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			else if (regex_match(input, match, rxn)) {
 				tgtAlt = MetricAlt::LvlMtoFeet(stoi(match[1]) * 100);
 			}
+			// TODO: cheat ES of QFE altitude
 		}
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 
@@ -537,8 +547,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "CFL Menu", 2);
 		// pre-select altitude
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-		int _lvl;
-		int rdrAlt = GetRadarDisplayAltitude(RadarTarget, _lvl);
+		int _ref;
+		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, _ref);
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// metric
@@ -680,7 +690,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			FlightPlan.GetClearenceFlag())
 			break;
 		int rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true); // force a refresh here to avoid error
-		if (rc == RouteCheckerConstants::COMPLETE_OK_LEVEL || rc == RouteCheckerConstants::NOT_FOUND) break;
+		if (rc == RouteCheckerConstants::NOT_FOUND) break;
 		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 
 		break; }
@@ -733,9 +743,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			// don't show list if other controller is tracking
 			break;
 		}
-		int transLvl;
-		int alt = GetRadarDisplayAltitude(RadarTarget, transLvl);
-		if (MetricAlt::FeettoM(alt) <= 7530 || alt < transLvl) { // use IAS
+		int altref;
+		int alt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
+		if (MetricAlt::FeettoM(alt) <= 7530 || altref != AltitudeReference::ALT_REF_QNE) { // use IAS
 			int aspd = FlightPlan.GetControllerAssignedData().GetAssignedSpeed();
 			OpenPopupList(Area, "IAS", 2);
 			for (int s = 320; s >= 160; s -= 10) {
@@ -967,16 +977,6 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	return false;
-}
-
-int CMTEPlugIn::GetRadarDisplayAltitude(CRadarTarget RadarTarget, int& TransLevel)
-{
-	// returns radar display altitude, stores transition level
-	if (!RadarTarget.IsValid()) return 0;
-	TransLevel = m_TransitionLevel->GetTransitionLevel(RadarTarget);
-	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
-	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
-	return stdAlt >= TransLevel ? stdAlt : qnhAlt;
 }
 
 void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area)

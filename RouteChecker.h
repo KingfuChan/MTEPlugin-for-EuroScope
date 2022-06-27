@@ -21,9 +21,11 @@ namespace RouteCheckerConstants {
 	const int NOT_FOUND = -1;
 	const int INVALID = 0;
 	const int PARTIAL_NO_LEVEL = 1;
-	const int COMPLETE_NO_LEVEL = 2;
+	const int STRUCT_NO_LEVEL = 2;
+	const int TEXT_NO_LEVEL = 3;
 	const int PARTIAL_OK_LEVEL = 11;
-	const int COMPLETE_OK_LEVEL = 12;
+	const int STRUCT_OK_LEVEL = 12;
+	const int TEXT_OK_LEVEL = 13;
 }
 
 class RouteChecker
