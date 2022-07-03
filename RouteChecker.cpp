@@ -160,7 +160,7 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 		plnvec.push_back({ ExtractedRoute.GetPointAirwayName(i), ExtractedRoute.GetPointName(i), ExtractedRoute.GetPointAirwayClassification(i) });
 	}
 	int i = 0;
-	int m = plnvec.size();
+	const int m = plnvec.size();
 
 	// parse database route
 	vector<string> rtevec;
@@ -170,23 +170,29 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 		rtevec.push_back(strt);
 	}
 	int j = 0;
-	int n = rtevec.size();
+	const int n = rtevec.size();
 
-	// make point i the 1st waypoint of route (out of SID)
+	// prevent error caused by empty vec
+	if (!m && n)
+		return 0;
+	else if (!n)
+		return 2;
+
+	// make point i the 1st waypoint of route (last of SID)
 	auto setsid = m_SIDSTAR.find(dep);
 	if (setsid != m_SIDSTAR.end()) {
 		for (i = 0; i < m &&
 			setsid->second.find(plnvec[i].via_) != setsid->second.end();
 			i++);
-		if (plnvec[i].cls_ != EuroScopePlugIn::AIRWAY_CLASS_NO_DATA_DIRECT)
+		if (i == m || plnvec[i].cls_ != EuroScopePlugIn::AIRWAY_CLASS_NO_DATA_DIRECT)
 			i--;
 	}
 
 	// compare vec to extracted route
 	for (j = 0; j < n && rtevec[j] != plnvec[i].to_; j++);
+	partial = j > 0 && plnvec[i].cls_ == EuroScopePlugIn::AIRWAY_CLASS_NO_DATA_DIRECT;
 	if (j == n) { // starting point not found in rtevec
-		partial = true;
-		i++;
+		i += (int)(i < m - 1); // make sure i<m
 		for (j = 0; j < n && rtevec[j] != plnvec[i].via_; j++); // locate starting airway
 		if (j == n) // starting airway not found in rtevec
 			return 0;
