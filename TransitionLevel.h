@@ -29,7 +29,16 @@ public:
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
 
 private:
+	struct AirportData {
+		int trans_level;
+		int elevation;
+		int QFE_range;
+		bool in_sector;
+		EuroScopePlugIn::CPosition position;
+	};
+
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
-	unordered_map<string, EuroScopePlugIn::CPosition> m_AirportPosMap;
-	unordered_map<string, int> m_TransLevelMap;
+	unordered_map<string, AirportData> m_AirportMap;
+	unordered_map<string, AirportData>::iterator GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
+	unordered_map<string, AirportData>::iterator GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
 };

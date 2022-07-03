@@ -229,22 +229,27 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int altref;
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
 		int dspAlt;
+		char tmpStr[16];
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
-			sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
+			sprintf_s(tmpStr, 5, "%04d", OVRFLW4(dspAlt));
 		}
 		else {
 			dspAlt = (int)round(rdrAlt / 100.0);
-			sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
+			sprintf_s(tmpStr, 4, "%03d", OVRFLW3(dspAlt));
 		}
-		if (altref != AltitudeReference::ALT_REF_QNE) {
-			// use custom number mapping
-			for (char* p = sItemString; *p != '\0'; p++) {
-				*p = m_CustomNumMap[int(*p - '0')];
+		string dspStr = tmpStr;
+		if (altref == AltitudeReference::ALT_REF_QNH) {
+			for (auto& c : dspStr) {
+				// use custom number mapping
+				c = m_CustomNumMap[int(c - '0')];
 			}
-			if (altref == AltitudeReference::ALT_REF_QFE)
-				*pColorCode = TAG_COLOR_REDUNDANT;
 		}
+		else if (altref == AltitudeReference::ALT_REF_QFE) {
+			dspStr = "(" + dspStr + ")";
+		}
+		strcpy_s(sItemString, dspStr.size() + 1, dspStr.c_str());
+
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
 		if (!FlightPlan.IsValid()) break;

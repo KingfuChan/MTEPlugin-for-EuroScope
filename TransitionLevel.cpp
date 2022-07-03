@@ -3,6 +3,8 @@
 #include "pch.h"
 #include "TransitionLevel.h"
 
+const int DISTANCE_THRESHOLD = 50; // nautical miles, for airport nearest RadarTarget
+
 TransitionLevel::TransitionLevel(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
@@ -14,8 +16,7 @@ TransitionLevel::~TransitionLevel(void)
 
 void TransitionLevel::LoadCSV(string filename)
 {
-	m_TransLevelMap.clear();
-	m_AirportPosMap.clear();
+	m_AirportMap.clear();
 	// external file
 	ifstream inFile;
 	inFile.open(filename, ios::in);
@@ -25,29 +26,32 @@ void TransitionLevel::LoadCSV(string filename)
 	}
 	string line;
 	getline(inFile, line);
-	if (line != "Airport,Level") { // confirm header
+	if (line != "Ident,TransLevel,Elevation,QFERange") { // confirm header
 		inFile.close();
 		throw string("invalid column names");
 	}
 	while (getline(inFile, line)) {
 		istringstream ssin(line);
-		string aplist, lvlstr;
-		getline(ssin, aplist, ',');
-		getline(ssin, lvlstr);
-		int lvlft;
+		string apid, lvlstr, elevstr, rangestr;
+		getline(ssin, apid, ',');
+		getline(ssin, lvlstr, ',');
+		getline(ssin, elevstr, ',');
+		getline(ssin, rangestr);
+		int lvlft(0), elevft(0), rangenm(0); // use 0 to re-initialize
 		if (sscanf_s(lvlstr.c_str(), "F%d", &lvlft)) {
-			lvlft = lvlft * 100;
+			m_AirportMap[apid].trans_level = lvlft * 100;
 		}
 		else if (sscanf_s(lvlstr.c_str(), "S%d", &lvlft)) {
-			lvlft = MetricAlt::LvlMtoFeet(lvlft * 100);
+			m_AirportMap[apid].trans_level = MetricAlt::LvlMtoFeet(lvlft * 100);
 		}
 		else {
-			continue;
+			m_AirportMap[apid].trans_level = 0;
 		}
-		// split airpots and assign level
-		string a;
-		for (istringstream ssapl(aplist); getline(ssapl, a, '/');) {
-			m_TransLevelMap[a] = lvlft;
+		if (sscanf_s(elevstr.c_str(), "%d", &elevft)) {
+			m_AirportMap[apid].elevation = elevft;
+		}
+		if (sscanf_s(rangestr.c_str(), "%d", &rangenm)) {
+			m_AirportMap[apid].QFE_range = rangenm;
 		}
 	}
 	inFile.close();
@@ -56,53 +60,29 @@ void TransitionLevel::LoadCSV(string filename)
 		se.IsValid();
 		se = m_PluginPtr->SectorFileElementSelectNext(se, EuroScopePlugIn::SECTOR_ELEMENT_AIRPORT)) {
 		EuroScopePlugIn::CPosition pos;
-		if (se.GetPosition(&pos, 0)) {
-			m_AirportPosMap.insert({ se.GetName(), pos });
-		}
+		m_AirportMap[se.GetName()].in_sector = se.GetPosition(&pos, 0);
+		m_AirportMap[se.GetName()].position = pos;
 	}
 }
 
 int TransitionLevel::GetTransitionLevel(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	if (!m_TransLevelMap.empty() && FlightPlan.IsValid()) {
-		string adep = FlightPlan.GetFlightPlanData().GetOrigin();
-		string aarr = FlightPlan.GetFlightPlanData().GetDestination();
-		auto ldep = m_TransLevelMap.find(adep);
-		auto larr = m_TransLevelMap.find(aarr);
-		auto curPos = FlightPlan.GetFPTrackPosition().GetPosition();
-		auto pdep = m_AirportPosMap.find(adep);
-		auto parr = m_AirportPosMap.find(aarr);
-		double ddep = pdep != m_AirportPosMap.end() ? curPos.DistanceTo(pdep->second) : FlightPlan.GetDistanceFromOrigin();
-		double darr = parr != m_AirportPosMap.end() ? curPos.DistanceTo(parr->second) : FlightPlan.GetDistanceToDestination();
-		auto& lres = ddep < darr ? ldep : larr;
-		if (lres != m_TransLevelMap.end())
-			return lres->second;
+	auto apitr = GetTargetAirport(FlightPlan);
+	if (apitr != m_AirportMap.end()) {
+		int trslvl = apitr->second.trans_level;
+		if (trslvl)
+			return trslvl;
 	}
 	return m_PluginPtr->GetTransitionAltitude();
 }
 
 int TransitionLevel::GetTransitionLevel(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	if (RadarTarget.IsValid()) {
-		auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
-		if (FlightPlan.IsValid()) {
-			return GetTransitionLevel(FlightPlan);
-		}
-		else if (!m_TransLevelMap.empty() && !m_AirportPosMap.empty()) {
-			double minDist(50); // within 50 nautical miles
-			int minL = m_PluginPtr->GetTransitionAltitude();
-			for (auto& l : m_TransLevelMap) {
-				auto p = m_AirportPosMap.find(l.first);
-				if (p != m_AirportPosMap.end()) {
-					double d = RadarTarget.GetPosition().GetPosition().DistanceTo(p->second);
-					if (d < minDist) {
-						minDist = d;
-						minL = l.second;
-					}
-				}
-			}
-			return minL;
-		}
+	auto apitr = GetTargetAirport(RadarTarget);
+	if (apitr != m_AirportMap.end()) {
+		int trslvl = apitr->second.trans_level;
+		if (trslvl)
+			return trslvl;
 	}
 	return m_PluginPtr->GetTransitionAltitude();
 }
@@ -119,7 +99,54 @@ int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget Radar
 		return stdAlt;
 	}
 	else {
+		auto apitr = GetTargetAirport(RadarTarget);
+		if (apitr != m_AirportMap.end() && apitr->second.in_sector) {
+			double distance = apitr->second.position.DistanceTo(RadarTarget.GetPosition().GetPosition());
+			if (distance <= apitr->second.QFE_range) {
+				reference = AltitudeReference::ALT_REF_QFE;
+				return qnhAlt - apitr->second.elevation;
+			}
+		}
 		reference = AltitudeReference::ALT_REF_QNH;
 		return qnhAlt;
 	}
+}
+
+unordered_map<string, TransitionLevel::AirportData>::iterator TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan)
+{
+	if (!m_AirportMap.empty() && FlightPlan.IsValid()) {
+		string adep = FlightPlan.GetFlightPlanData().GetOrigin();
+		string aarr = FlightPlan.GetFlightPlanData().GetDestination();
+		auto itrdep = m_AirportMap.find(adep);
+		auto itrarr = m_AirportMap.find(aarr);
+		auto curPos = FlightPlan.GetFPTrackPosition().GetPosition();
+		double ddep = itrdep != m_AirportMap.end() && itrdep->second.in_sector ? curPos.DistanceTo(itrdep->second.position) : FlightPlan.GetDistanceFromOrigin();
+		double darr = itrarr != m_AirportMap.end() && itrarr->second.in_sector ? curPos.DistanceTo(itrarr->second.position) : FlightPlan.GetDistanceToDestination();
+		return ddep < darr ? itrdep : itrarr;
+	}
+	return m_AirportMap.end();
+}
+
+unordered_map<string, TransitionLevel::AirportData>::iterator TransitionLevel::GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	auto res = m_AirportMap.end();
+	if (RadarTarget.IsValid()) {
+		auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+		if (FlightPlan.IsValid()) {
+			return GetTargetAirport(FlightPlan);
+		}
+		else if (!m_AirportMap.empty()) {
+			double minDist = DISTANCE_THRESHOLD;
+			auto rtpos = RadarTarget.GetPosition().GetPosition();
+			for (auto ap = m_AirportMap.begin(); ap != m_AirportMap.end(); ap++) {
+				if (!ap->second.in_sector) continue;
+				double d = rtpos.DistanceTo(ap->second.position);
+				if (d < minDist) {
+					minDist = d;
+					res = ap;
+				}
+			}
+		}
+	}
+	return res;
 }

@@ -8,9 +8,9 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 2. **RMK/STS indicator** - shows a **\*** if RMK/ or STS/ is found in flight plan remarks.
 3. **Vertical speed (4-digit FPM)** - vertical speed in xxxx, will not display if vs<=100 fpm.
 4. **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator. Threshold is 100 fpm.
-5. **Actual altitude (m)** - uses QNH altitude below transition level and STD altitude above.
-    + Allows custom number mapping if below transition level. See command line features below
-    + Transition level can be customized, see Transition Level below.
+5. **Actual altitude (m)** - uses QNH/QFE altitude below transition level and STD altitude above.
+    + Allows custom number mapping if below transition level. See command line features below.
+    + Transition level and QFE settings can be customized. See **Transition Level** below.
 6. **Cleared flight level (m/FL)** - shows Chinese metric RVSM levels if matches (4 digits), or FLxxx (3 digits), otherwise calculated meters (4 digits).
 7. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, otherwise calculated meters.
     + Similar to item 6, but won't show ILS/VA. More useful in a Sweatbox simulator session.
@@ -18,15 +18,17 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
     + Sxxx (above transition level), Mxxx (below transition level), Fxxx (regardless of transition level).
 9. **RFL unit indicator** - shows **#** if final altitude of tracked aircraft does not match Chinese metric RVSM levels.
 10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
-11. **RECAT-CN** - Re-categorization (Chinese) for H(eavy) aircrafts. Only includes **-B -C**.
-12. **Route validity** - route checker item, see detail below.
-13. **Departure sequence** - departure sequence item, see detail below.
-14. **Radar vector indicator** - shows **RV** for tracked aircraft with heading assigned.
+11. **RECAT-CN (H-B/C)** - wake turbulence re-categorization (RECAT-CN) for H(eavy) aircrafts. Only includes **-B -C**.
+12. **RECAT-CN (LMCBJ)** - wake turbulence re-categorization (RECAT-CN) for all aircrafts. Includes **L M C B J**.
+13. **Route validity** - route checker item, see detail below.
+14. **Departure sequence** - departure sequence item, see detail below.
+15. **Departure status** - departure sequence item, see detail below.
+16. **Radar vector indicator** - shows **RV** for tracked aircraft with heading assigned.
     + The color is set by *Symbology Settings->Datablock->Information*.
-15. **COMM ESTB indicator** - tracked recorder item, see detail below.
-16. **Tracked DUPE warning** - tracked recorder item, see detail below.
-17. **Similar callsign indicator** - tracked recorder item, see detail below.
-18. **Reconnected indicator** - tracked recorder item, see detail below.
+17. **COMM ESTB indicator** - tracked recorder item, see detail below.
+18. **Tracked DUPE warning** - tracked recorder item, see detail below.
+19. **Similar callsign indicator** - tracked recorder item, see detail below.
+20. **Reconnected indicator** - tracked recorder item, see detail below.
 
 ## Tag Item Functions
 
@@ -39,9 +41,10 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 4. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
 5. **Show route checker info** - route checker function, see detail below.
 6. **Set departure sequence** - departure sequence function, see detail below.
-7. **Set COMM ESTB** - tracked recorder function, see detail below.
-8. **Open similar callsign list** - tracked recorder function, see detail below.
-9. **Restore assigned data** - tracked recorder function, see detail below.
+7. **Set departure status** - departure sequence function, see detail below.
+8. **Set COMM ESTB** - tracked recorder function, see detail below.
+9. **Open similar callsign list** - tracked recorder function, see detail below.
+10. **Restore assigned data** - tracked recorder function, see detail below.
 
 ## Route Checker
 
@@ -72,12 +75,17 @@ You need to use a command line to load the CSV file: **.MTEP RC PATH** (case-ins
 
 Tag item type **Route validity** shows:
 
-+ **Y** - both route and final altitude is valid.
-+ **L** - route is valid but final altitude is not.
-+ **X** - route is not valid.
-+ **?** - no route is found for this DEP-ARR.
-+ shows nothing when clearance received flag is set or route checker is not configured.
-+ The color of **L X** is set by *Symbology Settings->Datablock->Redundant*.
+||Route|Final Altitude|
+|:--|:--:|:--:|
+|**Y**|Yes|Yes|
+|**P**|Partial|Yes|
+|**YL**|Yes|No|
+|**PL**|Partial|No|
+|**X**|No|/|
+|**?**|Not Found|/|
+
++ Blanks out when route checker is not configured or clearance received flag is set.
++ Different colors are used to distinguish two methods. Default color implies text-comparison method (**Y/YL/?**). Color set by *Symbology Settings->Datablock->Redundant* implies structurized-comparison method, in which case it could be inaccurate. Color set by *Symbology Settings->Datablock->Information* implies invalid route (**X**) with both methods.
 
 Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
 
@@ -110,7 +118,19 @@ There are 2 ways to re-activate reconnected flights and restoring previous seque
 + resetting previous ground state.
 + use **Set departure sequence** for NSTS flights.
 
-Command line function: **.MTEP DS RESET** will completely reset the module.
+Command line function: **.MTEP DS RESET** resets all memories.
+
+Tag item type **Departure status** provides a compound display for ground status by adding clearance received flag (**CLRD**) to native EuroScope **Ground status** item type (**STUP, PUSH, TAXI, DEPA** depending on Euroscope version).
+
++ **CLRD** is shown when clearance received flag is set and no ground status.
++ Use different color when there is a ground status but clearanced received flag hasn't been set. The color is set by *Symbology Settings->Datablock->Information*.
+
+Tag item function **Set departure status** is used to set clearance received flag and ground status.
+
++ Sets clearance received flag when it isn't.
++ Opens ground status popup list when clearance received flag is set.
++ Setting **NSTS** will reset clearance received flag if no ground status is present.
++ This function requires permission to draw on display types. Go to *Plug-ins settings->Allow to draw on types* and add ALL display types.
 
 ## Tracked Recorder
 
@@ -149,18 +169,23 @@ Related command line functions:
 
 ## Transition Level
 
-EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL and RFL originally use QNH altitudes when below transition altitude and use QNE altittudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results.
+EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL and RFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
 
-Transition levels can be customized for different airports. A CSV file is required for the customization, in the format below.
+A CSV file is required for the customization, in the format below.
 
-|Airport|Level|
-|:---:|:---:|
-|ZGSD/ZGSZ|S33|
-|ZPPP|S60|
-|VHHH|F110|
+|Ident|TransLevel|Elevation|QFERange|
+|:---:|:---:|:---:|:---:|
+|ZGSZ|S33|13|0|
+|ZGNN||420|50|
+|ZSWH|S21|148|50|
+|VHHH|F110|28|0|
 
-+ ***Airport*** can be a list seperated by "/".
-+ ***Level*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft.
++ ***Ident*** is the ICAO identification for a single airport.
++ ***TransLevel*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft. If this field is empty, the module will use *General Settings (in setting file) -> m_TransitionAltitude* instead.
++ ***Elevation*** is the airport elevation in feet. This is redundant if QFE is not applied to this airport.
++ ***QFERange*** (in nautical miles) is used to determine whether a radar target should use QFE or QNH. Only when the distance between radar target and the airport is within this range, QFE will be used. QFE will be disabled if this field is 0 or empty.
+
+When using QFE, **Actual altitude (m)** will show in parentheses "**()**", and custom number mapping won't apply.
 
 CSV files with incorrect column names or not in the given order, will not be loaded. It's possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
