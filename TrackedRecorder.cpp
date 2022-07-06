@@ -198,6 +198,7 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 	else if (tad.m_DCTName.size())
 		asd.SetDirectToPointName(tad.m_DCTName.c_str());
 	trd->second.m_Offline = false;
+	RefreshSimilarCallsign();
 	return FlightPlan.StartTracking();
 }
 
