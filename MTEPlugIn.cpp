@@ -93,7 +93,10 @@ CMTEPlugIn::CMTEPlugIn(void)
 	pluginModule = AfxGetInstanceHandle();
 
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
-	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, 0, 0, LR_SHARED));
+	UINT dpiSys = GetDpiForWindow(GetDesktopWindow());
+	UINT dpiWnd = GetDpiForWindow(pluginWindow);
+	int curSize = (dpiSys < 96 ? 96 : dpiSys) / (dpiWnd < 96 ? 96 : dpiWnd) * 32;
+	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, curSize, curSize, LR_SHARED));
 	m_CustomCursor = false;
 	if (setcc == nullptr ? false : stoi(setcc))
 		SetCustomCursor();
