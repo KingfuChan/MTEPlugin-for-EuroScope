@@ -95,7 +95,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	const char* setcc = GetDataFromSettings(SETTING_CUSTOM_CURSOR);
 	UINT dpiSys = GetDpiForWindow(GetDesktopWindow());
 	UINT dpiWnd = GetDpiForWindow(pluginWindow);
-	int curSize = (dpiSys < 96 ? 96 : dpiSys) / (dpiWnd < 96 ? 96 : dpiWnd) * 32;
+	int curSize = (int)((float)(dpiSys < 96 ? 96 : dpiSys) / (float)(dpiWnd < 96 ? 96 : dpiWnd) * 32.0);
 	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, curSize, curSize, LR_SHARED));
 	m_CustomCursor = false;
 	if (setcc == nullptr ? false : stoi(setcc))
