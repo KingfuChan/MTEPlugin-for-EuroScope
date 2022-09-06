@@ -55,7 +55,7 @@ void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, in
 	}
 }
 
-FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CFlightPlan FlightPlan)
+DepartureSequence::FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	// sequence == -1: inactive, 0: not found
 	for (auto& itm : m_SequenceListMap) {

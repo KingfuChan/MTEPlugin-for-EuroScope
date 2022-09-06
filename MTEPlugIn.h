@@ -41,7 +41,6 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
-
 	stack<CMTEPScreen*> m_ScreenStack; // for StartTagFunction
 	RouteChecker* m_RouteChecker;
 	DepartureSequence* m_DepartureSequence;

@@ -39,14 +39,16 @@ public:
 	void RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan);
 
 private:
-	struct RouteData {
+	typedef struct {
 		string m_Name;
 		string m_EvenO; // accepts a combination of SE SO FE FO. S/F - m/ft, E/O - Even/Odd. No need for seperation marks
 		string m_FixAltStr; // accepts a combination of alt Sxxx(m*100) Fxxx(ft*100), seperated by '/'
 		string m_MinAlt; // in feet
 		string m_Route;
 		string m_Remark;
-	};
+	}RouteData;
+	typedef struct { string via_; string to_; int cls_; }plan_point;
+	typedef vector<plan_point> plan_vec;
 
 	unordered_map<string, unordered_set<string>> m_SIDSTAR; // ICAO -> set <SID & STAR>
 	unordered_map<string, list<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair

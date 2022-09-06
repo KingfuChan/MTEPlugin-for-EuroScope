@@ -17,29 +17,35 @@ RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, string filename)
 		inFile.close();
 		throw string("invalid column names");
 	}
-	while (getline(inFile, line)) {
-		istringstream ssin(line);
-		RouteData rd;
-		string dep, arr, listeo, listalt, minalt;
-		string eo, la, ma;
-		getline(ssin, dep, ',');
-		getline(ssin, arr, ',');
-		getline(ssin, rd.m_Name, ',');
-		getline(ssin, rd.m_EvenO, ',');
-		getline(ssin, rd.m_FixAltStr, ',');
-		getline(ssin, rd.m_MinAlt, ',');
-		getline(ssin, rd.m_Route, ',');
-		getline(ssin, rd.m_Remark);
+	try {
+		while (getline(inFile, line)) {
+			istringstream ssin(line);
+			RouteData rd;
+			string dep, arr, listeo, listalt, minalt;
+			string eo, la, ma;
+			getline(ssin, dep, ',');
+			getline(ssin, arr, ',');
+			getline(ssin, rd.m_Name, ',');
+			getline(ssin, rd.m_EvenO, ',');
+			getline(ssin, rd.m_FixAltStr, ',');
+			getline(ssin, rd.m_MinAlt, ',');
+			getline(ssin, rd.m_Route, ',');
+			getline(ssin, rd.m_Remark);
 
-		// split departure and arrival airpots and assign route
-		string d, a;
-		for (istringstream ssdep(dep); getline(ssdep, d, '/');) {
-			for (istringstream ssarr(arr); getline(ssarr, a, '/');) {
-				m_Data[d + a].push_back(rd);
+			// split departure and arrival airpots and assign route
+			string d, a;
+			for (istringstream ssdep(dep); getline(ssdep, d, '/');) {
+				for (istringstream ssarr(arr); getline(ssarr, a, '/');) {
+					m_Data[d + a].push_back(rd);
+				}
 			}
 		}
+		inFile.close();
 	}
-	inFile.close();
+	catch (...) {
+		inFile.close();
+		throw;
+	}
 	// read sector file SID/STAR
 	for (auto se = plugin->SectorFileElementSelectFirst(EuroScopePlugIn::SECTOR_ELEMENT_SIDS_STARS);
 		se.IsValid();
@@ -154,8 +160,7 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	string arr = ExtractedRoute.GetPointName(ExtractedRoute.GetPointsNumber() - 1);
 
 	// load Extracted route
-	typedef struct { string via_; string to_; int cls_; }_plnpoint;
-	vector<_plnpoint> plnvec;
+	plan_vec plnvec;
 	for (int i = 1; i < ExtractedRoute.GetPointsNumber() - 1; i++) {
 		plnvec.push_back({ ExtractedRoute.GetPointAirwayName(i), ExtractedRoute.GetPointName(i), ExtractedRoute.GetPointAirwayClassification(i) });
 	}
@@ -173,10 +178,8 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	const int n = rtevec.size();
 
 	// prevent error caused by empty vec
-	if (!m && n)
+	if (!m || !n)
 		return 0;
-	else if (!n)
-		return 2;
 
 	// make point i the 1st waypoint of route (last of SID)
 	auto setsid = m_SIDSTAR.find(dep);

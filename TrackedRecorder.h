@@ -37,7 +37,7 @@ public:
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 private:
-	struct AssignedData {
+	typedef struct _AsD {
 		// in the order of SDK
 		string m_Squawk;
 		int m_FinalAlt;
@@ -50,7 +50,7 @@ private:
 		int m_Heading;
 		string m_DCTName;
 
-		AssignedData(EuroScopePlugIn::CFlightPlan _fp) :
+		_AsD(EuroScopePlugIn::CFlightPlan _fp) :
 			m_Squawk(_fp.GetControllerAssignedData().GetSquawk()),
 			m_FinalAlt(_fp.GetFinalAltitude()),
 			m_ClearedAlt(_fp.GetControllerAssignedData().GetClearedAltitude()),
@@ -62,8 +62,8 @@ private:
 			m_Heading(_fp.GetControllerAssignedData().GetAssignedHeading()),
 			m_DCTName(_fp.GetControllerAssignedData().GetDirectToPointName())
 		{};
-	};
-	struct TrackedData {
+	}AssignedData;
+	typedef struct _TkD {
 		string m_SystemID;
 		bool m_Offline;
 		bool m_CommEstbed;
@@ -71,12 +71,12 @@ private:
 		bool m_ForceFeet;
 		AssignedData m_AssignedData;
 
-		TrackedData(string _sID, AssignedData _asd) :
+		_TkD(string _sID, AssignedData _asd) :
 			m_SystemID(_sID),
 			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true), m_ForceFeet(false),
 			m_AssignedData(_asd)
 		{};
-	};
+	}TrackedData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	unordered_map<string, TrackedData> m_TrackedMap; // callsign
