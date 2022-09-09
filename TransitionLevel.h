@@ -8,6 +8,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <vector>
 #include <unordered_map>
 #include "MetricAlt.h"
 
@@ -24,21 +25,27 @@ public:
 	~TransitionLevel(void);
 
 	void LoadCSV(string filename);
-	int GetTransitionLevel(EuroScopePlugIn::CFlightPlan FlightPlan);
-	int GetTransitionLevel(EuroScopePlugIn::CRadarTarget RadarTarget);
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
+	bool SetAirportQNHQFE(string airport, bool isQFE);
 
 private:
-	struct AirportData {
+	typedef vector<EuroScopePlugIn::CPosition> pos_vec;
+	typedef struct {
 		int trans_level;
 		int elevation;
-		int QFE_range;
+		bool is_QFE;
+		int range;
+		pos_vec boundary;
 		bool in_sector;
 		EuroScopePlugIn::CPosition position;
-	};
+	}AirportData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	unordered_map<string, AirportData> m_AirportMap;
-	unordered_map<string, AirportData>::iterator GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
-	unordered_map<string, AirportData>::iterator GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
+	typedef unordered_map<string, AirportData>::iterator apmap_iter;
+	int m_MaxLevel;
+	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
+	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
+	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position);
+	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter);
 };

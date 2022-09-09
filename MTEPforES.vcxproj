@@ -15,7 +15,7 @@
     <ProjectGuid>{12D80871-5736-4124-8DF9-323FA3C05C02}</ProjectGuid>
     <Keyword>MFCDLLProj</Keyword>
     <RootNamespace>MTEPforES</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
     <ProjectName>MTEPlugin</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

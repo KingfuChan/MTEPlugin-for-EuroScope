@@ -167,11 +167,15 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 CMTEPlugIn::~CMTEPlugIn(void)
 {
-	CancelCustomCursor();
-	UnloadRouteChecker();
-	DeleteDepartureSequence();
-	delete m_TrackedRecorder;
+	while (!m_ScreenStack.empty()) {
+		delete m_ScreenStack.top();
+		m_ScreenStack.pop();
+	}
 	delete m_TransitionLevel;
+	delete m_TrackedRecorder;
+	DeleteDepartureSequence();
+	UnloadRouteChecker();
+	CancelCustomCursor();
 }
 
 void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
@@ -310,7 +314,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int dspMtr;
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr) && !m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// is metric RVSM and not forced feet
-			char trsMrk = rflAlt >= m_TransitionLevel->GetTransitionLevel(FlightPlan) ? 'S' : 'M';
+			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
 			sprintf_s(sItemString, 6, "%c%04d", trsMrk, OVRFLW4(dspMtr / 10));
 		}
 		else {
@@ -875,33 +879,19 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// flightradar24 and variflight
-	regex rxfr("^.MTEP FR24 ([A-Z]{4})$", regex_constants::icase);
-	regex rxvr("^.MTEP VARI ([A-Z]{4})$", regex_constants::icase);
-	bool mf, mv;
-	mf = regex_match(cmd, match, rxfr);
-	if (!mf)
-		mv = regex_match(cmd, match, rxvr);
-	if (mf || mv) {
-		string airport, url_base, url_full;
-		airport = MakeUpper(match[1].str());
-		if (mf) {
-			url_base = "https://www.flightradar24.com/";
-		}
-		else if (mv) {
-			url_base = "https://flightadsb.variflight.com/tracker/";
-		}
-		for (CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
-			se.IsValid(); se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT)) {
-			if (airport == se.GetName()) {
-				CPosition pos;
-				se.GetPosition(&pos, 0);
-				if (mf)
-					url_full = url_base + to_string(pos.m_Latitude) + "," + to_string(pos.m_Longitude) + "/9";
-				else if (mv)
-					url_full = url_base + to_string(pos.m_Longitude) + "," + to_string(pos.m_Latitude) + "/9";
-				ShellExecute(NULL, "open", url_full.c_str(), NULL, NULL, SW_SHOW);
-				return true;
-			}
+	regex rxfr("^.MTEP (FR24|VARI) ([A-Z]{4})$", regex_constants::icase);
+	if (regex_match(cmd, match, rxfr)) {
+		string  airport = MakeUpper(match[2].str());
+		CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
+		for (; se.IsValid() && airport != se.GetName();
+			se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT));
+		CPosition pos;
+		if (se.GetPosition(&pos, 0)) {
+			string url_full = MakeUpper(match[1].str()) == "FR24" ? \
+				"https://www.flightradar24.com/" + to_string(pos.m_Latitude) + "," + to_string(pos.m_Longitude) + "/9":\
+				"https://flightadsb.variflight.com/tracker/" + to_string(pos.m_Longitude) + "," + to_string(pos.m_Latitude) + "/9";
+			ShellExecute(NULL, "open", url_full.c_str(), NULL, NULL, SW_SHOW);
+			return true;
 		}
 	}
 
@@ -975,6 +965,18 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		return LoadTransitionLevel(match[1].str());
 	}
 
+	// set QNH/QFE
+	regex rxqr("^.MTEP ([A-Z]{4}) (QNH|QFE)$", regex_constants::icase);
+	if (regex_match(cmd, match, rxqr)) {
+		string airport = MakeUpper(match[1].str());
+		string isqfe = MakeUpper(match[2].str());
+		if (m_TransitionLevel->SetAirportQNHQFE(airport, isqfe == "QFE")) {
+			string msg = airport + " is set to " + isqfe;
+			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
+			return true;
+		}
+	}
+
 	// set custom number mapping
 	regex rxnm("^.MTEP NUM ([\\S]{10})$", regex_constants::icase);
 	if (regex_match(cmd, match, rxnm)) {
@@ -1034,6 +1036,12 @@ void CMTEPlugIn::LoadRouteChecker(string filename)
 			1, 0, 0, 0, 0);
 		UnloadRouteChecker();
 	}
+	catch (exception e) {
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Route checker failed to load (" + string(e.what()) + "). CSV file name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+		UnloadRouteChecker();
+	}
 }
 
 void CMTEPlugIn::UnloadRouteChecker(void)
@@ -1076,6 +1084,14 @@ bool CMTEPlugIn::LoadTransitionLevel(string filename)
 	catch (string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Transition levels failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			1, 0, 0, 0, 0);
+		delete m_TransitionLevel;
+		m_TransitionLevel = new TransitionLevel(this);
+		return false;
+	}
+	catch (exception e) {
+		DisplayUserMessage("MESSAGE", "MTEPlugin",
+			("Transition levels failed to load (" + string(e.what()) + "). CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
 		delete m_TransitionLevel;
 		m_TransitionLevel = new TransitionLevel(this);

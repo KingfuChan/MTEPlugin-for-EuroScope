@@ -161,11 +161,11 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 
 	// load Extracted route
 	plan_vec plnvec;
-	for (int i = 1; i < ExtractedRoute.GetPointsNumber() - 1; i++) {
+	for (size_t i = 1; (int)i < ExtractedRoute.GetPointsNumber() - 1; i++) {
 		plnvec.push_back({ ExtractedRoute.GetPointAirwayName(i), ExtractedRoute.GetPointName(i), ExtractedRoute.GetPointAirwayClassification(i) });
 	}
-	int i = 0;
-	const int m = plnvec.size();
+	size_t i = 0;
+	const size_t m = plnvec.size();
 
 	// parse database route
 	vector<string> rtevec;
@@ -174,8 +174,8 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	while (ssrt >> strt) {
 		rtevec.push_back(strt);
 	}
-	int j = 0;
-	const int n = rtevec.size();
+	size_t j = 0;
+	const size_t n = rtevec.size();
 
 	// prevent error caused by empty vec
 	if (!m || !n)
@@ -188,7 +188,7 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 			setsid->second.find(plnvec[i].via_) != setsid->second.end();
 			i++);
 		if (i == m || plnvec[i].cls_ != EuroScopePlugIn::AIRWAY_CLASS_NO_DATA_DIRECT)
-			i--;
+			i -= i > 0;
 	}
 
 	// compare vec to extracted route
