@@ -281,20 +281,32 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		default: {// have a cleared level
 			int dspAlt;
-			if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
+			int trslvl, elev;
+			bool isQFE = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev).size() && elev && cflAlt < trslvl;
+			cflAlt -= isQFE ? elev : 0;
+			bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign());
+			if (!isfeet) {
 				if (MetricAlt::RflFeettoM(cflAlt, dspAlt)) { // is metric RVSM
-					sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt / 10));
-					break;
+					dspAlt = dspAlt / 10;
 				}
 				else if (cflAlt % 1000) { // not metric RVSM nor FL xx0, convert to metric
 					dspAlt = MetricAlt::FeettoM(cflAlt) / 10;
-					sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
-					break;
+				}
+				else {
+					isfeet = true;
 				}
 			}
-			// FL xx0, show FL in feet
-			dspAlt = cflAlt / 100;
-			sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
+			if (isfeet) {
+				dspAlt = cflAlt / 100; // FL xx0, show FL in feet
+				sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
+			}
+			else {
+				sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
+			}
+			if (isQFE) {
+				string qfeAltStr = "(" + string(sItemString) + ")";
+				strcpy_s(sItemString, qfeAltStr.size() + 1, qfeAltStr.c_str());
+			}
 			break; }
 		}
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
@@ -501,12 +513,12 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET: {
 		if (!FlightPlan.IsValid()) break;
-		string input = sItemString;
-		if (MakeUpper(input) == "F") {
+		string input = MakeUpper(sItemString);
+		if (input == "F") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
 			break;
 		}
-		else if (MakeUpper(input) == "M") {
+		else if (input == "M") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), false);
 			break;
 		}
@@ -523,10 +535,10 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		else {
 			// use regular expressions to match input
-			regex rxfd("^F([0-9]+)\\.$", regex_constants::icase);
-			regex rxf("^F([0-9]+)$", regex_constants::icase);
-			regex rxd("^([0-9]+)\\.$", regex_constants::icase);
-			regex rxn("^([0-9]+)$", regex_constants::icase);
+			regex rxfd("^F([0-9]+)\\.$");
+			regex rxf("^F([0-9]+)$");
+			regex rxd("^([0-9]+)\\.$");
+			regex rxn("^([0-9]+)$");
 			smatch match;
 			if (regex_match(input, match, rxfd)) {
 				tgtAlt = stoi(match[1]);
@@ -540,7 +552,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			else if (regex_match(input, match, rxn)) {
 				tgtAlt = MetricAlt::LvlMtoFeet(stoi(match[1]) * 100);
 			}
-			// TODO: cheat ES of QFE altitude
+			int trslvl, elev;
+			string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+			tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
 		}
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 
@@ -559,20 +573,46 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "CFL Menu", 2);
 		// pre-select altitude
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-		int _ref;
-		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, _ref);
+		int ref;
+		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, ref);
+		int trslvl, elev;
+		m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+		map<int, int> m_mtof = MetricAlt::m_mtof;
+		vector<int> v_fl;
+		for (int fl = 430; fl >= 100; fl -= 10)
+			v_fl.push_back(fl * 100);
+		if (elev) { // QFE in use
+			cflAlt -= cflAlt > 2 && cflAlt < trslvl ? elev : 0;
+			// remove unavailable altitudes from list
+			for (auto it = m_mtof.begin(); it != m_mtof.end();) {
+				if (it->second < trslvl && it->second + elev >= trslvl) {
+					it = m_mtof.erase(it);
+				}
+				else {
+					it++;
+				}
+			}
+			for (auto it = v_fl.begin(); it != v_fl.end();) {
+				if (*it < trslvl && *it + elev >= trslvl) {
+					it = v_fl.erase(it);
+				}
+				else {
+					it++;
+				}
+			}
+		}
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			// metric
 			int minDif(100000), minAlt(0); // a big enough number
-			for (auto it = MetricAlt::m_ftom.begin(); it != MetricAlt::m_ftom.end(); it++) {
-				int dif = abs(it->first - cmpAlt);
+			for (auto it = m_mtof.begin(); it != m_mtof.end(); it++) {
+				int dif = abs(it->second - cmpAlt);
 				if (dif < minDif) {
 					minDif = dif;
-					minAlt = it->first;
+					minAlt = it->second;
 				}
 			}
-			for (auto it = MetricAlt::m_mtof.rbegin(); it != MetricAlt::m_mtof.rend(); it++) {
+			for (auto it = m_mtof.rbegin(); it != m_mtof.rend(); it++) {
 				int m = it->first / 100;
 				int f = it->second / 100;
 				char ms[4], fs[4];
@@ -583,7 +623,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		else {
 			// FLs
-			for (int fl = 430; fl >= 100; fl -= 10) {
+			for (auto it = v_fl.begin(); it != v_fl.end(); it++) {
+				int fl = *it / 100;
 				char fs[5];
 				sprintf_s(fs, 5, "F%d", fl);
 				AddPopupListElement(fs, "", TAG_ITEM_FUNCTION_CFL_SET, fl / 10 == (int)round(cmpAlt / 1000.0), POPUP_ELEMENT_NO_CHECKBOX, false, false);
@@ -612,17 +653,17 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_RFL_SET: {
 		if (!FlightPlan.IsValid()) break;
 		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
-		string input = sItemString;
-		if (MakeUpper(input) == "F") {
+		string input = MakeUpper(sItemString);
+		if (input == "F") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
 			break;
 		}
-		else if (MakeUpper(input) == "M") {
+		else if (input == "M") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), false);
 			break;
 		}
 		regex rxm("^([0-9]{1,3})$");
-		regex rxf("^F([0-9]{1,3})$", regex_constants::icase);
+		regex rxf("^F([0-9]{1,3})$");
 		smatch match;
 		if (regex_match(input, match, rxf)) {
 			ctrData.SetFinalAltitude(stoi(match[1]) * 100);
@@ -864,24 +905,20 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	smatch match; // all regular expressions will ignore cases
 
 	// custom cursor
-	regex rxcc0("^.MTEP CURSOR OFF$", regex_constants::icase);
-	regex rxcc1("^.MTEP CURSOR ON$", regex_constants::icase);
-	if (regex_match(cmd, match, rxcc0)) {
+	regex rxcc("^.MTEP CURSOR (ON|OFF)$", regex_constants::icase);
+	if (regex_match(cmd, match, rxcc)) {
 		CancelCustomCursor();
-		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "0");
-		return true;
-	}
-	else if (regex_match(cmd, match, rxcc1)) {
-		CancelCustomCursor();
-		SetCustomCursor();
-		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", "1");
+		bool cc = MakeUpper(match[1].str()) == "ON";
+		if (cc)
+			SetCustomCursor();
+		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", cc ? "1" : "0");
 		return true;
 	}
 
 	// flightradar24 and variflight
 	regex rxfr("^.MTEP (FR24|VARI) ([A-Z]{4})$", regex_constants::icase);
 	if (regex_match(cmd, match, rxfr)) {
-		string  airport = MakeUpper(match[2].str());
+		string airport = MakeUpper(match[2].str());
 		CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
 		for (; se.IsValid() && airport != se.GetName();
 			se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT));
@@ -965,13 +1002,36 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		return LoadTransitionLevel(match[1].str());
 	}
 
-	// set QNH/QFE
-	regex rxqr("^.MTEP ([A-Z]{4}) (QNH|QFE)$", regex_constants::icase);
-	if (regex_match(cmd, match, rxqr)) {
+	// set transition level for single airport
+	regex rxtlt("^.MTEP ([A-Z]{4}) TL (S|F)(\\d+)$", regex_constants::icase);
+	regex rxtlb("^.MTEP ([A-Z]{4}) (QNH|QFE)$", regex_constants::icase);
+	regex rxtlr("^.MTEP ([A-Z]{4}) R (\\d+)$", regex_constants::icase);
+	if (regex_match(cmd, match, rxtlt)) {
 		string airport = MakeUpper(match[1].str());
-		string isqfe = MakeUpper(match[2].str());
-		if (m_TransitionLevel->SetAirportQNHQFE(airport, isqfe == "QFE")) {
-			string msg = airport + " is set to " + isqfe;
+		int tl = stoi(MakeUpper(match[3].str())) * 100;
+		if (MakeUpper(match[2].str()) == "S") {
+			tl = MetricAlt::LvlMtoFeet(tl);
+		}
+		if (m_TransitionLevel->SetAirportParam(airport, tl, -1, -1)) {
+			string msg = airport + ", transition level is set to " + to_string(tl) + " ft.";
+			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
+			return true;
+		}
+	}
+	if (regex_match(cmd, match, rxtlb)) {
+		string airport = MakeUpper(match[1].str());
+		bool qfe = MakeUpper(match[2].str()) == "QFE";
+		if (m_TransitionLevel->SetAirportParam(airport, -1, qfe, -1)) {
+			string msg = airport + ", altitude reference is set to " + string(qfe ? "QFE." : "QNH.");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
+			return true;
+		}
+	}
+	if (regex_match(cmd, match, rxtlr)) {
+		string airport = MakeUpper(match[1].str());
+		int r = stoi(match[2].str());
+		if (m_TransitionLevel->SetAirportParam(airport, -1, -1, r)) {
+			string msg = airport + ", QNH/QFE range is set to " + match[2].str() + " miles.";
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}

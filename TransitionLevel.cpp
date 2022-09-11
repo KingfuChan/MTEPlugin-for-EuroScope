@@ -8,7 +8,7 @@ const int DISTANCE_THRESHOLD = 50; // nautical miles, for airport nearest RadarT
 TransitionLevel::TransitionLevel(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
-	m_MaxLevel = plugin->GetTransitionAltitude();
+	m_MaxLevel = 0;
 }
 
 TransitionLevel::~TransitionLevel(void)
@@ -18,7 +18,7 @@ TransitionLevel::~TransitionLevel(void)
 void TransitionLevel::LoadCSV(string filename)
 {
 	m_AirportMap.clear();
-	m_MaxLevel = m_PluginPtr->GetTransitionAltitude();
+	m_MaxLevel = 0;
 
 	// external file
 	ifstream inFile;
@@ -96,7 +96,7 @@ int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget Radar
 		reference = AltitudeReference::ALT_REF_QNE;
 		return stdAlt;
 	}
-	TransitionLevel::apmap_iter apitr = GetTargetAirport(RadarTarget);
+	apmap_iter apitr = GetTargetAirport(RadarTarget);
 	if (apitr == m_AirportMap.end()) { // no boundary match
 		reference = AltitudeReference::ALT_REF_QNE;
 		return stdAlt;
@@ -118,11 +118,32 @@ int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget Radar
 	}
 }
 
-bool TransitionLevel::SetAirportQNHQFE(string airport, bool isQFE)
+string TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation)
 {
-	TransitionLevel::apmap_iter apitr = m_AirportMap.find(airport);
+	// returns airport ident and sets trans_level, elevation. Elevation will be 0 if not QFE. Doesn't consider altitude.
+	apmap_iter apitr = GetTargetAirport(FlightPlan);
 	if (apitr != m_AirportMap.end()) {
-		apitr->second.is_QFE = isQFE;
+		trans_level = apitr->second.trans_level;
+		elevation = apitr->second.is_QFE ? apitr->second.elevation : 0;
+		return apitr->first;
+	}
+	// not found, default values
+	trans_level = m_PluginPtr->GetTransitionAltitude();
+	elevation = 0;
+	return string();
+}
+
+bool TransitionLevel::SetAirportParam(string airport, int trans_level, int isQFE, int range)
+{
+	// default to -1 for ignoring. isQFE=0 means QNH, trans_level in feet, range in nm
+	apmap_iter apitr = m_AirportMap.find(airport);
+	if (apitr != m_AirportMap.end()) {
+		if (trans_level > 0)
+			apitr->second.trans_level = trans_level;
+		if (isQFE >= 0)
+			apitr->second.is_QFE = isQFE;
+		if (range >= 0)
+			apitr->second.range = range;
 		return true;
 	}
 	return false;
@@ -154,7 +175,7 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 
 TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	TransitionLevel::apmap_iter res = m_AirportMap.end();
+	apmap_iter res = m_AirportMap.end();
 	if (RadarTarget.IsValid()) {
 		if (RadarTarget.GetCorrelatedFlightPlan().IsValid()) {
 			return GetTargetAirport(RadarTarget.GetCorrelatedFlightPlan());
@@ -168,7 +189,7 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 
 TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CPosition Position)
 {
-	TransitionLevel::apmap_iter apitr = m_AirportMap.begin();
+	apmap_iter apitr = m_AirportMap.begin();
 	for (; apitr != m_AirportMap.end() && !IsinQNHBoundary(Position, apitr);
 		apitr++);
 	return apitr;
@@ -176,7 +197,7 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 
 bool TransitionLevel::IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter)
 {
-
+	// lateral boundary only
 	if (airport_iter == m_AirportMap.end())
 		return false;
 

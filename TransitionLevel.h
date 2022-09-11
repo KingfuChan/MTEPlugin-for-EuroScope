@@ -26,7 +26,8 @@ public:
 
 	void LoadCSV(string filename);
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
-	bool SetAirportQNHQFE(string airport, bool isQFE);
+	string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
+	bool SetAirportParam(string airport, int trans_level = -1, int isQFE = -1, int range = -1);
 
 private:
 	typedef vector<EuroScopePlugIn::CPosition> pos_vec;
