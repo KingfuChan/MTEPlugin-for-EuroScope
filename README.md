@@ -169,32 +169,44 @@ Related command line functions:
 
 ## Transition Level
 
-EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL and RFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
+EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
 
 A CSV file is required for the customization, in the format below.
 
-|Ident|TransLevel|Elevation|QFERange|
-|:---:|:---:|:---:|:---:|
-|ZGSZ|S33|13|0|
-|ZGNN||420|50|
-|ZSWH|S21|148|50|
-|VHHH|F110|28|0|
+|Ident|TransLevel|Elevation|IsQFE|Range|Boundary|
+|:---:|:---:|:---:|:---:|:---:|:---:|
+|ZGSZ|S33|13|0||112.7/21.0 112.5/21.9 112.5/22.2 ...|
+|ZPLJ|S66|7359|0|50||
+|ZGNN|S36|420|1||109.1/23.1 109.1/22.5 108.6/22.0 ...|
+|ZSWH||148|1|50||
+|VHHH|F110|28|0||113.6/22.2 113.8/22.4 114.2/22.6 ...|
 
 + ***Ident*** is the ICAO identification for a single airport.
-+ ***TransLevel*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft. If this field is empty, the module will use *General Settings (in setting file) -> m_TransitionAltitude* instead.
-+ ***Elevation*** is the airport elevation in feet. This is redundant if QFE is not applied to this airport.
-+ ***QFERange*** (in nautical miles) is used to determine whether a radar target should use QFE or QNH. Only when the distance between radar target and the airport is within this range, QFE will be used. QFE will be disabled if this field is 0 or empty.
-
-When using QFE, **Actual altitude (m)** will show in parentheses "**()**", and custom number mapping won't apply.
++ ***TransLevel*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft. If this field is empty, the module will instead use EuroScope internal setting, *General Settings (in setting file) -> m_TransitionAltitude*.
++ ***Elevation*** is the airport elevation in feet. This will be redundant if QFE is not in use.
++ ***IsQFE*** determines whether QFE is in use. Use 0 (by default) for QNH.
++ ***Range*** (in nautical miles) is used to set a range for QNH/QFE lateral boundary. If the value is greater than 0, the following ***Boundary*** entry will be ignored.
++ ***Boundary*** should be a list of coordinates delineating QNH/QFE lateral boundary. Longitude/latitude values are in decimals (supports more digits for better precision); use space as seperator.
 
 CSV files with incorrect column names or not in the given order, will not be loaded. It's possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
-You need to use a command line to load the CSV file: **.MTEP TL PATH** (case-insensitive). **PATH** should be replace by the CSV file path and file name. Rules for **Route Checker** also applies.
+It's recommended to fill in either ***Range*** or ***Boundary***. If an aircraft is outside of all lateral boundaries/radius, **Actual altitude (m)** will always show in QNE, even below EuroScope internal transition altitude. This also suggests entering ALL available airports in csv. When using QFE, **Actual altitude (m)** and **Cleared flight level (m/FL)** will show in parentheses "**()**", and custom number mapping (see below) won't apply.
+
+When QFE in use and under certain circumstances, tag item function **Open CFL popup menu** and **Open CFL popup edit** will automatically convert elevation (QFE) to altitude (QNH), by adding the elevation of airport to EuroScope internal cleared altitude. This helps eliminate CLAM warnings for airports at higher altitudes, but will cause discrepancy between **Cleared flight level (m/FL)** and all other native item types (e.g. Matias).
+
+Related command line functions:
+
++ **.MTEP TL PATH** - **PATH** should be replace by the CSV file path and file name. Rules for **Route Checker** also applies.
++ **.MTEP ICAO TL S/Fxxx** - sets the transition level for airport **ICAO**. Use the same altitude format as the csv.
++ **.MTEP ICAO QFE/QNH** - sets QFE or QNH for the airport.
++ **.MTEP ICAO R xx** - sets the range (in nautical miles) for the airport.
+
+All customizations for single airport through command line functions won't be saved to the csv file.
 
 ## Other Command Line Features
 
 All command line functions are case-insensitive, including those mentioned above.
 
 1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
-2. **.MTEP CURSOR ON/OFF** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. This setting will be saved in your EuroScope plugin settings.
+2. **.MTEP CURSOR ON/OFF** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. On Windows 10 1607 or later systems, the size of cursor is set according to current EuroScope Hi-DPI setting. This setting will be saved in your EuroScope plugin settings.
 3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings should work.
