@@ -43,7 +43,7 @@ void TransitionLevel::LoadCSV(string filename)
 			getline(ssin, qfestr, ',');
 			getline(ssin, rngstr, ',');
 			getline(ssin, bndstr);
-			int lvlft(m_PluginPtr->GetTransitionAltitude()), elevft(0), isqfe(0), rngnm(0);
+			int lvlft(0), elevft(0), isqfe(0), rngnm(0);
 			if (sscanf_s(lvlstr.c_str(), "F%d", &lvlft)) {
 				lvlft = lvlft * 100;
 			}
