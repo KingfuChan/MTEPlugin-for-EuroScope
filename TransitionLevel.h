@@ -44,7 +44,7 @@ private:
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	unordered_map<string, AirportData> m_AirportMap;
 	typedef unordered_map<string, AirportData>::iterator apmap_iter;
-	int m_MaxLevel;
+	int m_DefaultLevel, m_MaxLevel;
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position);

@@ -182,9 +182,11 @@ A CSV file is required for the customization, in the format below.
 |VHHH|F110|28|0||113.6/22.2 113.8/22.4 114.2/22.6 ...|
 
 + ***Ident*** is the ICAO identification for a single airport.
-+ ***TransLevel*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft. If this field is empty, the module will instead use EuroScope internal setting, *General Settings (in setting file) -> m_TransitionAltitude*.
+  + Use an asteroid **(\*)** for all undefined airports within sector file. Only ***TransLevel*** in this line will be used.
+  + Blank out this field to denote default transition level when no matching airport is found for radar targets. Only ***TransLevel*** in this line will be used.
++ ***TransLevel*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft. For a given airport with this field blanked, the module will instead use EuroScope native setting, *General Settings (in setting file) -> m_TransitionAltitude*.
 + ***Elevation*** is the airport elevation in feet. This will be redundant if QFE is not in use.
-+ ***IsQFE*** determines whether QFE is in use. Use 0 (by default) for QNH.
++ ***IsQFE*** denotes whether QFE is in use. Use 0 (by default) for QNH.
 + ***Range*** (in nautical miles) is used to set a range for QNH/QFE lateral boundary. If the value is greater than 0, the following ***Boundary*** entry will be ignored.
 + ***Boundary*** should be a list of coordinates delineating QNH/QFE lateral boundary. Longitude/latitude values are in decimals (supports more digits for better precision); use space as seperator.
 

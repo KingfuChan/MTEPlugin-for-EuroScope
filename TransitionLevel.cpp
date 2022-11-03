@@ -8,6 +8,7 @@ const int DISTANCE_THRESHOLD = 50; // nautical miles, for airport nearest RadarT
 TransitionLevel::TransitionLevel(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
+	m_DefaultLevel = m_PluginPtr->GetTransitionAltitude();
 	m_MaxLevel = 0;
 }
 
@@ -18,7 +19,10 @@ TransitionLevel::~TransitionLevel(void)
 void TransitionLevel::LoadCSV(string filename)
 {
 	m_AirportMap.clear();
+	m_DefaultLevel = m_PluginPtr->GetTransitionAltitude();
 	m_MaxLevel = 0;
+	int asteroid_level = 0;
+	int asteroid_range = 0;
 
 	// external file
 	ifstream inFile;
@@ -65,10 +69,21 @@ void TransitionLevel::LoadCSV(string filename)
 					bndvec.push_back(pos);
 				}
 			}
-			m_AirportMap[apid] = AirportData{
-				lvlft,elevft,(bool)isqfe,rngnm,bndvec,false,EuroScopePlugIn::CPosition(),
-			};
+
+			// no checks for lvlft, need to check >0 when using it
 			m_MaxLevel = max(lvlft, m_MaxLevel);
+			if (apid == "*") { // for sector default
+				asteroid_level = lvlft;
+				asteroid_range = rngnm;
+			}
+			else if (!apid.size()) { // for run-time no match
+				m_DefaultLevel = lvlft;
+			}
+			else {
+				m_AirportMap[apid] = AirportData{
+				lvlft,elevft,(bool)isqfe,rngnm,bndvec,false,EuroScopePlugIn::CPosition(),
+				};
+			}
 		}
 		inFile.close();
 	}
@@ -81,9 +96,18 @@ void TransitionLevel::LoadCSV(string filename)
 	for (auto se = m_PluginPtr->SectorFileElementSelectFirst(EuroScopePlugIn::SECTOR_ELEMENT_AIRPORT);
 		se.IsValid();
 		se = m_PluginPtr->SectorFileElementSelectNext(se, EuroScopePlugIn::SECTOR_ELEMENT_AIRPORT)) {
+		auto apd = m_AirportMap.find(se.GetName());
 		EuroScopePlugIn::CPosition pos;
-		m_AirportMap[se.GetName()].in_sector = se.GetPosition(&pos, 0);
-		m_AirportMap[se.GetName()].position = pos;
+		se.GetPosition(&pos, 0);
+		if (apd != m_AirportMap.end()) {
+			apd->second.in_sector = true;
+			apd->second.position = pos;
+		}
+		else { // sector default
+			m_AirportMap.insert({ se.GetName(),
+				AirportData{asteroid_level,0,false,asteroid_range,pos_vec{},true,pos,}
+				});
+		}
 	}
 }
 
@@ -109,11 +133,18 @@ int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget Radar
 	}
 	apmap_iter apitr = GetTargetAirport(RadarTarget);
 	if (apitr == m_AirportMap.end()) { // no boundary match
-		reference = AltitudeReference::ALT_REF_QNE;
-		return stdAlt;
+		if (stdAlt >= m_DefaultLevel) {
+			reference = AltitudeReference::ALT_REF_QNE;
+			return stdAlt;
+		}
+		else {
+			reference = AltitudeReference::ALT_REF_QNH;
+			return qnhAlt;
+		}
 	}
 	// match boundary/range
-	if (stdAlt >= apitr->second.trans_level) {
+	int trslvl = apitr->second.trans_level > 0 ? apitr->second.trans_level : m_PluginPtr->GetTransitionAltitude();
+	if (stdAlt >= trslvl) {
 		reference = AltitudeReference::ALT_REF_QNE;
 		return stdAlt;
 	}
@@ -132,12 +163,12 @@ string TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan
 	// returns airport ident and sets trans_level, elevation. Elevation will be 0 if not QFE. Doesn't consider altitude.
 	apmap_iter apitr = GetTargetAirport(FlightPlan);
 	if (apitr != m_AirportMap.end()) {
-		trans_level = apitr->second.trans_level;
+		trans_level = apitr->second.trans_level > 0 ? apitr->second.trans_level : m_PluginPtr->GetTransitionAltitude();
 		elevation = apitr->second.is_QFE ? apitr->second.elevation : 0;
 		return apitr->first;
 	}
 	// not found, default values
-	trans_level = m_PluginPtr->GetTransitionAltitude();
+	trans_level = m_DefaultLevel;
 	elevation = 0;
 	return string();
 }
@@ -160,40 +191,40 @@ bool TransitionLevel::SetAirportParam(string airport, int trans_level, int isQFE
 
 TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	if (!m_AirportMap.empty() && FlightPlan.IsValid()) {
-		string callsign = FlightPlan.GetCallsign();
-		auto curPos = FlightPlan.GetFPTrackPosition().GetPosition();
-		string adep = FlightPlan.GetFlightPlanData().GetOrigin();
-		string aarr = FlightPlan.GetFlightPlanData().GetDestination();
-		double ddep = FlightPlan.GetDistanceFromOrigin();
-		double darr = FlightPlan.GetDistanceToDestination();
-		string acls = ddep < darr ? adep : aarr;
+	if (m_AirportMap.empty() || !FlightPlan.IsValid())
+		return m_AirportMap.end();
+	string callsign = FlightPlan.GetCallsign();
+	auto curPos = FlightPlan.GetFPTrackPosition().GetPosition();
+	string adep = FlightPlan.GetFlightPlanData().GetOrigin();
+	string aarr = FlightPlan.GetFlightPlanData().GetDestination();
+	double ddep = FlightPlan.GetDistanceFromOrigin();
+	double darr = FlightPlan.GetDistanceToDestination();
+
+	string acls = ddep < darr ? adep : aarr;
+	apmap_iter icls = m_AirportMap.find(acls);
+	if (icls != m_AirportMap.end() && IsinQNHBoundary(curPos, icls)) {
+		return icls;
+	}
+	else {
 		string afar = ddep > darr ? adep : aarr;
-		if (IsinQNHBoundary(curPos, m_AirportMap.find(acls))) {
-			return m_AirportMap.find(acls);
-		}
-		else if (IsinQNHBoundary(curPos, m_AirportMap.find(afar))) {
-			return m_AirportMap.find(afar);
-		}
-		else {
-			return GetTargetAirport(curPos);
+		apmap_iter ifar = m_AirportMap.find(afar);
+		if (ifar != m_AirportMap.end() && IsinQNHBoundary(curPos, ifar)) {
+			return ifar;
 		}
 	}
-	return m_AirportMap.end();
+	return GetTargetAirport(curPos);
 }
 
 TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	apmap_iter res = m_AirportMap.end();
-	if (RadarTarget.IsValid()) {
-		if (RadarTarget.GetCorrelatedFlightPlan().IsValid()) {
-			return GetTargetAirport(RadarTarget.GetCorrelatedFlightPlan());
-		}
-		else {
-			return GetTargetAirport(RadarTarget.GetPosition().GetPosition());
-		}
+	if (m_AirportMap.empty() || !RadarTarget.IsValid())
+		return m_AirportMap.end();
+	if (RadarTarget.GetCorrelatedFlightPlan().IsValid()) {
+		return GetTargetAirport(RadarTarget.GetCorrelatedFlightPlan());
 	}
-	return res;
+	else {
+		return GetTargetAirport(RadarTarget.GetPosition().GetPosition());
+	}
 }
 
 TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CPosition Position)
@@ -206,12 +237,9 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 
 bool TransitionLevel::IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter)
 {
-	// lateral boundary only
-	if (airport_iter == m_AirportMap.end())
-		return false;
-
+	// only considers lateral boundary, need to check iter's validity before calling
 	// by range
-	if (airport_iter->second.in_sector) {
+	if (airport_iter->second.in_sector && airport_iter->second.range) {
 		double distance = pos.DistanceTo(airport_iter->second.position);
 		if (distance < (double)airport_iter->second.range) {
 			return true;
