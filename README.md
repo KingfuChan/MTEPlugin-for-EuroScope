@@ -182,7 +182,7 @@ A CSV file is required for the customization, in the format below.
 |VHHH|F110|28|0||113.6/22.2 113.8/22.4 114.2/22.6 ...|
 
 + ***Ident*** is the ICAO identification for a single airport.
-  + Use an asteroid **(\*)** for all undefined airports within sector file. Only ***TransLevel*** in this line will be used.
+  + Use an asteroid **(\*)** for all undefined airports within sector file. Only ***TransLevel*** and ***Range*** in this line will be used.
   + Blank out this field to denote default transition level when no matching airport is found for radar targets. Only ***TransLevel*** in this line will be used.
 + ***TransLevel*** only accepts Sxxx or Fxxx. E.g. S33 for 3300m, S60 for 6000m, F110 for FL110/11000ft. For a given airport with this field blanked, the module will instead use EuroScope native setting, *General Settings (in setting file) -> m_TransitionAltitude*.
 + ***Elevation*** is the airport elevation in feet. This will be redundant if QFE is not in use.
