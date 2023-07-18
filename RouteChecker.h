@@ -3,8 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include "resource.h"
-#include <EuroScopePlugIn.h>
 #include <fstream>
 #include <string>
 #include <sstream>

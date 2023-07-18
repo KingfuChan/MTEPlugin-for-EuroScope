@@ -3,7 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include "resource.h"
 #include <string>
 #include <unordered_map>
 

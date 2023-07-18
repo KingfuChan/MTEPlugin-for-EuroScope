@@ -1,7 +1,7 @@
 // MTEPScreen.h
 
 #pragma once
-#include <EuroScopePlugIn.h>
+#include "pch.h"
 
 using namespace EuroScopePlugIn;
 

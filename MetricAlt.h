@@ -3,9 +3,11 @@
 #pragma once
 
 #include "pch.h"
-#include "resource.h"
-#include <map>
+#include <fstream>
 #include <string>
+#include <sstream>
+#include <map>
+#include <vector>
 
 using namespace std;
 
