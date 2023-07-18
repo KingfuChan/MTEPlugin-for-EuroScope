@@ -56,5 +56,6 @@ private:
 	void DeleteDepartureSequence(void);
 	void ResetTrackedRecorder(void);
 	bool LoadTransitionLevel(string filename);
+	bool LoadMetricAltitude(string filename);
 	string DisplayRouteMessage(string departure, string arrival);
 };
