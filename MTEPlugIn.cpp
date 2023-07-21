@@ -585,16 +585,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		OpenPopupList(Area, "CFL Menu", 1);
 
-		// TODO: use COPX
 		int copxAlt = FlightPlan.GetExitCoordinationAltitude();
-
-#ifdef DEBUG
-
 		string copxName = FlightPlan.GetExitCoordinationPointName();
-		DisplayUserMessage("MTEP-Debug", "", (copxName + ":" + to_string(copxAlt)).c_str(), 1, 1, 0, 0, 0);
-
-#endif // DEBUG
-
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		int ref;
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, ref);
@@ -615,9 +607,46 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (copxAlt > 0 && copxAlt != FlightPlan.GetFinalAltitude()) {
-			// TODO: more complicated method considering altitude change range
-			// auto ExtractedRoute = FlightPlan.GetExtractedRoute();
-			cmpAlt = copxAlt;
+			// known: COPX altitude is associated with a given route point
+			auto ExtractedRoute = FlightPlan.GetExtractedRoute();
+			int calIndex = ExtractedRoute.GetPointsCalculatedIndex();
+			int assIndex = ExtractedRoute.GetPointsAssignedIndex();
+			int nextIndex = assIndex > -1 ? assIndex : calIndex;
+			if (nextIndex > -1 && nextIndex < ExtractedRoute.GetPointsNumber()) { // next point is valid
+				double dtRun = 0;
+				CPosition prevPos = FlightPlan.GetFPTrackPosition().GetPosition();
+				int i = nextIndex;
+				for (; i < ExtractedRoute.GetPointsNumber(); i++) {
+					double nextD = prevPos.DistanceTo(ExtractedRoute.GetPointPosition(i));
+					dtRun += nextD;
+					prevPos = ExtractedRoute.GetPointPosition(i);
+					string nextName = ExtractedRoute.GetPointName(i);
+					int nextAlt = ExtractedRoute.GetPointCalculatedProfileAltitude(i);
+
+#ifdef DEBUG
+					DisplayUserMessage("MTEP-Debug", "", (
+						nextName + ":" + to_string(nextD) + " nextAlt:" + to_string(nextAlt) + " dtRun:" + to_string(dtRun)
+						).c_str(), 1, 1, 0, 0, 0);
+#endif // DEBUG
+
+					if (copxName == nextName && copxAlt == nextAlt) {
+						double dtReq = abs((double)(rdrAlt - copxAlt)) * 0.004713;
+						// altitude (feet) to distance (nautical miles), descent angle 2 deg
+						// 1 / tan(2.0 / 180.0 * 3.141593) / 1000.0 * 0.164579 = 0.004713
+
+#ifdef DEBUG
+						DisplayUserMessage("MTEP-Debug", "", (
+							copxName + ":" + to_string(copxAlt) + " dtRun:" + to_string(dtRun) + " dtReq:" + to_string(dtReq)
+							).c_str(), 1, 1, 0, 0, 0);
+#endif // DEBUG
+
+						if (dtReq + 20 >= dtRun) { // 20 more nautical miles
+							cmpAlt = copxAlt;
+						}
+						break;
+					}
+				}
+			}
 		}
 		// pre-select altitude
 		int minDif(100000), minAlt(0); // a big enough number
