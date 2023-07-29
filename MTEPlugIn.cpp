@@ -70,6 +70,7 @@ const char* SETTING_AUTO_RETRACK = "AutoRetrack";
 const char* SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9";
 const char* SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 const char* SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
+const char* SETTING_AMEND_CFL = "AmendQFEinCFL";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -113,7 +114,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	m_TrackedRecorder = new TrackedRecorder(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
-	m_AutoRetrack = setar == nullptr ? false : stoi(setar);
+	m_AutoRetrack = setar == nullptr ? 0 : stoi(setar);
 
 	m_TransitionLevel = new TransitionLevel(this);
 	const char* settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
@@ -132,6 +133,9 @@ CMTEPlugIn::CMTEPlugIn(void)
 			DisplayUserMessage("MESSAGE", "MTEPlugin", ("Numbers are mapped to (0-9): " + m_CustomNumMap).c_str(), 1, 0, 0, 0, 0);
 		}
 	}
+
+	const char* setac = GetDataFromSettings(SETTING_AMEND_CFL);
+	m_AmendCFL = setac == nullptr ? 1 : stoi(setac);
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
@@ -521,17 +525,15 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET_MENU: {
 		if (!FlightPlan.IsValid()) break;
-		int trslvl, elev;
-		string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign()));
 		if (tgtAlt > MetricAlt::ALT_MAP_NOT_FOUND) {
-			if (tgtAlt == 0) { // NONE
-			}
-			else if (tgtAlt == 1 || tgtAlt == 2) { // ILS or VA
+			if (tgtAlt == 1 || tgtAlt == 2) { // ILS or VA
 				FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
 			}
-			else if (aptgt.size() && tgtAlt < trslvl) {
-				tgtAlt += elev; // convert QNH to QFE
+			else if (tgtAlt > 2 && m_AmendCFL == 1) {
+				int trslvl, elev;
+				string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+				tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
 			}
 			FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 		}
@@ -566,9 +568,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		else if (regex_match(input, match, rxn)) {
 			tgtAlt = MetricAlt::LvlMtoFeet(stoi(match[1]) * 100);
 		}
-		int trslvl, elev;
-		string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
-		tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
+		if (tgtAlt > 2 && m_AmendCFL == 1) {
+			int trslvl, elev;
+			string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+			tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
+		}
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 
 		break; }
@@ -622,24 +626,10 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 					prevPos = ExtractedRoute.GetPointPosition(i);
 					string nextName = ExtractedRoute.GetPointName(i);
 					int nextAlt = ExtractedRoute.GetPointCalculatedProfileAltitude(i);
-
-#ifdef DEBUG
-					DisplayUserMessage("MTEP-Debug", "", (
-						nextName + ":" + to_string(nextD) + " nextAlt:" + to_string(nextAlt) + " dtRun:" + to_string(dtRun)
-						).c_str(), 1, 1, 0, 0, 0);
-#endif // DEBUG
-
 					if (copxName == nextName && copxAlt == nextAlt) {
 						double dtReq = abs((double)(rdrAlt - copxAlt)) * 0.004713;
 						// altitude (feet) to distance (nautical miles), descent angle 2 deg
 						// 1 / tan(2.0 / 180.0 * 3.141593) / 1000.0 * 0.164579 = 0.004713
-
-#ifdef DEBUG
-						DisplayUserMessage("MTEP-Debug", "", (
-							copxName + ":" + to_string(copxAlt) + " dtRun:" + to_string(dtRun) + " dtReq:" + to_string(dtReq)
-							).c_str(), 1, 1, 0, 0, 0);
-#endif // DEBUG
-
 						if (dtReq + 20 >= dtRun) { // 20 more nautical miles
 							cmpAlt = copxAlt;
 						}
@@ -865,12 +855,27 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 	if (!FlightPlan.IsValid())
 		return;
 	m_TrackedRecorder->UpdateFlight(FlightPlan);
-	if (FlightPlan.GetTrackingControllerIsMe()) {
-		if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE &&
-			FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
-			(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())) {
-			// initiate CFL to be confirmed
-			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
+	if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE) {
+		if (m_AmendCFL == 2) { // amend only when mode 2 (all) is set
+			int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+			if (cflAlt > 2) { // exclude ILS, VA, NONE
+				int trslvl, elev;
+				string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+				if (aptgt.size() && cflAlt < trslvl && elev > 0) {
+					cflAlt += elev; // convert QNH to QFE
+					m_AmendCFL = 0;
+					FlightPlan.GetControllerAssignedData().SetClearedAltitude(cflAlt);
+					m_AmendCFL = 2;
+					return;
+				}
+			}
+		}
+		if (FlightPlan.GetTrackingControllerIsMe()) {
+			if (FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
+				(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())) {
+				// initiate CFL to be confirmed
+				m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
+			}
 		}
 	}
 	if (m_RouteChecker != nullptr &&
@@ -1083,6 +1088,29 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		m_CustomNumMap = match[1].str();
 		SaveDataToSettings(SETTING_CUSTOM_NUMBER_MAP, "custom number mapping (0-9)", m_CustomNumMap.c_str());
 		DisplayUserMessage("MESSAGE", "MTEPlugin", ("Numbers are mapped to (0-9): " + m_CustomNumMap).c_str(), 1, 0, 0, 0, 0);
+		return true;
+	}
+
+	// set amend QFE in CFL
+	regex rxac("^.MTEP QFE ([0-2])$", regex_constants::icase);
+	if (regex_match(cmd, match, rxac)) {
+		string res = match[1].str();
+		const char* descr = "amend QFE in CFL";
+		if (res == "1") {
+			m_AmendCFL = 1;
+			SaveDataToSettings(SETTING_AMEND_CFL, descr, "1");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Amend QFE in CFL mode 1 (MTEP) is set", 1, 0, 0, 0, 0);
+		}
+		else if (res == "2") {
+			m_AmendCFL = 2;
+			SaveDataToSettings(SETTING_AMEND_CFL, descr, "2");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Amend QFE in CFL mode 2 (all) is set", 1, 0, 0, 0, 0);
+		}
+		else if (res == "0") {
+			m_AmendCFL = 0;
+			SaveDataToSettings(SETTING_AMEND_CFL, descr, "0");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Amend QFE in CFL is off", 1, 0, 0, 0, 0);
+		}
 		return true;
 	}
 

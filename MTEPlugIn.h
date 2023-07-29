@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <stack>
 #include <regex>
+#include <atomic>
 #include "Version.h"
 #include "MTEPScreen.h"
 #include "MetricAlt.h"
@@ -45,8 +46,9 @@ private:
 	TrackedRecorder* m_TrackedRecorder;
 	TransitionLevel* m_TransitionLevel;
 	bool m_CustomCursor;
-	int m_AutoRetrack; // 0: off; 1: silent; 2: notified.
+	int m_AutoRetrack; // 0: off (default); 1: silent; 2: notified.
 	string m_CustomNumMap; // 0-9
+	int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
 	void CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area);
 	void SetCustomCursor(void);
