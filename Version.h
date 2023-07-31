@@ -1,4 +1,5 @@
 // Version.h
+// Revision number is used in next Release build
 
 #pragma once
 
@@ -10,7 +11,7 @@
 #define VERSION_MAJOR 3
 #define VERSION_MINOR 2
 #define VERSION_REVISION 3
-#define VERSION_BUILD 343
+#define VERSION_BUILD 344
 
 #define VERSION_FILE VERSION_MAJOR,VERSION_MINOR,VERSION_REVISION
 #define VERSION_FILE_STR \

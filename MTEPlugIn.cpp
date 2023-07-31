@@ -1,6 +1,7 @@
 ﻿// MTEPlugin.cpp
 
 #include "pch.h"
+#include "Version.h"
 #include "MTEPlugin.h"
 
 #ifndef COPYRIGHTS

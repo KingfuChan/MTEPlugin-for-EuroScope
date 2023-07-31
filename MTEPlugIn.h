@@ -9,7 +9,6 @@
 #include <stack>
 #include <regex>
 #include <atomic>
-#include "Version.h"
 #include "MTEPScreen.h"
 #include "MetricAlt.h"
 #include "ReCat.h"

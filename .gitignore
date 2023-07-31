@@ -338,6 +338,8 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# Other
 /BuildNumber.py
 ._.DS_Store
 .DS_Store
