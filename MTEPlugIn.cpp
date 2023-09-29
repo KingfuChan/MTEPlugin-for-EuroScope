@@ -32,6 +32,7 @@ const int TAG_ITEM_TYPE_CFL_MTR = 17; // Cleared flight level (m)
 const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_TIEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
+const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -160,6 +161,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Reconnected indicator", TAG_ITEM_TYPE_RCNT_IND);
 	RegisterTagItemType("Departure status", TAG_TIEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
+	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -499,6 +501,19 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsActive(FlightPlan)) {
 			sprintf_s(sItemString, 2, "r");
 			*pColorCode = TAG_COLOR_INFORMATION;
+		}
+		break; }
+	case TAG_ITEM_TYPE_ASPD_BND: {
+		if (!FlightPlan.IsValid()) break;
+		if (!FlightPlan.GetControllerAssignedData().GetAssignedSpeed() &&
+			!FlightPlan.GetControllerAssignedData().GetAssignedMach())
+			break; // not assigned
+		string strip = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(7); // on (2, 3) of annotation
+		if (strip.find("/s+/") != string::npos) {
+			sprintf_s(sItemString, 2, "+");
+		}
+		else if (strip.find("/s-/") != string::npos) {
+			sprintf_s(sItemString, 2, "-");
 		}
 		break; }
 	default:
