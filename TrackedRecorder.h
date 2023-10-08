@@ -26,6 +26,7 @@ public:
 	void SetCFLConfirmed(string callsign, bool confirmed = true);
 	bool IsForceFeet(string callsign);
 	void SetAltitudeUnit(string callsign, bool feet);
+	void ResetAltitudeUnit(bool feet);
 	bool IsSquawkDUPE(string callsign);
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
@@ -35,6 +36,8 @@ public:
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 private:
+	bool m_DefaultFeet;
+
 	typedef struct _AsD {
 		// in the order of SDK
 		string m_Squawk;
@@ -69,9 +72,10 @@ private:
 		bool m_ForceFeet;
 		AssignedData m_AssignedData;
 
-		_TkD(string _sID, AssignedData _asd) :
+		_TkD(string _sID, AssignedData _asd, bool _fft) :
 			m_SystemID(_sID),
-			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true), m_ForceFeet(false),
+			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true),
+			m_ForceFeet(_fft),
 			m_AssignedData(_asd)
 		{};
 	}TrackedData;

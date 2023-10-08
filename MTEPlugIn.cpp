@@ -73,6 +73,7 @@ const char* SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9";
 const char* SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 const char* SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
 const char* SETTING_AMEND_CFL = "AmendQFEinCFL";
+const char* SETTING_FORCE_FEET = "ForceFeet";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -117,6 +118,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	m_TrackedRecorder = new TrackedRecorder(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
 	m_AutoRetrack = setar == nullptr ? 0 : stoi(setar);
+	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
+	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : stoi(setff) != 0);
 
 	m_TransitionLevel = new TransitionLevel(this);
 	const char* settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
@@ -1049,6 +1052,24 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		return true;
 	}
 
+	// set force feet
+	regex rxff("^.MTEP TR (F|M)$", regex_constants::icase);
+	if (regex_match(cmd, match, rxff)) {
+		string res = MakeUpper(match[1].str());
+		const char* descr = "force feet";
+		if (res == "F") {
+			m_TrackedRecorder->ResetAltitudeUnit(true);
+			SaveDataToSettings(SETTING_FORCE_FEET, descr, "1");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Altitude unit is set to feet", 1, 0, 0, 0, 0);
+		}
+		else if (res == "M") {
+			m_TrackedRecorder->ResetAltitudeUnit(false);
+			SaveDataToSettings(SETTING_FORCE_FEET, descr, "0");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Altitude unit is set to meter", 1, 0, 0, 0, 0);
+		}
+		return true;
+	}
+
 	// load transition level
 	regex rxtl("^.MTEP TL (.+\\.CSV)$", regex_constants::icase);
 	if (regex_match(cmd, match, rxtl)) {
@@ -1211,6 +1232,8 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	if (m_TrackedRecorder != nullptr)
 		delete m_TrackedRecorder;
 	m_TrackedRecorder = new TrackedRecorder(this);
+	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
+	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : stoi(setff) != 0);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 

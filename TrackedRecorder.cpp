@@ -6,6 +6,7 @@
 TrackedRecorder::TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
+	m_DefaultFeet = false;
 }
 
 TrackedRecorder::~TrackedRecorder(void)
@@ -38,7 +39,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded but tracking. add
-		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan) };
+		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan), m_DefaultFeet };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		RefreshSimilarCallsign();
 	}
@@ -64,7 +65,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded, tracking. add
-		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan) };
+		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan), m_DefaultFeet };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		RefreshSimilarCallsign();
 	}
@@ -108,7 +109,7 @@ bool TrackedRecorder::IsForceFeet(string callsign)
 	if (r != m_TrackedMap.end())
 		return r->second.m_ForceFeet;
 	else
-		return false;
+		return m_DefaultFeet;
 }
 
 void TrackedRecorder::SetAltitudeUnit(string callsign, bool feet)
@@ -116,6 +117,14 @@ void TrackedRecorder::SetAltitudeUnit(string callsign, bool feet)
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_ForceFeet = feet;
+}
+
+void TrackedRecorder::ResetAltitudeUnit(bool feet)
+{
+	m_DefaultFeet = feet;
+	for (auto& r : m_TrackedMap) {
+		r.second.m_ForceFeet = feet;
+	}
 }
 
 bool TrackedRecorder::IsSquawkDUPE(string callsign)
