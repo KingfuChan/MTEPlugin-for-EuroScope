@@ -329,6 +329,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			// TODO: customization
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {

@@ -3,10 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include <string>
-#include <list>
-#include <unordered_map>
-#include <unordered_set>
 #include "SimilarCallsign.h"
 
 using namespace std;

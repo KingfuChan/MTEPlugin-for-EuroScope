@@ -3,9 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include <string>
-#include <list>
-#include <map>
 
 using namespace std;
 

@@ -3,14 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <regex>
-#include <list>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
 #include "MetricAlt.h"
 
 using namespace std;

@@ -3,12 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include <string>
-#include <unordered_set>
-#include <unordered_map>
-#include <stack>
-#include <regex>
-#include <atomic>
 #include "MTEPScreen.h"
 #include "MetricAlt.h"
 #include "ReCat.h"

@@ -10,6 +10,23 @@
 // 添加要在此处预编译的标头
 #include "framework.h"
 
+// std
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <regex>
+
+#include <stack>
+#include <list>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#include <atomic>
+#include <memory>
+
+// project required
 #include "Resource.h"
 #include <EuroScopePlugIn.h>
 

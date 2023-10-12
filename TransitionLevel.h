@@ -3,11 +3,6 @@
 #pragma once
 
 #include "pch.h"
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <unordered_map>
 #include "MetricAlt.h"
 
 namespace AltitudeReference {
