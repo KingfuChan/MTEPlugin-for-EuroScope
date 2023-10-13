@@ -3,8 +3,6 @@
 #include "pch.h"
 #include "TransitionLevel.h"
 
-const int DISTANCE_THRESHOLD = 50; // nautical miles, for airport nearest RadarTarget
-
 TransitionLevel::TransitionLevel(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;

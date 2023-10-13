@@ -108,20 +108,17 @@ CMTEPlugIn::CMTEPlugIn(void)
 	if (setcc == nullptr ? false : stoi(setcc))
 		SetCustomCursor();
 
-	m_RouteChecker = nullptr;
 	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
 	if (setrc != nullptr)
 		LoadRouteChecker(setrc);
 
-	m_DepartureSequence = nullptr;
-
-	m_TrackedRecorder = new TrackedRecorder(this);
+	m_TrackedRecorder = make_unique<TrackedRecorder>(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
 	m_AutoRetrack = setar == nullptr ? 0 : stoi(setar);
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
 	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : stoi(setff) != 0);
 
-	m_TransitionLevel = new TransitionLevel(this);
+	m_TransitionLevel = make_unique<TransitionLevel>(this);
 	const char* settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
 	if (settl != nullptr)
 		LoadTransitionLevel(settl);
@@ -185,14 +182,6 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 CMTEPlugIn::~CMTEPlugIn(void)
 {
-	while (!m_ScreenStack.empty()) {
-		delete m_ScreenStack.top();
-		m_ScreenStack.pop();
-	}
-	delete m_TransitionLevel;
-	delete m_TrackedRecorder;
-	DeleteDepartureSequence();
-	UnloadRouteChecker();
 	CancelCustomCursor();
 }
 
@@ -424,7 +413,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
-		if (m_RouteChecker == nullptr ||
+		if (!m_RouteChecker ||
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
@@ -472,7 +461,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_DEP_SEQ: {
 		if (!FlightPlan.IsValid()) break;
-		if (m_DepartureSequence == nullptr) m_DepartureSequence = new DepartureSequence();
+		if (!m_DepartureSequence) m_DepartureSequence = make_unique<DepartureSequence>();
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq > 0)
 			sprintf_s(sItemString, 3, "%02d", OVRFLW2(seq));
@@ -781,7 +770,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RTE_INFO: {
-		if (m_RouteChecker == nullptr ||
+		if (!m_RouteChecker ||
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
@@ -792,7 +781,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_DSQ_MENU: {
 		if (!FlightPlan.IsValid()) break;
-		if (m_DepartureSequence == nullptr) break;
+		if (!m_DepartureSequence) break;
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq <= 0) { // reconnected or completely new
 			m_DepartureSequence->AddFlight(FlightPlan);
@@ -898,11 +887,11 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 			}
 		}
 	}
-	if (m_RouteChecker != nullptr &&
+	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
 		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
-	if (m_DepartureSequence != nullptr &&
+	if (m_DepartureSequence &&
 		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
@@ -917,9 +906,9 @@ void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
 {
 	if (!FlightPlan.IsValid())
 		return;
-	if (m_RouteChecker != nullptr)
+	if (m_RouteChecker)
 		m_RouteChecker->RemoveCache(FlightPlan);
-	if (m_DepartureSequence != nullptr)
+	if (m_DepartureSequence)
 		m_DepartureSequence->EditSequence(FlightPlan, -1);
 	if (FlightPlan.GetTrackingControllerIsMe())
 		m_TrackedRecorder->UpdateFlight(FlightPlan, false);
@@ -929,7 +918,7 @@ void CMTEPlugIn::OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan)
 {
 	if (!FlightPlan.IsValid())
 		return;
-	if (m_RouteChecker != nullptr) {
+	if (m_RouteChecker) {
 		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
 }
@@ -952,9 +941,9 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 
 CRadarScreen* CMTEPlugIn::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)
 {
-	CMTEPScreen* screen = new CMTEPScreen();
+	auto screen = make_shared<CMTEPScreen>();
 	m_ScreenStack.push(screen);
-	return screen;
+	return screen.get();
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
@@ -995,7 +984,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	if (regex_match(cmd, match, rxrc)) {
 		LoadRouteChecker(match[1].str());
 		SaveDataToSettings(SETTING_ROUTE_CHECKER_CSV, "route checker csv file", match[1].str().c_str());
-		return m_RouteChecker != nullptr;
+		return (bool)m_RouteChecker;
 	}
 
 	// route checker get route info
@@ -1089,7 +1078,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 			tl = MetricAlt::LvlMtoFeet(tl);
 		}
 		if (m_TransitionLevel->SetAirportParam(airport, tl, -1, -1)) {
-			string msg = airport + ", transition level is set to " + to_string(tl) + " ft.";
+			string msg = airport + " - transition level is set to " + to_string(tl) + " ft.";
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}
@@ -1098,7 +1087,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		string airport = MakeUpper(match[1].str());
 		bool qfe = MakeUpper(match[2].str()) == "QFE";
 		if (m_TransitionLevel->SetAirportParam(airport, -1, qfe, -1)) {
-			string msg = airport + ", altitude reference is set to " + string(qfe ? "QFE." : "QNH.");
+			string msg = airport + " - altitude reference is set to " + string(qfe ? "QFE." : "QNH.");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}
@@ -1107,7 +1096,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		string airport = MakeUpper(match[1].str());
 		int r = stoi(match[2].str());
 		if (m_TransitionLevel->SetAirportParam(airport, -1, -1, r)) {
-			string msg = airport + ", QNH/QFE range is set to " + match[2].str() + " miles.";
+			string msg = airport + " - QNH/QFE range is set to " + match[2].str() + " miles.";
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}
@@ -1158,11 +1147,11 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area)
 {
 	while (!m_ScreenStack.empty()) {
-		auto s = m_ScreenStack.top();
+		auto& s = m_ScreenStack.top();
 		if (s->m_Opened)
 			return s->StartTagFunction(sCallsign, nullptr, 0, nullptr, nullptr, FunctionId, Pt, Area);
 		else {
-			delete s;
+			s.reset();
 			m_ScreenStack.pop();
 		}
 	}
@@ -1186,12 +1175,12 @@ void CMTEPlugIn::CancelCustomCursor(void)
 
 void CMTEPlugIn::LoadRouteChecker(string filename)
 {
-	UnloadRouteChecker();
+	m_RouteChecker.reset();
 	if (filename[0] == '@') {
 		filename = GetAbsolutePath(filename.substr(1));
 	}
 	try {
-		m_RouteChecker = new RouteChecker(this, filename);
+		m_RouteChecker = make_unique<RouteChecker>(this, filename);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Route checker is loaded successfully. CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
@@ -1200,39 +1189,31 @@ void CMTEPlugIn::LoadRouteChecker(string filename)
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Route checker failed to load (" + e + "). CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
-		UnloadRouteChecker();
+		m_RouteChecker.reset();
 	}
 	catch (exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Route checker failed to load (" + string(e.what()) + "). CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
-		UnloadRouteChecker();
+		m_RouteChecker.reset();
 	}
 }
 
 void CMTEPlugIn::UnloadRouteChecker(void)
 {
-	if (m_RouteChecker != nullptr) {
-		delete m_RouteChecker;
-		m_RouteChecker = nullptr;
-		DisplayUserMessage("MESSAGE", "MTEPlugin", "Route checker is unloaded!", 1, 0, 0, 0, 0);
-	}
+	m_RouteChecker.reset();
+	DisplayUserMessage("MESSAGE", "MTEPlugin", "Route checker is unloaded!", 1, 0, 0, 0, 0);
 }
 
 void CMTEPlugIn::DeleteDepartureSequence(void)
 {
-	if (m_DepartureSequence != nullptr) {
-		delete m_DepartureSequence;
-		m_DepartureSequence = nullptr;
-		DisplayUserMessage("MESSAGE", "MTEPlugin", "Departure sequence is deleted!", 1, 0, 0, 0, 0);
-	}
+	m_DepartureSequence.reset();
+	DisplayUserMessage("MESSAGE", "MTEPlugin", "Departure sequence is deleted!", 1, 0, 0, 0, 0);
 }
 
 void CMTEPlugIn::ResetTrackedRecorder(void)
 {
-	if (m_TrackedRecorder != nullptr)
-		delete m_TrackedRecorder;
-	m_TrackedRecorder = new TrackedRecorder(this);
+	m_TrackedRecorder.reset(new TrackedRecorder(this));
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
 	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : stoi(setff) != 0);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
@@ -1253,16 +1234,14 @@ bool CMTEPlugIn::LoadTransitionLevel(string filename)
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Transition levels failed to load (" + e + "). CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
-		delete m_TransitionLevel;
-		m_TransitionLevel = new TransitionLevel(this);
+		m_TransitionLevel.reset(new TransitionLevel(this));
 		return false;
 	}
 	catch (exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Transition levels failed to load (" + string(e.what()) + "). CSV file name: " + filename).c_str(),
 			1, 0, 0, 0, 0);
-		delete m_TransitionLevel;
-		m_TransitionLevel = new TransitionLevel(this);
+		m_TransitionLevel.reset(new TransitionLevel(this));
 		return false;
 	}
 	return true;
@@ -1296,7 +1275,7 @@ bool CMTEPlugIn::LoadMetricAltitude(string filename)
 
 string CMTEPlugIn::DisplayRouteMessage(string departure, string arrival)
 {
-	if (m_RouteChecker == nullptr) return "";
+	if (!m_RouteChecker) return "";
 	auto rinfo = m_RouteChecker->GetRouteInfo(departure, arrival);
 	if (!rinfo.size()) return "";
 	string res = departure + "-" + arrival;

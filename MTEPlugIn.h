@@ -33,11 +33,11 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
-	stack<CMTEPScreen*> m_ScreenStack; // for StartTagFunction
-	RouteChecker* m_RouteChecker;
-	DepartureSequence* m_DepartureSequence;
-	TrackedRecorder* m_TrackedRecorder;
-	TransitionLevel* m_TransitionLevel;
+	stack<shared_ptr<CMTEPScreen>> m_ScreenStack; // for StartTagFunction
+	unique_ptr<RouteChecker> m_RouteChecker;
+	unique_ptr<DepartureSequence> m_DepartureSequence;
+	unique_ptr<TrackedRecorder> m_TrackedRecorder;
+	unique_ptr<TransitionLevel> m_TransitionLevel;
 	bool m_CustomCursor;
 	int m_AutoRetrack; // 0: off (default); 1: silent; 2: notified.
 	string m_CustomNumMap; // 0-9

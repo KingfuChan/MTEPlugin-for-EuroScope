@@ -7,10 +7,8 @@
 
 using namespace std;
 
-
 class TrackedRecorder
 {
-
 public:
 	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
 	~TrackedRecorder(void);
