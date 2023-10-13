@@ -74,6 +74,17 @@ const char* SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 const char* SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
 const char* SETTING_AMEND_CFL = "AmendQFEinCFL";
 const char* SETTING_FORCE_FEET = "ForceFeet";
+// COLOR DEFINITIONS
+const char* SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
+const char* SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
+const char* SETTING_COLOR_COMM_ESTAB = "Color/CommNoEstablish";
+const char* SETTING_COLOR_RC_INVALID = "Color/RouteInvalid";
+const char* SETTING_COLOR_RC_UNCERTN = "Color/RouteUncertain";
+const char* SETTING_COLOR_SQ_DUPE = "Color/SquawkDupe";
+const char* SETTING_COLOR_DS_NUMBR = "Color/DSRestore";
+const char* SETTING_COLOR_DS_STATE = "Color/DSNotCleared";
+const char* SETTING_COLOR_RDRV_IND = "Color/RadarVector";
+const char* SETTING_COLOR_RECONT_IND = "Color/Reconnected";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -318,7 +329,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
 			*pColorCode = TAG_COLOR_REDUNDANT;
-			// TODO: customization
+			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {
@@ -347,6 +358,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (m_TrackedRecorder->IsSimilarCallsign(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 3, "SC");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_CS_SIMILR, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
@@ -395,6 +407,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsCommEstablished(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 2, "C");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_COMM_ESTAB, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_RECAT_BC: {
@@ -425,14 +438,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case RouteCheckerConstants::INVALID:
 			sprintf_s(sItemString, 3, "X ");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_RC_INVALID, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::PARTIAL_NO_LEVEL:
 			sprintf_s(sItemString, 3, "PL");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_NO_LEVEL:
 			sprintf_s(sItemString, 3, "YL");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_NO_LEVEL:
 			sprintf_s(sItemString, 3, "YL");
@@ -440,10 +456,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
 			sprintf_s(sItemString, 3, "P ");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_OK_LEVEL:
 			sprintf_s(sItemString, 3, "Y ");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_OK_LEVEL:
 			sprintf_s(sItemString, 3, "Y ");
@@ -457,6 +475,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (m_TrackedRecorder->IsSquawkDUPE(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 5, "DUPE");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_SQ_DUPE, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_DEP_SEQ: {
@@ -468,6 +487,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else if (seq < 0) { // reconnected
 			sprintf_s(sItemString, 3, "--");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_DS_NUMBR, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_TIEM_TYPE_DEP_STS: {
@@ -477,6 +497,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, gsts.size() + 1, gsts.c_str());
 			if (!FlightPlan.GetClearenceFlag()) {
 				*pColorCode = TAG_COLOR_INFORMATION;
+				GetColorDefinition(SETTING_COLOR_DS_STATE, pColorCode, pRGB);
 			}
 		}
 		else if (FlightPlan.GetClearenceFlag()) {
@@ -487,6 +508,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (FlightPlan.IsValid() && FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
 			sprintf_s(sItemString, 3, "RV");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_RDRV_IND, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_RCNT_IND: {
@@ -494,6 +516,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsActive(FlightPlan)) {
 			sprintf_s(sItemString, 2, "r");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_RECONT_IND, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_ASPD_BND: {
@@ -1154,6 +1177,19 @@ void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, P
 			s.reset();
 			m_ScreenStack.pop();
 		}
+	}
+}
+
+void CMTEPlugIn::GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB)
+{
+	// If setting is not present or invalid, it will not touch anything
+	unsigned int r, g, b;
+	auto settingValue = GetDataFromSettings(setting);
+	if (settingValue != nullptr && sscanf_s(settingValue, "%u:%u:%u", &r, &g, &b) != 3)
+		return;
+	if (r <= 255 && g <= 255 && b <= 255) {
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = RGB(r, g, b);
 	}
 }
 

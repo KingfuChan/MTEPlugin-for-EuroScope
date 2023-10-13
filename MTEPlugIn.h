@@ -44,6 +44,7 @@ private:
 	int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
 	void CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area);
+	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(string filename);
