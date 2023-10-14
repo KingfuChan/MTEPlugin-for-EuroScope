@@ -37,9 +37,11 @@ private:
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	unordered_map<string, AirportData> m_AirportMap;
 	typedef unordered_map<string, AirportData>::iterator apmap_iter;
+	unordered_map<string, string> m_Cache; // systemID/callsign -> target airport
 	int m_DefaultLevel, m_MaxLevel;
+
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position);
+	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position, string CacheID);
 	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter);
 };

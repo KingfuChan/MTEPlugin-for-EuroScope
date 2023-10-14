@@ -23,7 +23,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include <atomic>
+#include <algorithm>
+#include <mutex>
+#include <thread>
 #include <memory>
 
 // project required
