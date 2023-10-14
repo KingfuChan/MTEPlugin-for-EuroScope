@@ -57,9 +57,9 @@ const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 // COMPUTERISING RELATED
 constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
 constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
-constexpr int OVRFLW2(int t) { return abs(t) > 99 ? 99 : abs(t); } // overflow pre-process 2 digits
-constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
-constexpr int OVRFLW4(int t) { return abs(t) > 9999 ? 9999 : abs(t); }  // overflow pre-process 4 digits
+constexpr int OVRFLW2(int t) { return t > 99 || t < 0 ? 99 : t; } // overflow pre-process 2 digits
+constexpr int OVRFLW3(int t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
+constexpr int OVRFLW4(int t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
 string MakeUpper(string str);
 string GetAbsolutePath(string relativePath);
 int CalculateVerticalSpeed(CRadarTarget RadarTarget);
