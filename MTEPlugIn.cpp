@@ -1183,7 +1183,7 @@ void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, P
 void CMTEPlugIn::GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB)
 {
 	// If setting is not present or invalid, it will not touch anything
-	unsigned int r, g, b;
+	unsigned int r(256), g(256), b(256);
 	auto settingValue = GetDataFromSettings(setting);
 	if (settingValue != nullptr && sscanf_s(settingValue, "%u:%u:%u", &r, &g, &b) != 3)
 		return;
