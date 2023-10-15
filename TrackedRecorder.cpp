@@ -163,11 +163,13 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 
 bool TrackedRecorder::IsSimilarCallsign(string callsign)
 {
+	lock_guard<mutex> lock(similar_callsign_lock);
 	return m_SCSetMap.find(callsign) != m_SCSetMap.end();
 }
 
 unordered_set<string> TrackedRecorder::GetSimilarCallsigns(string callsign)
 {
+	lock_guard<mutex> lock(similar_callsign_lock);
 	auto f = m_SCSetMap.find(callsign);
 	if (f != m_SCSetMap.end())
 		return f->second;
@@ -241,23 +243,28 @@ unordered_map<string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::G
 
 void TrackedRecorder::RefreshSimilarCallsign(void)
 {
-	m_SCSetMap.clear();
-	unordered_set<string> setENG, setCHN;
-	for (auto& r : m_TrackedMap) {
-		if (r.second.m_Offline || r.second.m_AssignedData.m_CommType == 'T') continue; // offline or text
-		string cal = r.first.substr(0, 3);
-		if (m_CHNCallsign.find(cal) != m_CHNCallsign.end() && r.second.m_AssignedData.m_ScratchPad.find("*EN") == string::npos)
-			setCHN.insert(r.first);
-		else
-			setENG.insert(r.first);
-	}
-	for (auto& cset : { setENG,setCHN }) {
-		for (auto& c1 : cset) {
-			for (auto& c2 : cset) {
-				if (c1 != c2 && CompareCallsign(c1, c2)) {
-					m_SCSetMap[c1].insert(c2);
+	thread threadRefresh([&] {
+		lock_guard<mutex> lock(similar_callsign_lock);
+		m_SCSetMap.clear();
+		unordered_set<string> setENG, setCHN;
+		// TODO: use algorithm
+		for (auto& r : m_TrackedMap) {
+			if (r.second.m_Offline || r.second.m_AssignedData.m_CommType == 'T') continue; // offline or text
+			string cal = r.first.substr(0, 3);
+			if (m_CHNCallsign.find(cal) != m_CHNCallsign.end() && r.second.m_AssignedData.m_ScratchPad.find("*EN") == string::npos)
+				setCHN.insert(r.first);
+			else
+				setENG.insert(r.first);
+		}
+		for (auto& cset : { setENG,setCHN }) {
+			for (auto& c1 : cset) {
+				for (auto& c2 : cset) {
+					if (c1 != c2 && CompareCallsign(c1, c2)) {
+						m_SCSetMap[c1].insert(c2);
+					}
 				}
 			}
 		}
-	}
+		});
+	threadRefresh.detach();
 }

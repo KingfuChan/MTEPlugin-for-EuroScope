@@ -6,9 +6,9 @@
 string ExtractNumfromCallsign(const string callsign)
 {
 	// extract num from callsign
-	string res(callsign.size(), '\0');
+	string res;
 	bool num1st = false;
-	copy_if(callsign.begin(), callsign.end(), res.begin(), [&num1st](char c) {
+	copy_if(callsign.begin(), callsign.end(), back_inserter(res), [&num1st](char c) {
 		num1st = num1st || (c >= '1' && c <= '9'); // leading '0's are excluded
 		return num1st;
 		});
