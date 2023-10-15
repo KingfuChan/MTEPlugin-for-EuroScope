@@ -24,7 +24,7 @@ public:
 	RouteChecker(EuroScopePlugIn::CPlugIn* plugin, string filename);
 	~RouteChecker(void);
 
-	list<string> GetRouteInfo(string departure, string arrival); // for string display
+	vector<string> GetRouteInfo(string departure, string arrival); // for string display
 	int CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh = false);
 	void RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan);
 
@@ -41,7 +41,7 @@ private:
 	typedef vector<plan_point> plan_vec;
 
 	unordered_map<string, unordered_set<string>> m_SIDSTAR; // ICAO -> set <SID & STAR>
-	unordered_map<string, list<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair
+	unordered_map<string, vector<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair
 	unordered_map<string, int> m_Cache; // callsign -> check result
 
 	bool IsRouteValid(string FProute, string DBroute);

@@ -58,17 +58,12 @@ RouteChecker::~RouteChecker(void)
 {
 }
 
-list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
+vector<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 {
-	list<string> res;
-	list<RouteData> routes;
-	try {
-		routes = m_Data.at(departure + arrival);
-	}
-	catch (out_of_range e) {
-		return res;
-	}
-	for (auto& rd : routes) {
+	vector<string> res;
+	auto rditr = m_Data.find(departure + arrival);
+	if (rditr == m_Data.end()) return res;
+	for (auto& rd : rditr->second) {
 		string info = rd.m_Route;
 		if (rd.m_Name.size())
 			info = "(" + rd.m_Name + ")  " + info;
