@@ -247,14 +247,21 @@ void TrackedRecorder::RefreshSimilarCallsign(void)
 		lock_guard<mutex> lock(similar_callsign_lock);
 		m_SCSetMap.clear();
 		unordered_set<string> setENG, setCHN;
-		// TODO: use algorithm
-		for (auto& r : m_TrackedMap) {
-			if (r.second.m_Offline || r.second.m_AssignedData.m_CommType == 'T') continue; // offline or text
-			string cal = r.first.substr(0, 3);
-			if (m_CHNCallsign.find(cal) != m_CHNCallsign.end() && r.second.m_AssignedData.m_ScratchPad.find("*EN") == string::npos)
-				setCHN.insert(r.first);
-			else
-				setENG.insert(r.first);
+		for (auto& [c, d] : m_TrackedMap) {
+			if (d.m_Offline || d.m_AssignedData.m_CommType == 'T') continue;
+			string cal = c.substr(0, 3);
+			if (m_CHNCallsign.find(cal) != m_CHNCallsign.end()) {
+				string scratch = d.m_AssignedData.m_ScratchPad;
+				transform(scratch.begin(), scratch.end(), scratch.begin(), ::toupper);
+				size_t epos = scratch.find("EN");
+				if (epos != string::npos && epos > 0) {
+					if (string("*/\\.").find(scratch[epos - 1]) != string::npos) {
+						setCHN.insert(c);
+						continue;
+					}
+				}
+			}
+			setENG.insert(c);
 		}
 		for (auto& cset : { setENG,setCHN }) {
 			for (auto& c1 : cset) {
