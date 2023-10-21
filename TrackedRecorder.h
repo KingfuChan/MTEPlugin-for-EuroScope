@@ -10,20 +10,20 @@ class TrackedRecorder
 public:
 	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
 	~TrackedRecorder(void);
-	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online = true);
+	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
-	bool IsCommEstablished(std::string callsign);
-	void SetCommEstablished(std::string callsign);
-	bool IsCFLConfirmed(std::string callsign);
-	void SetCFLConfirmed(std::string callsign, bool confirmed = true);
-	bool IsForceFeet(std::string callsign);
-	void SetAltitudeUnit(std::string callsign, bool feet);
-	void ResetAltitudeUnit(bool feet);
-	bool IsSquawkDUPE(std::string callsign);
+	bool IsCommEstablished(const std::string& callsign);
+	void SetCommEstablished(const std::string& callsign);
+	bool IsCFLConfirmed(const std::string& callsign);
+	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
+	bool IsForceFeet(const std::string& callsign);
+	void SetAltitudeUnit(const std::string& callsign, const bool& feet);
+	void ResetAltitudeUnit(const bool& feet);
+	bool IsSquawkDUPE(const std::string& callsign);
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
-	bool IsSimilarCallsign(std::string callsign);
-	std::unordered_set<std::string> GetSimilarCallsigns(std::string callsign);
+	bool IsSimilarCallsign(const std::string& callsign);
+	std::unordered_set<std::string> GetSimilarCallsigns(const std::string& callsign);
 	bool SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
@@ -77,6 +77,6 @@ private:
 	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign
 	std::mutex similar_callsign_lock;
 
-	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(std::string systemID);
+	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(const std::string& systemID);
 	void RefreshSimilarCallsign(void);
 };

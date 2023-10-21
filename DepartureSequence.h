@@ -11,7 +11,7 @@ public:
 	~DepartureSequence(void);
 	void AddFlight(EuroScopePlugIn::CFlightPlan FlightPlan);
 	int GetSequence(EuroScopePlugIn::CFlightPlan FlightPlan);
-	void EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, int seq);
+	void EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, const int& sequence);
 
 private:
 	typedef struct {

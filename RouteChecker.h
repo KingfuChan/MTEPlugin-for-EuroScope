@@ -19,11 +19,11 @@ namespace RouteCheckerConstants {
 class RouteChecker
 {
 public:
-	RouteChecker(EuroScopePlugIn::CPlugIn* plugin, std::string filename);
+	RouteChecker(EuroScopePlugIn::CPlugIn* plugin, const std::string& filename);
 	~RouteChecker(void);
 
-	std::vector<std::string> GetRouteInfo(std::string departure, std::string arrival); // for std::string display
-	int CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh = false);
+	std::vector<std::string> GetRouteInfo(const std::string& departure, const std::string& arrival); // for std::string display
+	int CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const bool refresh = false);
 	void RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan);
 
 private:
@@ -42,7 +42,7 @@ private:
 	std::unordered_map<std::string, std::vector<RouteData>> m_Data; // map std::string store: "ZSSSZGGG" OD pair
 	std::unordered_map<std::string, int> m_Cache; // callsign -> check result
 
-	bool IsRouteValid(std::string FProute, std::string DBroute);
-	int IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, std::string DBroute);
-	bool IsLevelValid(int planalt, std::string evenodd, std::string fixalt, std::string minalt);
+	bool IsRouteValid(const std::string& FProute, const std::string& DBroute);
+	int IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, const std::string& DBroute);
+	bool IsLevelValid(const int& planalt, const std::string& evenodd, const std::string& fixalt, const std::string& minalt);
 };

@@ -3,7 +3,7 @@
 #include "pch.h"
 #include "SimilarCallsign.h"
 
-std::string ExtractNumfromCallsign(const std::string callsign)
+std::string ExtractNumfromCallsign(const std::string& callsign)
 {
 	// extract num from callsign
 	std::string res;
@@ -15,7 +15,7 @@ std::string ExtractNumfromCallsign(const std::string callsign)
 	return res;
 }
 
-bool CompareFlightNum(std::string num1, std::string num2)
+bool CompareFlightNum(const std::string& num1, const std::string& num2)
 {
 	// compares two callsigns in same size
 	if (num1.size() != num2.size()) return false;
@@ -40,7 +40,7 @@ bool CompareFlightNum(std::string num1, std::string num2)
 	return false;
 }
 
-bool CompareCallsign(std::string callsign1, std::string callsign2)
+bool CompareCallsign(const std::string& callsign1, const std::string& callsign2)
 {
 	// compares two complete callsigns
 	std::string cs1 = ExtractNumfromCallsign(callsign1);

@@ -55,15 +55,15 @@ const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registered)
 const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 
 // COMPUTERISING RELATED
-constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
-constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
-constexpr int OVRFLW2(int t) { return t > 99 || t < 0 ? 99 : t; } // overflow pre-process 2 digits
-constexpr int OVRFLW3(int t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
-constexpr int OVRFLW4(int t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
-std::string MakeUpper(std::string str);
-std::string GetAbsolutePath(std::string relativePath);
-int CalculateVerticalSpeed(CRadarTarget RadarTarget);
-bool IsCFLAssigned(CFlightPlan FlightPlan);
+constexpr double KN_KPH(const double& k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
+constexpr double KPH_KN(const double& k) { return k / 1.85184; } // 1.85184 kph = 1 knot
+constexpr int OVRFLW2(const int& t) { return t > 99 || t < 0 ? 99 : t; } // overflow pre-process 2 digits
+constexpr int OVRFLW3(const int& t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
+constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
+inline std::string MakeUpper(const std::string& str);
+inline std::string GetAbsolutePath(const std::string& relativePath);
+inline int CalculateVerticalSpeed(CRadarTarget RadarTarget);
+inline bool IsCFLAssigned(CFlightPlan FlightPlan);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -1167,7 +1167,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	return false;
 }
 
-void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area)
+void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area)
 {
 	while (!m_ScreenStack.empty()) {
 		auto& s = m_ScreenStack.top();
@@ -1209,27 +1209,28 @@ void CMTEPlugIn::CancelCustomCursor(void)
 	m_CustomCursor = false;
 }
 
-void CMTEPlugIn::LoadRouteChecker(std::string filename)
+void CMTEPlugIn::LoadRouteChecker(const std::string& filename)
 {
 	m_RouteChecker.reset();
-	if (filename[0] == '@') {
-		filename = GetAbsolutePath(filename.substr(1));
+	std::string fn = filename;
+	if (fn[0] == '@') {
+		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		m_RouteChecker = make_unique<RouteChecker>(this, filename);
+		m_RouteChecker = make_unique<RouteChecker>(this, fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker is loaded successfully. CSV file name: " + filename).c_str(),
+			("Route checker is loaded successfully. CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			("Route checker failed to load (" + e + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_RouteChecker.reset();
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker failed to load (" + std::string(e.what()) + "). CSV file name: " + filename).c_str(),
+			("Route checker failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_RouteChecker.reset();
 	}
@@ -1255,27 +1256,28 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 
-bool CMTEPlugIn::LoadTransitionLevel(std::string filename)
+bool CMTEPlugIn::LoadTransitionLevel(const std::string& filename)
 {
-	if (filename[0] == '@') {
-		filename = GetAbsolutePath(filename.substr(1));
+	std::string fn = filename;
+	if (fn[0] == '@') {
+		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		m_TransitionLevel->LoadCSV(filename);
+		m_TransitionLevel->LoadCSV(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels are loaded successfully. CSV file name: " + filename).c_str(),
+			("Transition levels are loaded successfully. CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			("Transition levels failed to load (" + e + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_TransitionLevel.reset(new TransitionLevel(this));
 		return false;
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels failed to load (" + std::string(e.what()) + "). CSV file name: " + filename).c_str(),
+			("Transition levels failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_TransitionLevel.reset(new TransitionLevel(this));
 		return false;
@@ -1283,33 +1285,34 @@ bool CMTEPlugIn::LoadTransitionLevel(std::string filename)
 	return true;
 }
 
-bool CMTEPlugIn::LoadMetricAltitude(std::string filename)
+bool CMTEPlugIn::LoadMetricAltitude(const std::string& filename)
 {
-	if (filename[0] == '@') {
-		filename = GetAbsolutePath(filename.substr(1));
+	std::string fn = filename;
+	if (fn[0] == '@') {
+		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		MetricAlt::LoadAltitudeDefinition(filename);
+		MetricAlt::LoadAltitudeDefinition(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions are loaded successfully. TXT file name: " + filename).c_str(),
+			("Altitude menu definitions are loaded successfully. TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions failed to load (" + e + "). TXT file name: " + filename).c_str(),
+			("Altitude menu definitions failed to load (" + e + "). TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		return false;
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions failed to load (" + std::string(e.what()) + "). TXT file name: " + filename).c_str(),
+			("Altitude menu definitions failed to load (" + std::string(e.what()) + "). TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		return false;
 	}
 	return true;
 }
 
-std::string CMTEPlugIn::DisplayRouteMessage(std::string departure, std::string arrival)
+std::string CMTEPlugIn::DisplayRouteMessage(const std::string& departure, const std::string& arrival)
 {
 	if (!m_RouteChecker) return "";
 	auto rinfo = m_RouteChecker->GetRouteInfo(departure, arrival);
@@ -1323,13 +1326,14 @@ std::string CMTEPlugIn::DisplayRouteMessage(std::string departure, std::string a
 	return res;
 }
 
-std::string MakeUpper(std::string str)
+std::string MakeUpper(const std::string& str)
 {
-	for (auto& c : str) c = toupper(c);
-	return str;
+	std::string res;
+	std::transform(str.begin(), str.end(), back_inserter(res), ::toupper);
+	return res;
 }
 
-std::string GetAbsolutePath(std::string relativePath)
+std::string GetAbsolutePath(const std::string& relativePath)
 {
 	// add DLL directory before relative path
 	if (pluginModule != nullptr) {

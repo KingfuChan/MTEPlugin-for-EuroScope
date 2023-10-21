@@ -3,7 +3,7 @@
 #include "pch.h"
 #include "RouteChecker.h"
 
-RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, std::string filename)
+RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, const std::string& filename)
 {
 	std::ifstream inFile;
 	inFile.open(filename, std::ios::in);
@@ -58,7 +58,7 @@ RouteChecker::~RouteChecker(void)
 {
 }
 
-std::vector<std::string> RouteChecker::GetRouteInfo(std::string departure, std::string arrival)
+std::vector<std::string> RouteChecker::GetRouteInfo(const std::string& departure, const std::string& arrival)
 {
 	std::vector<std::string> res;
 	auto rditr = m_Data.find(departure + arrival);
@@ -80,7 +80,7 @@ std::vector<std::string> RouteChecker::GetRouteInfo(std::string departure, std::
 	return res;
 }
 
-int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh)
+int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const bool refresh)
 {
 	// see RouteCheckerConstants for returns. => refresh=true will force refresh, otherwise will look up in cache
 
@@ -115,7 +115,7 @@ void RouteChecker::RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan)
 	m_Cache.erase(FlightPlan.GetCallsign());
 }
 
-bool RouteChecker::IsRouteValid(std::string FProute, std::string DBroute)
+bool RouteChecker::IsRouteValid(const std::string& FProute, const std::string& DBroute)
 {
 	std::string temproute = FProute;
 	// remove dep rwy and alt/spd restrictions
@@ -147,7 +147,7 @@ bool RouteChecker::IsRouteValid(std::string FProute, std::string DBroute)
 	return newroute.find(" " + DBroute + " ") != std::string::npos;
 }
 
-int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, std::string DBroute)
+int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, const std::string& DBroute)
 {
 	// returns: 0-not valid, 1-partially valid, 2-valid
 	bool partial = false;
@@ -226,7 +226,7 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	return 0;
 }
 
-bool RouteChecker::IsLevelValid(int planalt, std::string evenodd, std::string fixalt, std::string minalt)
+bool RouteChecker::IsLevelValid(const int& planalt, const std::string& evenodd, const std::string& fixalt, const std::string& minalt)
 {
 	// considers even/odd, fixed altitudes and restrictions
 	int malt = 0;

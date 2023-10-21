@@ -13,7 +13,7 @@ TrackedRecorder::~TrackedRecorder(void)
 {
 }
 
-void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online)
+void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online)
 {
 	// Pass online=false to deactivate when disconnecting.
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
@@ -71,7 +71,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 }
 
-bool TrackedRecorder::IsCommEstablished(std::string callsign)
+bool TrackedRecorder::IsCommEstablished(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
@@ -80,14 +80,14 @@ bool TrackedRecorder::IsCommEstablished(std::string callsign)
 		return true;
 }
 
-void TrackedRecorder::SetCommEstablished(std::string callsign)
+void TrackedRecorder::SetCommEstablished(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_CommEstbed = true;
 }
 
-bool TrackedRecorder::IsCFLConfirmed(std::string callsign)
+bool TrackedRecorder::IsCFLConfirmed(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
@@ -96,14 +96,14 @@ bool TrackedRecorder::IsCFLConfirmed(std::string callsign)
 		return true;
 }
 
-void TrackedRecorder::SetCFLConfirmed(std::string callsign, bool confirmed)
+void TrackedRecorder::SetCFLConfirmed(const std::string& callsign, const bool confirmed)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_CFLConfirmed = confirmed;
 }
 
-bool TrackedRecorder::IsForceFeet(std::string callsign)
+bool TrackedRecorder::IsForceFeet(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
@@ -112,14 +112,14 @@ bool TrackedRecorder::IsForceFeet(std::string callsign)
 		return m_DefaultFeet;
 }
 
-void TrackedRecorder::SetAltitudeUnit(std::string callsign, bool feet)
+void TrackedRecorder::SetAltitudeUnit(const std::string& callsign, const bool& feet)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_ForceFeet = feet;
 }
 
-void TrackedRecorder::ResetAltitudeUnit(bool feet)
+void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
 {
 	m_DefaultFeet = feet;
 	for (auto& r : m_TrackedMap) {
@@ -127,7 +127,7 @@ void TrackedRecorder::ResetAltitudeUnit(bool feet)
 	}
 }
 
-bool TrackedRecorder::IsSquawkDUPE(std::string callsign)
+bool TrackedRecorder::IsSquawkDUPE(const std::string& callsign)
 {
 	auto r1 = m_TrackedMap.find(callsign);
 	if (r1 == m_TrackedMap.end())
@@ -161,13 +161,13 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 }
 
-bool TrackedRecorder::IsSimilarCallsign(std::string callsign)
+bool TrackedRecorder::IsSimilarCallsign(const std::string& callsign)
 {
 	std::lock_guard<std::mutex> lock(similar_callsign_lock);
 	return m_SCSetMap.find(callsign) != m_SCSetMap.end();
 }
 
-std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(std::string callsign)
+std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(const std::string& callsign)
 {
 	std::lock_guard<std::mutex> lock(similar_callsign_lock);
 	auto f = m_SCSetMap.find(callsign);
@@ -232,7 +232,7 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return false;
 }
 
-std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(std::string systemID)
+std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(const std::string& systemID)
 {
 	for (auto trd = m_TrackedMap.begin(); trd != m_TrackedMap.end(); trd++) {
 		if (trd->second.m_SystemID == systemID)

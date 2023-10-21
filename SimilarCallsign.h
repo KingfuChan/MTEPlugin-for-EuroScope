@@ -21,4 +21,4 @@ const std::unordered_set<std::string> m_CHNCallsign = {
 	"YZR",
 };
 
-bool CompareCallsign(std::string callsign1, std::string callsign2);
+bool CompareCallsign(const std::string& callsign1, const std::string& callsign2);

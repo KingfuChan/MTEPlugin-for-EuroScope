@@ -33,7 +33,7 @@ int DepartureSequence::GetSequence(EuroScopePlugIn::CFlightPlan FlightPlan)
 		return -1;
 }
 
-void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, int seq)
+void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, const int& sequence)
 {
 	// if seq is -1, will deactivate flight; if seq is 0, will remove from list
 	FlightSeqData fsd = FindData(FlightPlan);
@@ -43,6 +43,7 @@ void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, in
 		fsd.iterator->active = GetFPGroundState(FlightPlan) == fsd.state;
 		return;
 	}
+	int seq = sequence;
 	if (seq < 0)
 		fsd.iterator->active = false;
 	else if (seq == 0)

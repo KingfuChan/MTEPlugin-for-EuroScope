@@ -14,7 +14,7 @@ TransitionLevel::~TransitionLevel(void)
 {
 }
 
-void TransitionLevel::LoadCSV(std::string filename)
+void TransitionLevel::LoadCSV(const std::string& filename)
 {
 	m_AirportMap.clear();
 	m_DefaultLevel = m_PluginPtr->GetTransitionAltitude();
@@ -171,7 +171,7 @@ std::string TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan Fligh
 	return std::string();
 }
 
-bool TransitionLevel::SetAirportParam(std::string airport, int trans_level, int isQFE, int range)
+bool TransitionLevel::SetAirportParam(const std::string& airport, const int trans_level, const int isQFE, const int range)
 {
 	// default to -1 for ignoring. isQFE=0 means QNH, trans_level in feet, range in nm
 	apmap_iter apitr = m_AirportMap.find(airport);
@@ -248,7 +248,7 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 	}
 }
 
-TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CPosition Position, std::string CacheID)
+TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CPosition Position, const std::string& CacheID)
 {
 	// will not check cache
 	std::map<double, std::string> distance_airports; // sorted by distance to reduce calculation
@@ -267,7 +267,7 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 	return m_AirportMap.end();
 }
 
-bool TransitionLevel::IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter)
+bool TransitionLevel::IsinQNHBoundary(EuroScopePlugIn::CPosition pos, const apmap_iter& airport_iter)
 {
 	// only considers lateral boundary, need to check iter's validity before calling
 	// by range

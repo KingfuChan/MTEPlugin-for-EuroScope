@@ -217,13 +217,13 @@ namespace MetricAlt {
 	{60000,"","F600","","60000",},
 	};
 
-	int MtoFeet(const int meter);
-	int FeettoM(const int feet);
-	int LvlMtoFeet(const int meter);
-	int LvlFeettoM(const int feet);
-	bool RflFeettoM(const int feet, int& meter);
-	std::string LvlFeetEvenOdd(const int feet); // for RouteChecker
-	bool LoadAltitudeDefinition(const std::string filename);
-	std::vector<AltitudeMenuEntry> GetMenuItems(const bool metric, const int trans_level);
-	int GetAltitudeFromMenuItem(const std::string menuItem, const bool metric);
+	int MtoFeet(const int& meter);
+	int FeettoM(const int& feet);
+	int LvlMtoFeet(const int& meter);
+	int LvlFeettoM(const int& feet);
+	bool RflFeettoM(const int& feet, int& meter);
+	std::string LvlFeetEvenOdd(const int& feet); // for RouteChecker
+	bool LoadAltitudeDefinition(const std::string& filename);
+	std::vector<AltitudeMenuEntry> GetMenuItems(const bool& metric, const int& trans_level);
+	int GetAltitudeFromMenuItem(const std::string& menuItem, const bool& metric);
 }

@@ -17,10 +17,10 @@ public:
 	TransitionLevel(EuroScopePlugIn::CPlugIn* plugin);
 	~TransitionLevel(void);
 
-	void LoadCSV(std::string filename);
+	void LoadCSV(const std::string& filename);
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
 	std::string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
-	bool SetAirportParam(std::string airport, int trans_level = -1, int isQFE = -1, int range = -1);
+	bool SetAirportParam(const std::string& airport, const int trans_level = -1, const int isQFE = -1, const int range = -1);
 
 private:
 	typedef std::vector<EuroScopePlugIn::CPosition> pos_vec;
@@ -42,6 +42,6 @@ private:
 
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position, std::string CacheID);
-	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter);
+	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position, const std::string& CacheID);
+	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, const apmap_iter& airport_iter);
 };

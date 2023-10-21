@@ -42,15 +42,15 @@ private:
 	std::string m_CustomNumMap; // 0-9
 	int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
-	void CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area);
+	void CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area);
 	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
-	void LoadRouteChecker(std::string filename);
+	void LoadRouteChecker(const std::string& filename);
 	void UnloadRouteChecker(void);
 	void DeleteDepartureSequence(void);
 	void ResetTrackedRecorder(void);
-	bool LoadTransitionLevel(std::string filename);
-	bool LoadMetricAltitude(std::string filename);
-	std::string DisplayRouteMessage(std::string departure, std::string arrival);
+	bool LoadTransitionLevel(const std::string& filename);
+	bool LoadMetricAltitude(const std::string& filename);
+	std::string DisplayRouteMessage(const std::string& departure, const std::string& arrival);
 };
