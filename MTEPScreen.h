@@ -3,10 +3,8 @@
 #pragma once
 #include "pch.h"
 
-using namespace EuroScopePlugIn;
-
 class CMTEPScreen :
-	public CRadarScreen
+	public EuroScopePlugIn::CRadarScreen
 {
 public:
 	bool m_Opened;

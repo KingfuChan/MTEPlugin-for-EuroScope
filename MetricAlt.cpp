@@ -5,7 +5,7 @@
 
 using namespace MetricAlt;
 
-vector<AltitudeEntry> m_AltStrMap = v_atos1; // initialize with default fallback
+std::vector<AltitudeEntry> m_AltStrMap = v_atos1; // initialize with default fallback
 
 int MetricAlt::MtoFeet(const int meter)
 {
@@ -41,7 +41,7 @@ bool MetricAlt::RflFeettoM(const int feet, int& meter) {
 	}
 }
 
-string MetricAlt::LvlFeetEvenOdd(const int feet)
+std::string MetricAlt::LvlFeetEvenOdd(const int feet)
 {
 	int i = 1; // first one is odd
 	for (auto it = m_ftom.begin(); it != m_ftom.end(); it++, i++) {
@@ -58,21 +58,21 @@ string MetricAlt::LvlFeetEvenOdd(const int feet)
 	return "NONE";
 }
 
-bool MetricAlt::LoadAltitudeDefinition(const string filename)
+bool MetricAlt::LoadAltitudeDefinition(const std::string filename)
 {
 	m_AltStrMap.clear(); // clear previous record
-	ifstream inFile;
-	inFile.open(filename, ios::in);
+	std::ifstream inFile;
+	inFile.open(filename, std::ios::in);
 	if (!inFile.is_open()) // unable to open file
 	{
 		m_AltStrMap = v_atos1;
-		throw string("unable to open file");
+		throw std::string("unable to open file");
 	}
-	string line;
+	std::string line;
 	try {
 		while (getline(inFile, line)) {
-			istringstream ssin(line);
-			string stra, strm, strf, strma, strfa;
+			std::istringstream ssin(line);
+			std::string stra, strm, strf, strma, strfa;
 			getline(ssin, stra, '\t');
 			getline(ssin, strm, '\t');
 			getline(ssin, strf, '\t');
@@ -93,11 +93,11 @@ bool MetricAlt::LoadAltitudeDefinition(const string filename)
 	return false;
 }
 
-vector<AltitudeMenuEntry> MetricAlt::GetMenuItems(const bool metric, const int trans_level)
+std::vector<AltitudeMenuEntry> MetricAlt::GetMenuItems(const bool metric, const int trans_level)
 {
-	vector<AltitudeMenuEntry> res;
+	std::vector<AltitudeMenuEntry> res;
 	for (auto& as : m_AltStrMap) {
-		string s = "";
+		std::string s = "";
 		if (metric) {
 			if (as.m.size()) {
 				if (as.ma.size() && as.alt > 3 && as.alt < trans_level) {
@@ -132,11 +132,11 @@ vector<AltitudeMenuEntry> MetricAlt::GetMenuItems(const bool metric, const int t
 	return res;
 }
 
-int MetricAlt::GetAltitudeFromMenuItem(const string menuItem, const bool metric)
+int MetricAlt::GetAltitudeFromMenuItem(const std::string menuItem, const bool metric)
 {
 	for (auto& as : m_AltStrMap) {
-		string s = metric ? as.m : as.f;
-		string sa = metric ? as.ma : as.fa;
+		std::string s = metric ? as.m : as.f;
+		std::string sa = metric ? as.ma : as.fa;
 		if (menuItem == s || menuItem == sa)
 			return as.alt;
 	}

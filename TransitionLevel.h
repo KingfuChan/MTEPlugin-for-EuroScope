@@ -17,13 +17,13 @@ public:
 	TransitionLevel(EuroScopePlugIn::CPlugIn* plugin);
 	~TransitionLevel(void);
 
-	void LoadCSV(string filename);
+	void LoadCSV(std::string filename);
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
-	string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
-	bool SetAirportParam(string airport, int trans_level = -1, int isQFE = -1, int range = -1);
+	std::string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
+	bool SetAirportParam(std::string airport, int trans_level = -1, int isQFE = -1, int range = -1);
 
 private:
-	typedef vector<EuroScopePlugIn::CPosition> pos_vec;
+	typedef std::vector<EuroScopePlugIn::CPosition> pos_vec;
 	typedef struct {
 		int trans_level;
 		int elevation;
@@ -35,13 +35,13 @@ private:
 	}AirportData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
-	unordered_map<string, AirportData> m_AirportMap;
-	typedef unordered_map<string, AirportData>::iterator apmap_iter;
-	unordered_map<string, string> m_Cache; // systemID/callsign -> target airport
+	std::unordered_map<std::string, AirportData> m_AirportMap;
+	typedef std::unordered_map<std::string, AirportData>::iterator apmap_iter;
+	std::unordered_map<std::string, std::string> m_Cache; // systemID/callsign -> target airport
 	int m_DefaultLevel, m_MaxLevel;
 
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
 	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position, string CacheID);
+	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position, std::string CacheID);
 	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter);
 };

@@ -4,9 +4,7 @@
 
 #include "pch.h"
 
-using namespace std;
-
-const unordered_set<string> m_CHNCallsign = {
+const std::unordered_set<std::string> m_CHNCallsign = {
 	"ALP","AYE","BDJ","BFM","BGC","BJN","BNH","BSH","CAF","CAO",
 	"CBG","CBJ","CCA","CCD","CCO","CCS","CDC","CDG","CES","CFA",
 	"CFB","CFI","CFZ","CGH","CGN","CGZ","CHB","CHC","CHF","CHH",
@@ -23,4 +21,4 @@ const unordered_set<string> m_CHNCallsign = {
 	"YZR",
 };
 
-bool CompareCallsign(string callsign1, string callsign2);
+bool CompareCallsign(std::string callsign1, std::string callsign2);

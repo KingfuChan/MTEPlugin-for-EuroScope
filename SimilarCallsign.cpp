@@ -3,10 +3,10 @@
 #include "pch.h"
 #include "SimilarCallsign.h"
 
-string ExtractNumfromCallsign(const string callsign)
+std::string ExtractNumfromCallsign(const std::string callsign)
 {
 	// extract num from callsign
-	string res;
+	std::string res;
 	bool num1st = false;
 	copy_if(callsign.begin(), callsign.end(), back_inserter(res), [&num1st](char c) {
 		num1st = num1st || (c >= '1' && c <= '9'); // leading '0's are excluded
@@ -15,12 +15,12 @@ string ExtractNumfromCallsign(const string callsign)
 	return res;
 }
 
-bool CompareFlightNum(string num1, string num2)
+bool CompareFlightNum(std::string num1, std::string num2)
 {
 	// compares two callsigns in same size
 	if (num1.size() != num2.size()) return false;
 	// compare by character
-	vector<bool> diff_pos(num1.size(), false);
+	std::vector<bool> diff_pos(num1.size(), false);
 	transform(num1.begin(), num1.end(), num2.begin(), diff_pos.begin(),
 		[](char a, char b) {return a != b; });
 	size_t diff_cnt = count(diff_pos.begin(), diff_pos.end(), true);
@@ -28,7 +28,7 @@ bool CompareFlightNum(string num1, string num2)
 		return true;
 	}
 	else if (diff_cnt == 2) {
-		set<char> dif1, dif2; // unique and sorted
+		std::set<char> dif1, dif2; // unique and sorted
 		for (size_t i = 0; i < diff_pos.size(); i++) {
 			if (diff_pos[i]) {
 				dif1.insert(num1[i]);
@@ -40,11 +40,11 @@ bool CompareFlightNum(string num1, string num2)
 	return false;
 }
 
-bool CompareCallsign(string callsign1, string callsign2)
+bool CompareCallsign(std::string callsign1, std::string callsign2)
 {
 	// compares two complete callsigns
-	string cs1 = ExtractNumfromCallsign(callsign1);
-	string cs2 = ExtractNumfromCallsign(callsign2);
+	std::string cs1 = ExtractNumfromCallsign(callsign1);
+	std::string cs2 = ExtractNumfromCallsign(callsign2);
 	if (!cs1.size() || !cs2.size()) { // one of it doesn't have a number
 		return false;
 	}
@@ -57,10 +57,10 @@ bool CompareCallsign(string callsign1, string callsign2)
 	else {
 		// exchange, make cs1 the longer callsign for justification
 		size_t max_size = max(cs1.size(), cs2.size());
-		string cs1_left = string(max_size - cs1.size(), ' ') + cs1;
-		string cs2_left = string(max_size - cs2.size(), ' ') + cs2;
-		string cs1_right = cs1 + string(max_size - cs1.size(), ' ');
-		string cs2_right = cs2 + string(max_size - cs2.size(), ' ');
+		std::string cs1_left = std::string(max_size - cs1.size(), ' ') + cs1;
+		std::string cs2_left = std::string(max_size - cs2.size(), ' ') + cs2;
+		std::string cs1_right = cs1 + std::string(max_size - cs1.size(), ' ');
+		std::string cs2_right = cs2 + std::string(max_size - cs2.size(), ' ');
 		return CompareFlightNum(cs1_left, cs2_left) || CompareFlightNum(cs1_right, cs2_right);
 	}
 }

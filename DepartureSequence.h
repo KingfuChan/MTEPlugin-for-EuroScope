@@ -4,10 +4,6 @@
 
 #include "pch.h"
 
-using namespace std;
-
-
-
 class DepartureSequence
 {
 public:
@@ -19,17 +15,17 @@ public:
 
 private:
 	typedef struct {
-		string callsign;
+		std::string callsign;
 		bool active;
 	}SeqData;
-	typedef list<SeqData> seq_list;
+	typedef std::list<SeqData> seq_list;
 	typedef struct {
-		string callsign;
-		string state;
+		std::string callsign;
+		std::string state;
 		int sequence; // will be -1 if inactive, 0 if cleared or not exist
 		seq_list::iterator iterator;
 	}FlightSeqData;
-	map<string, seq_list> m_SequenceListMap; // {state, SeqData list}
+	std::map<std::string, seq_list> m_SequenceListMap; // {state, SeqData list}
 	FlightSeqData FindData(EuroScopePlugIn::CFlightPlan FlightPlan);
-	string GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan);
+	std::string GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan);
 };

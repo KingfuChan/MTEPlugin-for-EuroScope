@@ -18,8 +18,8 @@ void DepartureSequence::AddFlight(EuroScopePlugIn::CFlightPlan FlightPlan)
 		fsd.iterator->active = fsd.state == GetFPGroundState(FlightPlan);
 	}
 	else if (fsd.sequence == 0) {
-		string state = GetFPGroundState(FlightPlan);
-		string callsign = FlightPlan.GetCallsign();
+		std::string state = GetFPGroundState(FlightPlan);
+		std::string callsign = FlightPlan.GetCallsign();
 		m_SequenceListMap[state].push_back(SeqData{ callsign, true });
 	}
 }
@@ -71,9 +71,9 @@ DepartureSequence::FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CF
 	return FlightSeqData{ "", "NONE", 0, seq_list::iterator() };
 }
 
-string DepartureSequence::GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan)
+std::string DepartureSequence::GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	string s = FlightPlan.GetGroundState();
+	std::string s = FlightPlan.GetGroundState();
 	s = s.length() ? s : FlightPlan.GetClearenceFlag() ? "CLRD" : "NSTS";
 	return s;
 }

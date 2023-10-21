@@ -4,19 +4,17 @@
 
 #include "pch.h"
 
-using namespace std;
-
 namespace MetricAlt {
 	typedef struct _alt {
 		int alt;
-		string m;
-		string f;
-		string ma;
-		string fa;
+		std::string m;
+		std::string f;
+		std::string ma;
+		std::string fa;
 	} AltitudeEntry;
 	typedef struct _menu {
 		int altitude;
-		string entry;
+		std::string entry;
 	} AltitudeMenuEntry;
 	const int ALT_MAP_METER = 1;
 	const int ALT_MAP_FEET = 2;
@@ -25,7 +23,7 @@ namespace MetricAlt {
 	const int ALT_MAP_NOT_FOUND = -1;
 
 	// default conversions
-	const map<int, int> m_mtof = { // meter to feet map
+	const std::map<int, int> m_mtof = { // meter to feet map
 	{  300, 1000},
 	{  600, 2000},
 	{  900, 3000},
@@ -73,7 +71,7 @@ namespace MetricAlt {
 	{14900,48900},
 	{15500,50900},
 	};
-	const map<int, int> m_ftom = {  // feet to meter map
+	const std::map<int, int> m_ftom = {  // feet to meter map
 	{ 1000,  300},
 	{ 2000,  600},
 	{ 3000,  900},
@@ -122,7 +120,7 @@ namespace MetricAlt {
 	{50900,15500},
 	};
 
-	const vector<AltitudeEntry> v_atos1 = { // altitude to string vector (fallback)
+	const std::vector<AltitudeEntry> v_atos1 = { // altitude to std::string vector (fallback)
 	{0,"-------","----","","",},
 	{2,"VA     ","VA  ","","",},
 	{1,"ILS    ","ILS ","","",},
@@ -224,8 +222,8 @@ namespace MetricAlt {
 	int LvlMtoFeet(const int meter);
 	int LvlFeettoM(const int feet);
 	bool RflFeettoM(const int feet, int& meter);
-	string LvlFeetEvenOdd(const int feet); // for RouteChecker
-	bool LoadAltitudeDefinition(const string filename);
-	vector<AltitudeMenuEntry> GetMenuItems(const bool metric, const int trans_level);
-	int GetAltitudeFromMenuItem(const string menuItem, const bool metric);
+	std::string LvlFeetEvenOdd(const int feet); // for RouteChecker
+	bool LoadAltitudeDefinition(const std::string filename);
+	std::vector<AltitudeMenuEntry> GetMenuItems(const bool metric, const int trans_level);
+	int GetAltitudeFromMenuItem(const std::string menuItem, const bool metric);
 }
