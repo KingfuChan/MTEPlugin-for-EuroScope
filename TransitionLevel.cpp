@@ -256,7 +256,7 @@ TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::C
 		double d = ap.second.position.DistanceTo(Position);
 		distance_airports[d] = ap.first;
 	}
-	for (auto& dstap : distance_airports) {
+	for (const auto& dstap : distance_airports) {
 		auto apitr = m_AirportMap.find(dstap.second);
 		if (IsinQNHBoundary(Position, apitr)) {
 			m_Cache[CacheID] = dstap.second;

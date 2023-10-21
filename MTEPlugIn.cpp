@@ -254,21 +254,21 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int altref;
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
 		int dspAlt;
-		char tmpStr[16];
+		std::string tmpStr;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
-			sprintf_s(tmpStr, 5, "%04d", OVRFLW4(dspAlt));
+			tmpStr = std::format("{:04d}", OVRFLW4(dspAlt));
 		}
 		else {
 			dspAlt = (int)round(rdrAlt / 100.0);
-			sprintf_s(tmpStr, 4, "%03d", OVRFLW3(dspAlt));
+			tmpStr = std::format("{:03d}", OVRFLW3(dspAlt));
 		}
 		std::string dspStr = tmpStr;
 		if (altref == AltitudeReference::ALT_REF_QNH) {
-			for (auto& c : dspStr) {
-				// use custom number mapping
-				c = m_CustomNumMap[int(c - '0')];
-			}
+			// use custom number mapping
+			std::transform(dspStr.begin(), dspStr.end(), dspStr.begin(), [&](auto& c) {
+				return m_CustomNumMap[int(c - '0')];
+				});
 		}
 		else if (altref == AltitudeReference::ALT_REF_QFE) {
 			dspStr = "(" + dspStr + ")";
@@ -632,14 +632,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		if (elev) { // QFE in use
 			cflAlt -= cflAlt > 2 && cflAlt < trslvl ? elev : 0;
 			// remove unavailable altitudes from list
-			for (auto it = m_alt.begin(); it != m_alt.end();) {
-				if (it->altitude < trslvl && it->altitude + elev >= trslvl) {
-					it = m_alt.erase(it);
-				}
-				else {
-					it++;
-				}
-			}
+			std::erase_if(m_alt, [&](const auto& i) { return i.altitude < trslvl && i.altitude + elev >= trslvl; });
 		}
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (copxAlt > 0 && copxAlt != FlightPlan.GetFinalAltitude()) {
@@ -671,14 +664,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			}
 		}
 		// pre-select altitude
-		int minDif(100000), minAlt(0); // a big enough number
-		for (auto it = m_alt.begin(); it != m_alt.end(); it++) {
-			int dif = abs(it->altitude - cmpAlt);
-			if (dif < minDif) {
-				minDif = dif;
-				minAlt = it->altitude;
-			}
-		}
+		int minAlt = std::ranges::min_element(m_alt, {}, [&](const auto& a) { return abs(a.altitude - cmpAlt); })->altitude;
 		for (auto it = m_alt.rbegin(); it != m_alt.rend(); it++) {
 			if (it->altitude > 3) { // not NONE, ILS, VA, EDIT
 				AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_CFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
@@ -743,15 +729,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "RFL Menu", 1);
 		// pre-select altitude
 		int rflAlt = FlightPlan.GetFinalAltitude();
-		int minDif(100000), minAlt(0); // a big enough number
 		auto m_alt = MetricAlt::GetMenuItems(!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign()), 0);
-		for (auto it = m_alt.begin(); it != m_alt.end(); it++) {
-			int dif = abs(it->altitude - rflAlt);
-			if (dif < minDif) {
-				minDif = dif;
-				minAlt = it->altitude;
-			}
-		}
+		int minAlt = std::ranges::min_element(m_alt, {}, [&](const auto& a) { return abs(a.altitude - rflAlt); })->altitude;
 		for (auto it = m_alt.rbegin(); it != m_alt.rend(); it++) {
 			if (it->altitude > 3) {
 				AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_RFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
@@ -1319,7 +1298,7 @@ std::string CMTEPlugIn::DisplayRouteMessage(const std::string& departure, const 
 	if (!rinfo.size()) return "";
 	std::string res = departure + "-" + arrival;
 	DisplayUserMessage("MTEP-Route", res.c_str(), (std::to_string(rinfo.size()) + " route(s):").c_str(), 1, 1, 0, 0, 0);
-	for (auto& ri : rinfo) {
+	for (const auto& ri : rinfo) {
 		DisplayUserMessage("MTEP-Route", nullptr, ri.c_str(), 1, 0, 0, 0, 0);
 		res += "\n" + ri;
 	}

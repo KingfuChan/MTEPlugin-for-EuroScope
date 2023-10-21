@@ -44,28 +44,29 @@ void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, co
 		return;
 	}
 	int seq = sequence;
-	if (seq < 0)
+	if (seq < 0) {
 		fsd.iterator->active = false;
-	else if (seq == 0)
-		m_SequenceListMap[fsd.state].erase(fsd.iterator);
+	}
 	else {
-		m_SequenceListMap[fsd.state].erase(fsd.iterator);
-		auto itm = m_SequenceListMap[fsd.state].begin();
-		for (; itm != m_SequenceListMap[fsd.state].end() && seq > 1; seq -= itm->active, itm++);
-		m_SequenceListMap[fsd.state].insert(itm, SeqData{ fsd.callsign, true });
+		auto& in_list = m_SequenceListMap[fsd.state];
+		in_list.erase(fsd.iterator);
+		if (seq != 0) {
+			auto itm = std::find_if(in_list.begin(), in_list.end(), [&seq](const auto& s) {seq -= s.active; return seq < 1; });
+			in_list.insert(itm, SeqData{ fsd.callsign, true });
+		}
 	}
 }
 
 DepartureSequence::FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	// sequence == -1: inactive, 0: not found
-	for (auto& itm : m_SequenceListMap) {
+	for (auto& [state, state_list] : m_SequenceListMap) {
 		int seq = 0;
-		for (auto itl = itm.second.begin(); itl != itm.second.end(); itl++) {
+		for (auto itl = state_list.begin(); itl != state_list.end(); itl++) {
 			seq += itl->active;
 			if (itl->callsign == FlightPlan.GetCallsign()) {
 				seq = itl->active ? seq : -1;
-				return FlightSeqData{ itl->callsign, itm.first, seq, itl };
+				return FlightSeqData{ itl->callsign, state, seq, itl };
 			}
 		}
 	}

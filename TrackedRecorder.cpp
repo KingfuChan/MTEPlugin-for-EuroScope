@@ -122,23 +122,21 @@ void TrackedRecorder::SetAltitudeUnit(const std::string& callsign, const bool& f
 void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
 {
 	m_DefaultFeet = feet;
-	for (auto& r : m_TrackedMap) {
-		r.second.m_ForceFeet = feet;
+	for (auto& [c, d] : m_TrackedMap) {
+		d.m_ForceFeet = feet;
 	}
 }
 
 bool TrackedRecorder::IsSquawkDUPE(const std::string& callsign)
 {
-	auto r1 = m_TrackedMap.find(callsign);
+	const auto r1 = m_TrackedMap.find(callsign);
 	if (r1 == m_TrackedMap.end())
 		return false;
-	for (auto& r2 : m_TrackedMap) {
-		if (!r2.second.m_Offline &&
+	return std::any_of(m_TrackedMap.begin(), m_TrackedMap.end(), [&](const auto& r2) {
+		return !r2.second.m_Offline &&
 			r1->first != r2.first &&
-			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk)
-			return true;
-	}
-	return false;
+			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk;
+		});
 }
 
 bool TrackedRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)
@@ -234,11 +232,7 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 
 std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(const std::string& systemID)
 {
-	for (auto trd = m_TrackedMap.begin(); trd != m_TrackedMap.end(); trd++) {
-		if (trd->second.m_SystemID == systemID)
-			return trd;
-	}
-	return m_TrackedMap.end();
+	return std::find_if(m_TrackedMap.begin(), m_TrackedMap.end(), [&systemID](const auto& d) { return d.second.m_SystemID == systemID; });
 }
 
 void TrackedRecorder::RefreshSimilarCallsign(void)
@@ -247,7 +241,7 @@ void TrackedRecorder::RefreshSimilarCallsign(void)
 		std::lock_guard<std::mutex> lock(similar_callsign_lock);
 		m_SCSetMap.clear();
 		std::unordered_set<std::string> setENG, setCHN;
-		for (auto& [c, d] : m_TrackedMap) {
+		for (const auto& [c, d] : m_TrackedMap) {
 			if (d.m_Offline || d.m_AssignedData.m_CommType == 'T') continue;
 			std::string cal = c.substr(0, 3);
 			if (m_CHNCallsign.find(cal) != m_CHNCallsign.end()) {
@@ -263,9 +257,9 @@ void TrackedRecorder::RefreshSimilarCallsign(void)
 			}
 			setENG.insert(c);
 		}
-		for (auto& cset : { setENG,setCHN }) {
-			for (auto& c1 : cset) {
-				for (auto& c2 : cset) {
+		for (const auto& cset : { setENG,setCHN }) {
+			for (const auto& c1 : cset) {
+				for (const auto& c2 : cset) {
 					if (c1 != c2 && CompareCallsign(c1, c2)) {
 						m_SCSetMap[c1].insert(c2);
 					}
