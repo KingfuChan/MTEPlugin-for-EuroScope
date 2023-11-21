@@ -25,7 +25,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 15. **Departure status** - departure sequence item.
     + See [**DS**](#departure-sequence-ds) below.
 16. **Radar vector indicator** - shows **RV** for tracked aircraft with heading assigned.
-    + The color is set by *Symbology Settings->Datablock->Information*.
+    + In the color of [`Color/RadarVector`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 17. **COMM ESTB indicator** - tracked recorder item.
 18. **Tracked DUPE warning** - tracked recorder item.
 19. **Similar callsign indicator** - tracked recorder item.
@@ -136,7 +136,7 @@ Tag item type **Route validity** shows:
 |**?**|Not Found|/|
 
 + Blanks out when route checker is not configured or clearance received flag is set.
-+ Different colors are used to distinguish two methods. Default color implies text-comparison method (**Y/YL/?**). Color set by *Symbology Settings->Datablock->Redundant* implies structurized-comparison method, in which case it could be inaccurate. Color set by *Symbology Settings->Datablock->Information* implies invalid route (**X**) with both methods.
++ Different colors are used to distinguish two methods. Default color implies text-comparison method (**Y/YL/?**). Color of [`Color/RouteUncertain`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant` implies structurized-comparison method, in which case it could be inaccurate. Color of [`Color/RouteInvalid`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information` implies invalid route (**X**) with both methods.
 
 ### RC - Functions
 
@@ -153,12 +153,12 @@ This module is a simplified version of my [Departure-List-Sequencing-PlugIn](htt
 Tag item type **Departure status** provides a compound display for ground status by adding clearance received flag (**CLRD**) to native EuroScope **Ground status** item type (**STUP, PUSH, TAXI, DEPA** depending on Euroscope version).
 
 + **CLRD** is shown when clearance received flag is set and no ground status.
-+ Use different color when there is a ground status but clearanced received flag hasn't been set. The color is set by *Symbology Settings->Datablock->Information*.
++ In the color of [`Color/DSNotCleared`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`, when there is a ground status but clearanced received flag hasn't been set.
 
 Tag item type **Departure sequence** shows:
 
 + **two digits number 01~99** - the sequence of the flight.
-+ **--** - indicating a reconnected flight. The color is set by *Symbology Settings->Datablock->Information*.
++ **--** - indicating a reconnected flight, in the color of [`Color/DSRestore`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 
 ### DS - Tag Item Function
 
@@ -167,7 +167,7 @@ Tag item function **Set departure status** is used to set clearance received fla
 + Sets clearance received flag when it isn't.
 + Opens ground status popup list when clearance received flag is set.
 + Setting **NSTS** will reset clearance received flag if no ground status is present.
-+ This function requires permission to draw on display types. Go to *Plug-ins settings->Allow to draw on types* and add ALL display types.
++ This function requires permission to draw on display types. Go to `Plug-ins settings->Allow to draw on types` and add ALL display types.
 
 Tag item function **Set departure sequence** is used to:
 
@@ -198,17 +198,18 @@ Some of the tag item types and functions are viable through this module. This mo
 ### TR - Tag Item Types
 
 + **Cleared flight level (m/FL)** - confirmed status is stored in tracked recorder.
-  + The color will be set by *Symbology Settings->Datablock->Redundant* if a new flight level is cleared but not confirmed.
+  + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`,if a new flight level is cleared but not confirmed.
 + **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - altitude display unit follows individual setting by entering ***F/M*** in CFL/RFL popup edit or global setting by [command line](#tr---command-line-functions).
 + **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
-  + Considers Chinese/English crews and ignores those text-only. Enter *\*EN* in scratch pad to distinguish Chinese airlines speaking English.
-  + The color is set by *Symbology Settings->Datablock->Information*.
+  + Considers Chinese/English crews and ignores those text-only.
+  + Reads info from scratch pad to distinguish Chinese airlines speaking English.
+  + In the color of [`Color/SimilarCallsign`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 + **COMM ESTB indicator** - shows a **C** at tracking. Works with **Set COMM ESTB** function.
-  + The color is set by *Symbology Settings->Datablock->Redundant*.
+  + In the color of [`Color/CommNoEstablish`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`.
 + **Tracked DUPE warning** - squawk DUPE warning only for aircrafts tracked by myself.
-  + The color is set by *Symbology Settings->Datablock->Information*.
+  + In the color of [`Color/SquawkDupe`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 + **Reconnected indicator** - shows **r** if reconnected. With auto retrack mode 1/2, should show nothing (see [below](#tr---command-line-functions)).
-  + The color is set by *Symbology Settings->Datablock->Information*.
+  + In the color of [`Color/Reconnected`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 
 ### TR - Tag Item Functions
 
@@ -271,10 +272,30 @@ It's recommended to fill in either ***Range*** or ***Boundary***. If an aircraft
 
 All customizations for single airport through command line functions won't be saved to the csv file.
 
+## Tag Item Type Colors
+
+Some tag item types with specific color is customizable through plugin settings file. Add the corresponding lines below into the plugin settings file to replace default color from EuroScope symbology setting. The values are in RGB format ***RRR:GGG:BBB*** (the following is for demonstration only, not used as default value).
+
+```text
+PLUGINS
+<eventually existing configuration lines>
+MTEPlugin:Color/CFLNeedConfirm:255:0:0
+MTEPlugin:Color/CommNoEstablish:255:255:0
+MTEPlugin:Color/SimilarCallsign:0:0:0
+MTEPlugin:Color/RouteInvalid:255:50:50
+MTEPlugin:Color/RouteUncertain:0:255:0
+MTEPlugin:Color/SquawkDupe:0:0:255
+MTEPlugin:Color/DSRestore:0:0:255
+MTEPlugin:Color/DSNotCleared:0:0:255
+MTEPlugin:Color/RadarVector:0:255:0
+MTEPlugin:Color/Reconnected:150:0:0
+END
+```
+
 ## Other Command Line Features
 
 All command line functions are case-insensitive, including those mentioned above.
 
 1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
 2. **.MTEP CURSOR ON/OFF** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. On Windows 10 1607 or later systems, the size of cursor is set according to current EuroScope Hi-DPI setting. This setting will be saved in your EuroScope plugin settings.
-3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings should work.
+3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings file should work.
