@@ -40,7 +40,7 @@ private:
 	bool m_CustomCursor;
 	int m_AutoRetrack; // 0: off (default); 1: silent; 2: notified.
 	std::string m_CustomNumMap; // 0-9
-	int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
+	std::atomic_int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
 	void CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area);
 	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);

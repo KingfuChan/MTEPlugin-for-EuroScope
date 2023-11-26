@@ -278,26 +278,23 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
 		if (!FlightPlan.IsValid()) break;
-		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-		switch (cflAlt)
-		{
-		case 2: // cleared for visual approach
-			sprintf_s(sItemString, 3, "VA");
-			break;
-		case 1: // cleared for ILS approach
-			sprintf_s(sItemString, 4, "ILS");
-			break;
-		case 0: { // no cleared level or CFL==RFL
-			if (!IsCFLAssigned(FlightPlan)) {
-				sprintf_s(sItemString, 5, "    ");
-				break;
-			}
-			else {
-				cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
-			}
-			[[fallthrough]];
+		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
+			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
-		default: {// have a cleared level
+		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+		if (cflAlt == 2) { // cleared for visual approach
+			sprintf_s(sItemString, 3, "VA");
+		}
+		else if (cflAlt == 1) { // cleared for ILS approach
+			sprintf_s(sItemString, 4, "ILS");
+		}
+		else if (cflAlt <= 0 && !IsCFLAssigned(FlightPlan)) { // no cleared level or CFL==RFL
+			// TODO: sometimes FlightPlan.GetControllerAssignedData().GetClearedAltitude() returns -1.
+			sprintf_s(sItemString, 5, "    ");
+		}
+		else { // have a cleared level
+			cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
 			int dspAlt;
 			int trslvl, elev;
 			bool isQFE = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev).size() && elev && cflAlt < trslvl;
@@ -325,11 +322,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				std::string qfeAltStr = "(" + std::string(sItemString) + ")";
 				strcpy_s(sItemString, qfeAltStr.size() + 1, qfeAltStr.c_str());
 			}
-			break; }
-		}
-		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
-			*pColorCode = TAG_COLOR_REDUNDANT;
-			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {
@@ -865,7 +857,6 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 {
 	if (!FlightPlan.IsValid())
 		return;
-	m_TrackedRecorder->UpdateFlight(FlightPlan);
 	if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE) {
 		if (m_AmendCFL == 2) { // amend only when mode 2 (all) is set
 			int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
@@ -902,6 +893,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		!strlen(FlightPlan.GetGroundState())) {
 		CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
 	}
+	m_TrackedRecorder->UpdateFlight(FlightPlan);
 }
 
 void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
@@ -933,12 +925,12 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 		m_TrackedRecorder->UpdateFlight(RadarTarget);
 	}
 	else if (m_AutoRetrack) {
-		bool r = m_TrackedRecorder->SetTrackedData(RadarTarget);
-		if (r && m_AutoRetrack == 2) {
+		if (m_TrackedRecorder->SetTrackedData(RadarTarget) && m_AutoRetrack == 2) {
 			std::string msg = std::string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
 			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
 		}
 	}
+	// TODO: update TL cache, deprecate real-time calculation
 }
 
 CRadarScreen* CMTEPlugIn::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)

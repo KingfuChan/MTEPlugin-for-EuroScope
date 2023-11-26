@@ -29,6 +29,7 @@
 #include <mutex>
 #include <thread>
 #include <memory>
+#include <atomic>
 
 // project required
 #include "Resource.h"
