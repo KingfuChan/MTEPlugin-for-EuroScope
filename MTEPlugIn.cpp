@@ -930,7 +930,7 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
 		}
 	}
-	// TODO: update TL cache, deprecate real-time calculation
+	std::thread(&TransitionLevel::UpdateRadarPosition, m_TransitionLevel.get(), RadarTarget).detach();
 }
 
 CRadarScreen* CMTEPlugIn::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)

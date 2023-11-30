@@ -18,6 +18,7 @@ public:
 	~TransitionLevel(void);
 
 	void LoadCSV(const std::string& filename);
+	void UpdateRadarPosition(EuroScopePlugIn::CRadarTarget RadarTarget);
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
 	std::string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
 	bool SetAirportParam(const std::string& airport, const int trans_level = -1, const int isQFE = -1, const int range = -1);
@@ -36,12 +37,13 @@ private:
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	std::unordered_map<std::string, AirportData> m_AirportMap;
-	typedef std::unordered_map<std::string, AirportData>::iterator apmap_iter;
-	std::unordered_map<std::string, std::string> m_Cache; // systemID/callsign -> target airport
-	int m_DefaultLevel, m_MaxLevel;
+	std::unordered_map<std::string, std::string> m_RadarCache; // systemID -> target airport
+	std::shared_mutex cache_mutex;
+	std::shared_mutex data_mutex;
+	int m_DefaultLevel; // logic: only used when m_AirportMap not empty, and defined by csv, and outside of all boundaries. 
+	// If m_AirportMap is empty, use m_PluginPtr->GetTransitionAltitude() for all.
+	// If not defined, a/c ouside of all boundaries will use 0 as trans_level.
+	int m_MaxLevel;
 
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position, const std::string& CacheID);
-	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, const apmap_iter& airport_iter);
+	bool IsinQNHBoundary(const EuroScopePlugIn::CPosition pos, const AirportData airport_iter);
 };
