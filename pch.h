@@ -26,7 +26,6 @@
 
 #include <algorithm>
 #include <format>
-#include <mutex>
 #include <shared_mutex>
 #include <thread>
 #include <memory>

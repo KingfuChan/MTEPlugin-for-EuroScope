@@ -161,13 +161,13 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 
 bool TrackedRecorder::IsSimilarCallsign(const std::string& callsign)
 {
-	std::lock_guard<std::mutex> lock(similar_callsign_lock);
+	std::shared_lock lock(sc_mutex);
 	return m_SCSetMap.find(callsign) != m_SCSetMap.end();
 }
 
 std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(const std::string& callsign)
 {
-	std::lock_guard<std::mutex> lock(similar_callsign_lock);
+	std::shared_lock lock(sc_mutex);
 	auto f = m_SCSetMap.find(callsign);
 	if (f != m_SCSetMap.end())
 		return f->second;
@@ -238,7 +238,7 @@ std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedR
 void TrackedRecorder::RefreshSimilarCallsign(void)
 {
 	std::thread threadRefresh([&] {
-		std::lock_guard<std::mutex> lock(similar_callsign_lock);
+		std::unique_lock lock(sc_mutex);
 		m_SCSetMap.clear();
 		std::unordered_set<std::string> setENG, setCHN;
 		for (const auto& [c, d] : m_TrackedMap) {

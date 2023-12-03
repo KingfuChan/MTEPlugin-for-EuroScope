@@ -41,6 +41,7 @@ private:
 	std::unordered_map<std::string, std::unordered_set<std::string>> m_SIDSTAR; // ICAO -> set <SID & STAR>
 	std::unordered_map<std::string, std::vector<RouteData>> m_Data; // map std::string store: "ZSSSZGGG" OD pair
 	std::unordered_map<std::string, int> m_Cache; // callsign -> check result
+	std::shared_mutex cache_mutex;
 
 	bool IsRouteValid(const std::string& FProute, const std::string& DBroute);
 	int IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, const std::string& DBroute);

@@ -882,7 +882,8 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 	}
 	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
-		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
+		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
+		//m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
 	if (m_DepartureSequence &&
 		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
@@ -913,7 +914,8 @@ void CMTEPlugIn::OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan)
 	if (!FlightPlan.IsValid())
 		return;
 	if (m_RouteChecker) {
-		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
+		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
+		//m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
 }
 

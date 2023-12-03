@@ -85,6 +85,7 @@ int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const
 	// see RouteCheckerConstants for returns. => refresh=true will force refresh, otherwise will look up in cache
 
 	if (!refresh) {
+		std::shared_lock clock(cache_mutex);
 		auto r = m_Cache.find(FlightPlan.GetCallsign());
 		if (r != m_Cache.end())
 			return r->second;
@@ -106,12 +107,16 @@ int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const
 				break;
 		}
 	}
-	m_Cache[FlightPlan.GetCallsign()] = res;
+	{
+		std::unique_lock clock(cache_mutex);
+		m_Cache[FlightPlan.GetCallsign()] = res;
+	}
 	return res;
 }
 
 void RouteChecker::RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
+	std::unique_lock clock(cache_mutex);
 	m_Cache.erase(FlightPlan.GetCallsign());
 }
 

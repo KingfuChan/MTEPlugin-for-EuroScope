@@ -75,7 +75,7 @@ private:
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign
 	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign
-	std::mutex similar_callsign_lock;
+	std::shared_mutex sc_mutex;
 
 	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(const std::string& systemID);
 	void RefreshSimilarCallsign(void);
