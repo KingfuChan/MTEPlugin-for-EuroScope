@@ -17,13 +17,14 @@ public:
 	TransitionLevel(EuroScopePlugIn::CPlugIn* plugin);
 	~TransitionLevel(void);
 
-	void LoadCSV(string filename);
+	void LoadCSV(const std::string& filename);
+	void UpdateRadarPosition(EuroScopePlugIn::CRadarTarget RadarTarget);
 	int GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference);
-	string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
-	bool SetAirportParam(string airport, int trans_level = -1, int isQFE = -1, int range = -1);
+	std::string GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation);
+	bool SetAirportParam(const std::string& airport, const int trans_level = -1, const int isQFE = -1, const int range = -1);
 
 private:
-	typedef vector<EuroScopePlugIn::CPosition> pos_vec;
+	typedef std::vector<EuroScopePlugIn::CPosition> pos_vec;
 	typedef struct {
 		int trans_level;
 		int elevation;
@@ -35,11 +36,14 @@ private:
 	}AirportData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
-	unordered_map<string, AirportData> m_AirportMap;
-	typedef unordered_map<string, AirportData>::iterator apmap_iter;
-	int m_DefaultLevel, m_MaxLevel;
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget);
-	apmap_iter GetTargetAirport(EuroScopePlugIn::CPosition Position);
-	bool IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter);
+	std::unordered_map<std::string, AirportData> m_AirportMap;
+	std::unordered_map<std::string, std::string> m_RadarCache; // systemID -> target airport
+	std::shared_mutex cache_mutex;
+	std::shared_mutex data_mutex;
+	int m_DefaultLevel; // logic: only used when m_AirportMap not empty, and defined by csv, and outside of all boundaries. 
+	// If m_AirportMap is empty, use m_PluginPtr->GetTransitionAltitude() for all.
+	// If not defined, a/c ouside of all boundaries will use 0 as trans_level.
+	int m_MaxLevel;
+
+	bool IsinQNHBoundary(const EuroScopePlugIn::CPosition pos, const AirportData airport_iter);
 };

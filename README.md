@@ -25,7 +25,7 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 15. **Departure status** - departure sequence item.
     + See [**DS**](#departure-sequence-ds) below.
 16. **Radar vector indicator** - shows **RV** for tracked aircraft with heading assigned.
-    + The color is set by *Symbology Settings->Datablock->Information*.
+    + In the color of [`Color/RadarVector`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 17. **COMM ESTB indicator** - tracked recorder item.
 18. **Tracked DUPE warning** - tracked recorder item.
 19. **Similar callsign indicator** - tracked recorder item.
@@ -40,9 +40,9 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
    + Menu items are customizable, see [**MA**](#customizable-cflrfl-menu-ma) below.
 3. **Open CFL popup edit** - Chinese metric RVSM altitudes.
 4. **Open RFL popup edit** - Chinese metric RVSM altitudes.
-   + CFL popup edit supports (standalone or in-menu): ***xxx*** for metric RVSM levels, ***Fxxx*** for FLxxx, ***550.*** for 550m, ***F4500.*** for 4500ft, etc. Enter ***0*** to clear CFL.
-   + RFL popup edit supports: ***xxx*** for metric, ***Fxxx*** for FLxxx. Enter ***0*** to reset RFL to the final altitude in flight plan.
-   + Enter a ***F*** or ***M*** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit, only for tracked aircrafts.
+   + CFL popup edit supports (standalone or in-menu): **`xxx`** for metric RVSM levels, **`Fxxx`** for FLxxx, **`550.`** for 550m, **`F4500.`** for 4500ft, etc. Enter **`0`** to clear CFL.
+   + RFL popup edit supports: **`xxx`** for metric, **`Fxxx`** for FLxxx. Enter **`0`** to reset RFL to the final altitude in flight plan.
+   + Enter a **`F`** or **`M`** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit, only for tracked aircrafts.
 5. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
 6. **Show route checker info** - route checker function, see [**RC**](#route-checker-rc) below.
 7. **Set departure sequence** - departure sequence function.
@@ -81,10 +81,10 @@ Altitude|Metric|Imperial|Metric (Alternative)|Imperial (Alternative)
 + ***Metric***, ***Imperial*** - at least one should contain value.
 + ***Metric (Alternative)***, ***Imperial (Alternative)*** - optional.
 
-You need to use a command line to load the TSV file: **.MTEP MA PATH** (case-insensitive). **PATH** should be replace by the TSV file path and file name.
+You need to use a command line to load the TSV file: **`.MTEP MA PATH`** (case-insensitive). **`PATH`** should be replace by the TSV file path and file name.
 
 + If you use relative path, please note it's based on working directory where EuroScope.exe is running.
-+ Or you can insert **@** to the front of the path to make it relative to the DLL file.
++ Or you can insert **`@`** to the front of the path to make it relative to the DLL file.
 + The file setting will be saved in your EuroScope plugin settings.
 
 ### MA - Schematic
@@ -116,10 +116,10 @@ ZBAA/ZBAD|ZSSS/ZSPD|test|SE/SO/FE/FO|S81/S89/S107/F350/F450|9800|ELKUR .... SASA
 
 CSV files with incorrect column names or not in the given order, will not be loaded. Empty cells are accepted. However it's still possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
-You need to use a command line to load the CSV file: **.MTEP RC PATH** (case-insensitive). **PATH** should be replace by the CSV file path and file name.
+You need to use a command line to load the CSV file: **`.MTEP RC PATH`** (case-insensitive). **`PATH`** should be replace by the CSV file path and file name.
 
 + If you use relative path, please note it's based on working directory where EuroScope.exe is running.
-+ Or you can insert **@** to the front of the path to make it relative to the DLL file.
++ Or you can insert **`@`** to the front of the path to make it relative to the DLL file.
 + The file setting will be saved in your EuroScope plugin settings.
 
 ### RC - Tag Item Type
@@ -136,13 +136,13 @@ Tag item type **Route validity** shows:
 |**?**|Not Found|/|
 
 + Blanks out when route checker is not configured or clearance received flag is set.
-+ Different colors are used to distinguish two methods. Default color implies text-comparison method (**Y/YL/?**). Color set by *Symbology Settings->Datablock->Redundant* implies structurized-comparison method, in which case it could be inaccurate. Color set by *Symbology Settings->Datablock->Information* implies invalid route (**X**) with both methods.
++ Different colors are used to distinguish two methods. Default color implies text-comparison method (**Y/YL/?**). Color of [`Color/RouteUncertain`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant` implies structurized-comparison method, in which case it could be inaccurate. Color of [`Color/RouteInvalid`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information` implies invalid route (**X**) with both methods.
 
 ### RC - Functions
 
-Tag item function **Show route checker info**: Displays a *MTEP-Route* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
+Tag item function **Show route checker info**: Displays a *`MTEP-Route`* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
 
-Command line function: **.MTEP RC DDDD AAAA** will display the valid routes from DDDD to AAAA and copy to clipboard.
+Command line function: **`.MTEP RC DDDD AAAA`** will display the valid routes from **`DDDD`** to **`AAAA`** and copy to clipboard.
 
 ## Departure Sequence (DS)
 
@@ -153,12 +153,12 @@ This module is a simplified version of my [Departure-List-Sequencing-PlugIn](htt
 Tag item type **Departure status** provides a compound display for ground status by adding clearance received flag (**CLRD**) to native EuroScope **Ground status** item type (**STUP, PUSH, TAXI, DEPA** depending on Euroscope version).
 
 + **CLRD** is shown when clearance received flag is set and no ground status.
-+ Use different color when there is a ground status but clearanced received flag hasn't been set. The color is set by *Symbology Settings->Datablock->Information*.
++ In the color of [`Color/DSNotCleared`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`, when there is a ground status but clearanced received flag hasn't been set.
 
 Tag item type **Departure sequence** shows:
 
 + **two digits number 01~99** - the sequence of the flight.
-+ **--** - indicating a reconnected flight. The color is set by *Symbology Settings->Datablock->Information*.
++ **--** - indicating a reconnected flight, in the color of [`Color/DSRestore`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 
 ### DS - Tag Item Function
 
@@ -167,7 +167,7 @@ Tag item function **Set departure status** is used to set clearance received fla
 + Sets clearance received flag when it isn't.
 + Opens ground status popup list when clearance received flag is set.
 + Setting **NSTS** will reset clearance received flag if no ground status is present.
-+ This function requires permission to draw on display types. Go to *Plug-ins settings->Allow to draw on types* and add ALL display types.
++ This function requires permission to draw on display types. Go to `Plug-ins settings->Allow to draw on types` and add ALL display types.
 
 Tag item function **Set departure sequence** is used to:
 
@@ -189,7 +189,7 @@ There are 2 ways to re-activate reconnected flights and restoring previous seque
 
 ### DS - Command Line Function
 
-Command line function: **.MTEP DS RESET** resets all memories.
+Command line function: **`.MTEP DS RESET`** resets all memories.
 
 ## Tracked Recorder (TR)
 
@@ -198,35 +198,36 @@ Some of the tag item types and functions are viable through this module. This mo
 ### TR - Tag Item Types
 
 + **Cleared flight level (m/FL)** - confirmed status is stored in tracked recorder.
-  + The color will be set by *Symbology Settings->Datablock->Redundant* if a new flight level is cleared but not confirmed.
-+ **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - altitude display unit follows individual setting by entering ***F/M*** in CFL/RFL popup edit or global setting by [command line](#tr---command-line-functions).
+  + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`,if a new flight level is cleared but not confirmed.
++ **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - altitude display unit follows individual setting by entering **`F`** or **`M`** in CFL/RFL popup edit or global setting by [command line](#tr---command-line-functions).
 + **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
-  + Considers Chinese/English crews and ignores those text-only. Enter *\*EN* in scratch pad to distinguish Chinese airlines speaking English.
-  + The color is set by *Symbology Settings->Datablock->Information*.
+  + Considers Chinese/English crews and ignores those text-only.
+  + Reads scratch pad to distinguish Chinese airlines speaking English.
+  + In the color of [`Color/SimilarCallsign`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 + **COMM ESTB indicator** - shows a **C** at tracking. Works with **Set COMM ESTB** function.
-  + The color is set by *Symbology Settings->Datablock->Redundant*.
+  + In the color of [`Color/CommNoEstablish`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`.
 + **Tracked DUPE warning** - squawk DUPE warning only for aircrafts tracked by myself.
-  + The color is set by *Symbology Settings->Datablock->Information*.
+  + In the color of [`Color/SquawkDupe`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 + **Reconnected indicator** - shows **r** if reconnected. With auto retrack mode 1/2, should show nothing (see [below](#tr---command-line-functions)).
-  + The color is set by *Symbology Settings->Datablock->Information*.
+  + In the color of [`Color/Reconnected`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
 
 ### TR - Tag Item Functions
 
 + **Open CFL popup menu**, **Open CFL popup edit**  - will confirm previous CFL before opening.
 + **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
 + **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
-  + Selecting one will toggle native ***.find*** command.
+  + Selecting one will toggle native **`.find`** command.
 + **Restore assigned data** - restore previously assigned data for reconnected flights and start tracking.
   + Assigned data includes: *communication type, squawk, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, scratch pad*.
 
 ### TR - Command Line Functions
 
-+ **.MTEP TR 0/1/2** - sets auto retrack mode. This setting will be saved in your EuroScope plugin settings.
-  + **(0)** no auto retrack;
-  + **(1)** auto retrack, no notifications;
-  + **(2)** auto retrack, notified through *MTEP-Recorder* message.
-+ **.MTEP TR F/M** - sets default feet/metric as altitude unit for aircrafts including untracked ones. Equivalent to entering an ***F/M*** in **Open CFL popup menu**, **Open CFL popup edit** and **Open RFL popup menu**.
-+ **.MTEP TR RESET** - resets tracked recorder. Use this command if this module is not working properly. Note that it also deletes all saved data for reconnected flights.
++ **`.MTEP TR 0/1/2`** - sets auto retrack mode. This setting will be saved in your EuroScope plugin settings.
+  + **`0`** no auto retrack;
+  + **`1`** auto retrack, no notifications;
+  + **`2`** auto retrack, notified through *`MTEP-Recorder`* message.
++ **`.MTEP TR F/M`** - sets default feet/metric as altitude unit for aircrafts including untracked ones. Equivalent to entering an **`F`** or **`M`** in **Open CFL popup menu**, **Open CFL popup edit** and **Open RFL popup menu**.
++ **`.MTEP TR RESET`** - resets tracked recorder. Use this command if this module is not working properly. Note that it also deletes all saved data for reconnected flights.
 
 ## Transition Level (TL)
 
@@ -255,26 +256,46 @@ VHHH|F110|28|0||113.6/22.2 113.8/22.4 114.2/22.6 ...
 
 CSV files with incorrect column names or not in the given order, will not be loaded. It's possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
-It's recommended to fill in either ***Range*** or ***Boundary***. If an aircraft is outside of all lateral boundaries/radius, **Actual altitude (m)** will show in QNE unless denoted in blanked-out ***Ident*** or set through EuroScope internal transition altitude. When using QFE, **Actual altitude (m)** and **Cleared flight level (m/FL)** will show in parentheses "**()**", and custom number mapping (see [below](#other-command-line-features)) won't apply.
+It's recommended to fill in either ***Range*** or ***Boundary***. If an aircraft is outside of all lateral boundaries/radius, **Actual altitude (m)** will show in QNE unless denoted in blanked-out ***Ident*** or set through EuroScope internal transition altitude. When using QFE, **Actual altitude (m)** and **Cleared flight level (m/FL)** will show in parentheses "**()**", and [custom number mapping](#other-command-line-features) won't apply.
 
 ### TL - Command Line Functions
 
-+ **.MTEP TL PATH** - **PATH** should be replace by the CSV file path and file name. Rules for **Route Checker** also applies.
-+ **.MTEP ICAO TL S/Fxxx** - sets the transition level for airport **ICAO**. Use the same altitude format as the csv.
-+ **.MTEP ICAO QFE/QNH** - sets QFE or QNH for the airport.
-+ **.MTEP ICAO R xx** - sets the range (in nautical miles) for the airport.
-+ **.MTEP QFE 0/1/2** - sets the behaviour of CFL changes when QFE is in use.
-  + **(0)** QFE will not be amended;
-  + **(1)** CFL changes made by MTEP functions (**Open CFL popup menu** and **Open CFL popup edit**) will be amended;
-  + **(2)** all CFL changes will be amended.
++ **`.MTEP TL PATH`** - **`PATH`** should be replace by the CSV file path and file name. Rules for **Route Checker** also applies.
++ **`.MTEP ICAO TL S/Fxxx`** - sets the transition level for airport **ICAO**. Use the same altitude format as the csv.
++ **`.MTEP ICAO QFE/QNH`** - sets QFE or QNH for the airport.
++ **`.MTEP ICAO R xx`** - sets the range (in nautical miles) for the airport.
++ **`.MTEP QFE 0/1/2`** - sets the behaviour of CFL changes when QFE is in use.
+  + **`0`** QFE will not be amended;
+  + **`1`** CFL changes made by MTEP functions (**Open CFL popup menu** and **Open CFL popup edit**) will be amended;
+  + **`2`** all CFL changes will be amended.
   + This feature will automatically convert elevation (QFE) to altitude (QNH), by adding the elevation of airport to EuroScope internal cleared altitude. This helps eliminate CLAM warnings for airports at higher altitudes, but will cause discrepancy between **Cleared flight level (m/FL)** and all other native item types (e.g. Matias).
 
 All customizations for single airport through command line functions won't be saved to the csv file.
+
+## Tag Item Type Colors
+
+Some tag item types with specific color is customizable through plugin settings file. Add the corresponding lines below into the plugin settings file to replace default color from EuroScope symbology setting. The values are in RGB format ***RRR:GGG:BBB*** (the following is for demonstration only, not used as default value).
+
+```text
+PLUGINS
+<eventually existing configuration lines>
+MTEPlugin:Color/CFLNeedConfirm:255:0:0
+MTEPlugin:Color/CommNoEstablish:255:255:0
+MTEPlugin:Color/SimilarCallsign:0:0:0
+MTEPlugin:Color/RouteInvalid:255:50:50
+MTEPlugin:Color/RouteUncertain:0:255:0
+MTEPlugin:Color/SquawkDupe:0:0:255
+MTEPlugin:Color/DSRestore:0:0:255
+MTEPlugin:Color/DSNotCleared:0:0:255
+MTEPlugin:Color/RadarVector:0:255:0
+MTEPlugin:Color/Reconnected:150:0:0
+END
+```
 
 ## Other Command Line Features
 
 All command line functions are case-insensitive, including those mentioned above.
 
-1. **.MTEP FR24 ICAO / .MTEP VARI ICAO** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **ICAO** airport. Only works with airports within sector file.
-2. **.MTEP CURSOR ON/OFF** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. On Windows 10 1607 or later systems, the size of cursor is set according to current EuroScope Hi-DPI setting. This setting will be saved in your EuroScope plugin settings.
-3. **.MTEP NUM 0123456789** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings should work.
+1. **`.MTEP FR24 ICAO / .MTEP VARI ICAO`** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **`ICAO`** airport. Only works with airports within sector file.
+2. **`.MTEP CURSOR ON/OFF`** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. On Windows 10 1607 or later systems, the size of cursor is set according to current EuroScope Hi-DPI setting. This setting will be saved in your EuroScope plugin settings.
+3. **`.MTEP NUM 0123456789`** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings file should work.

@@ -5,8 +5,6 @@
 #include "pch.h"
 #include "MetricAlt.h"
 
-using namespace std;
-
 namespace RouteCheckerConstants {
 	const int NOT_FOUND = -1;
 	const int INVALID = 0;
@@ -21,30 +19,31 @@ namespace RouteCheckerConstants {
 class RouteChecker
 {
 public:
-	RouteChecker(EuroScopePlugIn::CPlugIn* plugin, string filename);
+	RouteChecker(EuroScopePlugIn::CPlugIn* plugin, const std::string& filename);
 	~RouteChecker(void);
 
-	list<string> GetRouteInfo(string departure, string arrival); // for string display
-	int CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh = false);
+	std::vector<std::string> GetRouteInfo(const std::string& departure, const std::string& arrival); // for std::string display
+	int CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const bool refresh = false);
 	void RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan);
 
 private:
 	typedef struct {
-		string m_Name;
-		string m_EvenO; // accepts a combination of SE SO FE FO. S/F - m/ft, E/O - Even/Odd. No need for seperation marks
-		string m_FixAltStr; // accepts a combination of alt Sxxx(m*100) Fxxx(ft*100), seperated by '/'
-		string m_MinAlt; // in feet
-		string m_Route;
-		string m_Remark;
+		std::string m_Name;
+		std::string m_EvenO; // accepts a combination of SE SO FE FO. S/F - m/ft, E/O - Even/Odd. No need for seperation marks
+		std::string m_FixAltStr; // accepts a combination of alt Sxxx(m*100) Fxxx(ft*100), seperated by '/'
+		std::string m_MinAlt; // in feet
+		std::string m_Route;
+		std::string m_Remark;
 	}RouteData;
-	typedef struct { string via_; string to_; int cls_; }plan_point;
-	typedef vector<plan_point> plan_vec;
+	typedef struct { std::string via_; std::string to_; int cls_; }plan_point;
+	typedef std::vector<plan_point> plan_vec;
 
-	unordered_map<string, unordered_set<string>> m_SIDSTAR; // ICAO -> set <SID & STAR>
-	unordered_map<string, list<RouteData>> m_Data; // map string store: "ZSSSZGGG" OD pair
-	unordered_map<string, int> m_Cache; // callsign -> check result
+	std::unordered_map<std::string, std::unordered_set<std::string>> m_SIDSTAR; // ICAO -> set <SID & STAR>
+	std::unordered_map<std::string, std::vector<RouteData>> m_Data; // map std::string store: "ZSSSZGGG" OD pair
+	std::unordered_map<std::string, int> m_Cache; // callsign -> check result
+	std::shared_mutex cache_mutex;
 
-	bool IsRouteValid(string FProute, string DBroute);
-	int IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, string DBroute);
-	bool IsLevelValid(int planalt, string evenodd, string fixalt, string minalt);
+	bool IsRouteValid(const std::string& FProute, const std::string& DBroute);
+	int IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, const std::string& DBroute);
+	bool IsLevelValid(const int& planalt, const std::string& evenodd, const std::string& fixalt, const std::string& minalt);
 };

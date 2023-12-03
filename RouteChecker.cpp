@@ -3,26 +3,26 @@
 #include "pch.h"
 #include "RouteChecker.h"
 
-RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, string filename)
+RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, const std::string& filename)
 {
-	ifstream inFile;
-	inFile.open(filename, ios::in);
+	std::ifstream inFile;
+	inFile.open(filename, std::ios::in);
 	if (!inFile.is_open()) // unable to open file
 	{
-		throw string("unable to open file");
+		throw std::string("unable to open file");
 	}
-	string line;
+	std::string line;
 	getline(inFile, line);
 	if (line != "Dep,Arr,Name,EvenOdd,AltList,MinAlt,Route,Remarks") { // confirm header
 		inFile.close();
-		throw string("invalid column names");
+		throw std::string("invalid column names");
 	}
 	try {
 		while (getline(inFile, line)) {
-			istringstream ssin(line);
+			std::istringstream ssin(line);
 			RouteData rd;
-			string dep, arr, listeo, listalt, minalt;
-			string eo, la, ma;
+			std::string dep, arr, listeo, listalt, minalt;
+			std::string eo, la, ma;
 			getline(ssin, dep, ',');
 			getline(ssin, arr, ',');
 			getline(ssin, rd.m_Name, ',');
@@ -33,9 +33,9 @@ RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, string filename)
 			getline(ssin, rd.m_Remark);
 
 			// split departure and arrival airpots and assign route
-			string d, a;
-			for (istringstream ssdep(dep); getline(ssdep, d, '/');) {
-				for (istringstream ssarr(arr); getline(ssarr, a, '/');) {
+			std::string d, a;
+			for (std::istringstream ssdep(dep); getline(ssdep, d, '/');) {
+				for (std::istringstream ssarr(arr); getline(ssarr, a, '/');) {
 					m_Data[d + a].push_back(rd);
 				}
 			}
@@ -58,18 +58,13 @@ RouteChecker::~RouteChecker(void)
 {
 }
 
-list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
+std::vector<std::string> RouteChecker::GetRouteInfo(const std::string& departure, const std::string& arrival)
 {
-	list<string> res;
-	list<RouteData> routes;
-	try {
-		routes = m_Data.at(departure + arrival);
-	}
-	catch (out_of_range e) {
-		return res;
-	}
-	for (auto& rd : routes) {
-		string info = rd.m_Route;
+	std::vector<std::string> res;
+	auto rditr = m_Data.find(departure + arrival);
+	if (rditr == m_Data.end()) return res;
+	for (auto& rd : rditr->second) {
+		std::string info = rd.m_Route;
 		if (rd.m_Name.size())
 			info = "(" + rd.m_Name + ")  " + info;
 		if (rd.m_FixAltStr.size())
@@ -85,18 +80,19 @@ list<string> RouteChecker::GetRouteInfo(string departure, string arrival)
 	return res;
 }
 
-int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool refresh)
+int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const bool refresh)
 {
 	// see RouteCheckerConstants for returns. => refresh=true will force refresh, otherwise will look up in cache
 
 	if (!refresh) {
+		std::shared_lock clock(cache_mutex);
 		auto r = m_Cache.find(FlightPlan.GetCallsign());
 		if (r != m_Cache.end())
 			return r->second;
 	}
 	int res;
 	EuroScopePlugIn::CFlightPlanData fpd = FlightPlan.GetFlightPlanData();
-	string od = string(fpd.GetOrigin()) + string(fpd.GetDestination());
+	std::string od = std::string(fpd.GetOrigin()) + std::string(fpd.GetDestination());
 	auto rteit = m_Data.find(od);
 	if (rteit == m_Data.end()) {
 		res = -1;
@@ -111,31 +107,35 @@ int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, bool 
 				break;
 		}
 	}
-	m_Cache[FlightPlan.GetCallsign()] = res;
+	{
+		std::unique_lock clock(cache_mutex);
+		m_Cache[FlightPlan.GetCallsign()] = res;
+	}
 	return res;
 }
 
 void RouteChecker::RemoveCache(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
+	std::unique_lock clock(cache_mutex);
 	m_Cache.erase(FlightPlan.GetCallsign());
 }
 
-bool RouteChecker::IsRouteValid(string FProute, string DBroute)
+bool RouteChecker::IsRouteValid(const std::string& FProute, const std::string& DBroute)
 {
-	string temproute = FProute;
+	std::string temproute = FProute;
 	// remove dep rwy and alt/spd restrictions
 	// e.g. PIK81D/17L PIKAS -> PIK81D PIKAS
 	// e.g. W107 SANKO/K0909S1130 A326 AKARA -> W107 SANKO A326 AKARA
-	regex rex1("/(.+?)(\\s+?)");
+	std::regex rex1("/(.+?)(\\s+?)");
 	temproute = regex_replace(temproute, rex1, " ");
 	// clear all DCTs
-	regex rex2(" DCT "); // must have space, or points like _DCT_ will be replaced
+	std::regex rex2(" DCT "); // must have space, or points like _DCT_ will be replaced
 	temproute = " " + temproute + " "; // for first and last DCT
 	temproute = regex_replace(temproute, rex2, " ");
 	// shrink route
 	// e.g. N620 GUDOR/K0898F360 N620 NALEB/K0898F370 G494 -> N620 NALEB G494
-	istringstream prss(temproute);
-	string buf0, buf1, buf2, newroute(" ");
+	std::istringstream prss(temproute);
+	std::string buf0, buf1, buf2, newroute(" ");
 	while (prss >> buf0) {
 		if (buf0 == buf2) {
 			buf1 = "";
@@ -149,15 +149,15 @@ bool RouteChecker::IsRouteValid(string FProute, string DBroute)
 	}
 	newroute += buf2 + " " + buf1 + " ";
 	// find route, note both newroute and realroute starts and ends with space
-	return newroute.find(" " + DBroute + " ") != string::npos;
+	return newroute.find(" " + DBroute + " ") != std::string::npos;
 }
 
-int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, string DBroute)
+int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute ExtractedRoute, const std::string& DBroute)
 {
 	// returns: 0-not valid, 1-partially valid, 2-valid
 	bool partial = false;
-	string dep = ExtractedRoute.GetPointName(0);
-	string arr = ExtractedRoute.GetPointName(ExtractedRoute.GetPointsNumber() - 1);
+	std::string dep = ExtractedRoute.GetPointName(0);
+	std::string arr = ExtractedRoute.GetPointName(ExtractedRoute.GetPointsNumber() - 1);
 
 	// load Extracted route
 	plan_vec plnvec;
@@ -168,9 +168,9 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	const size_t m = plnvec.size();
 
 	// parse database route
-	vector<string> rtevec;
-	istringstream ssrt(DBroute);
-	string strt = "";
+	std::vector<std::string> rtevec;
+	std::istringstream ssrt(DBroute);
+	std::string strt = "";
 	while (ssrt >> strt) {
 		rtevec.push_back(strt);
 	}
@@ -231,19 +231,19 @@ int RouteChecker::IsRouteValid(EuroScopePlugIn::CFlightPlanExtractedRoute Extrac
 	return 0;
 }
 
-bool RouteChecker::IsLevelValid(int planalt, string evenodd, string fixalt, string minalt)
+bool RouteChecker::IsLevelValid(const int& planalt, const std::string& evenodd, const std::string& fixalt, const std::string& minalt)
 {
 	// considers even/odd, fixed altitudes and restrictions
 	int malt = 0;
 	sscanf_s(minalt.c_str(), "%d", &malt); // it's ok to be empty
 	if (planalt < malt) return false;
 	if (fixalt.empty()) {
-		return !evenodd.size() || evenodd.find(MetricAlt::LvlFeetEvenOdd(planalt)) != string::npos;
+		return !evenodd.size() || evenodd.find(MetricAlt::LvlFeetEvenOdd(planalt)) != std::string::npos;
 	}
 	else { // there is restrictions
-		istringstream fass(fixalt);
+		std::istringstream fass(fixalt);
 		int falt = 0;
-		for (string r; getline(fass, r, '/');) {
+		for (std::string r; getline(fass, r, '/');) {
 			if (sscanf_s(r.c_str(), "S%d", &falt))
 				falt = MetricAlt::LvlMtoFeet(falt * 100);
 			else if (sscanf_s(r.c_str(), "F%d", &falt)) {

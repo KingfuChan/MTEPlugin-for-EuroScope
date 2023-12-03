@@ -13,7 +13,7 @@ TrackedRecorder::~TrackedRecorder(void)
 {
 }
 
-void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online)
+void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online)
 {
 	// Pass online=false to deactivate when disconnecting.
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
@@ -71,7 +71,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 }
 
-bool TrackedRecorder::IsCommEstablished(string callsign)
+bool TrackedRecorder::IsCommEstablished(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
@@ -80,14 +80,14 @@ bool TrackedRecorder::IsCommEstablished(string callsign)
 		return true;
 }
 
-void TrackedRecorder::SetCommEstablished(string callsign)
+void TrackedRecorder::SetCommEstablished(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_CommEstbed = true;
 }
 
-bool TrackedRecorder::IsCFLConfirmed(string callsign)
+bool TrackedRecorder::IsCFLConfirmed(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
@@ -96,14 +96,14 @@ bool TrackedRecorder::IsCFLConfirmed(string callsign)
 		return true;
 }
 
-void TrackedRecorder::SetCFLConfirmed(string callsign, bool confirmed)
+void TrackedRecorder::SetCFLConfirmed(const std::string& callsign, const bool confirmed)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_CFLConfirmed = confirmed;
 }
 
-bool TrackedRecorder::IsForceFeet(string callsign)
+bool TrackedRecorder::IsForceFeet(const std::string& callsign)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
@@ -112,33 +112,31 @@ bool TrackedRecorder::IsForceFeet(string callsign)
 		return m_DefaultFeet;
 }
 
-void TrackedRecorder::SetAltitudeUnit(string callsign, bool feet)
+void TrackedRecorder::SetAltitudeUnit(const std::string& callsign, const bool& feet)
 {
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
 		r->second.m_ForceFeet = feet;
 }
 
-void TrackedRecorder::ResetAltitudeUnit(bool feet)
+void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
 {
 	m_DefaultFeet = feet;
-	for (auto& r : m_TrackedMap) {
-		r.second.m_ForceFeet = feet;
+	for (auto& [c, d] : m_TrackedMap) {
+		d.m_ForceFeet = feet;
 	}
 }
 
-bool TrackedRecorder::IsSquawkDUPE(string callsign)
+bool TrackedRecorder::IsSquawkDUPE(const std::string& callsign)
 {
-	auto r1 = m_TrackedMap.find(callsign);
+	const auto r1 = m_TrackedMap.find(callsign);
 	if (r1 == m_TrackedMap.end())
 		return false;
-	for (auto& r2 : m_TrackedMap) {
-		if (!r2.second.m_Offline &&
+	return std::any_of(m_TrackedMap.begin(), m_TrackedMap.end(), [&](const auto& r2) {
+		return !r2.second.m_Offline &&
 			r1->first != r2.first &&
-			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk)
-			return true;
-	}
-	return false;
+			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk;
+		});
 }
 
 bool TrackedRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)
@@ -161,18 +159,20 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 }
 
-bool TrackedRecorder::IsSimilarCallsign(string callsign)
+bool TrackedRecorder::IsSimilarCallsign(const std::string& callsign)
 {
+	std::shared_lock lock(sc_mutex);
 	return m_SCSetMap.find(callsign) != m_SCSetMap.end();
 }
 
-unordered_set<string> TrackedRecorder::GetSimilarCallsigns(string callsign)
+std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(const std::string& callsign)
 {
+	std::shared_lock lock(sc_mutex);
 	auto f = m_SCSetMap.find(callsign);
 	if (f != m_SCSetMap.end())
 		return f->second;
 	else
-		return unordered_set<string>();
+		return std::unordered_set<std::string>();
 }
 
 bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
@@ -230,34 +230,42 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return false;
 }
 
-unordered_map<string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(string systemID)
+std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(const std::string& systemID)
 {
-	for (auto trd = m_TrackedMap.begin(); trd != m_TrackedMap.end(); trd++) {
-		if (trd->second.m_SystemID == systemID)
-			return trd;
-	}
-	return m_TrackedMap.end();
+	return std::find_if(m_TrackedMap.begin(), m_TrackedMap.end(), [&systemID](const auto& d) { return d.second.m_SystemID == systemID; });
 }
 
 void TrackedRecorder::RefreshSimilarCallsign(void)
 {
-	m_SCSetMap.clear();
-	unordered_set<string> setENG, setCHN;
-	for (auto& r : m_TrackedMap) {
-		if (r.second.m_Offline || r.second.m_AssignedData.m_CommType == 'T') continue; // offline or text
-		string cal = r.first.substr(0, 3);
-		if (m_CHNCallsign.find(cal) != m_CHNCallsign.end() && r.second.m_AssignedData.m_ScratchPad.find("*EN") == string::npos)
-			setCHN.insert(r.first);
-		else
-			setENG.insert(r.first);
-	}
-	for (auto& cset : { setENG,setCHN }) {
-		for (auto& c1 : cset) {
-			for (auto& c2 : cset) {
-				if (c1 != c2 && CompareCallsign(c1, c2)) {
-					m_SCSetMap[c1].insert(c2);
+	std::thread threadRefresh([&] {
+		std::unique_lock lock(sc_mutex);
+		m_SCSetMap.clear();
+		std::unordered_set<std::string> setENG, setCHN;
+		for (const auto& [c, d] : m_TrackedMap) {
+			if (d.m_Offline || d.m_AssignedData.m_CommType == 'T') continue;
+			std::string cal = c.substr(0, 3);
+			if (m_CHNCallsign.find(cal) != m_CHNCallsign.end()) {
+				std::string scratch = d.m_AssignedData.m_ScratchPad;
+				transform(scratch.begin(), scratch.end(), scratch.begin(), ::toupper);
+				size_t epos = scratch.find("EN");
+				if (epos != std::string::npos && epos > 0) {
+					if (std::string("*/\\.").find(scratch[epos - 1]) != std::string::npos) {
+						setCHN.insert(c);
+						continue;
+					}
+				}
+			}
+			setENG.insert(c);
+		}
+		for (const auto& cset : { setENG,setCHN }) {
+			for (const auto& c1 : cset) {
+				for (const auto& c2 : cset) {
+					if (c1 != c2 && CompareCallsign(c1, c2)) {
+						m_SCSetMap[c1].insert(c2);
+					}
 				}
 			}
 		}
-	}
+		});
+	threadRefresh.detach();
 }

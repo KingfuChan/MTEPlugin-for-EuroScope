@@ -55,15 +55,15 @@ const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registered)
 const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 
 // COMPUTERISING RELATED
-constexpr double KN_KPH(double k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
-constexpr double KPH_KN(double k) { return k / 1.85184; } // 1.85184 kph = 1 knot
-constexpr int OVRFLW2(int t) { return abs(t) > 99 ? 99 : abs(t); } // overflow pre-process 2 digits
-constexpr int OVRFLW3(int t) { return abs(t) > 999 ? 999 : abs(t); } // overflow pre-process 3 digits
-constexpr int OVRFLW4(int t) { return abs(t) > 9999 ? 9999 : abs(t); }  // overflow pre-process 4 digits
-string MakeUpper(string str);
-string GetAbsolutePath(string relativePath);
-int CalculateVerticalSpeed(CRadarTarget RadarTarget);
-bool IsCFLAssigned(CFlightPlan FlightPlan);
+constexpr double KN_KPH(const double& k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
+constexpr double KPH_KN(const double& k) { return k / 1.85184; } // 1.85184 kph = 1 knot
+constexpr int OVRFLW2(const int& t) { return t > 99 || t < 0 ? 99 : t; } // overflow pre-process 2 digits
+constexpr int OVRFLW3(const int& t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
+constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
+inline std::string MakeUpper(const std::string& str);
+inline std::string GetAbsolutePath(const std::string& relativePath);
+inline int CalculateVerticalSpeed(CRadarTarget RadarTarget);
+inline bool IsCFLAssigned(CFlightPlan FlightPlan);
 
 // SETTING NAMES
 const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -74,6 +74,17 @@ const char* SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 const char* SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
 const char* SETTING_AMEND_CFL = "AmendQFEinCFL";
 const char* SETTING_FORCE_FEET = "ForceFeet";
+// COLOR DEFINITIONS
+const char* SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
+const char* SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
+const char* SETTING_COLOR_COMM_ESTAB = "Color/CommNoEstablish";
+const char* SETTING_COLOR_RC_INVALID = "Color/RouteInvalid";
+const char* SETTING_COLOR_RC_UNCERTN = "Color/RouteUncertain";
+const char* SETTING_COLOR_SQ_DUPE = "Color/SquawkDupe";
+const char* SETTING_COLOR_DS_NUMBR = "Color/DSRestore";
+const char* SETTING_COLOR_DS_STATE = "Color/DSNotCleared";
+const char* SETTING_COLOR_RDRV_IND = "Color/RadarVector";
+const char* SETTING_COLOR_RECONT_IND = "Color/Reconnected";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -105,23 +116,20 @@ CMTEPlugIn::CMTEPlugIn(void)
 	int curSize = (int)((float)(dpiSys < 96 ? 96 : dpiSys) / (float)(dpiWnd < 96 ? 96 : dpiWnd) * 32.0);
 	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, curSize, curSize, LR_SHARED));
 	m_CustomCursor = false;
-	if (setcc == nullptr ? false : stoi(setcc))
+	if (setcc == nullptr ? false : std::stoi(setcc))
 		SetCustomCursor();
 
-	m_RouteChecker = nullptr;
 	const char* setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
 	if (setrc != nullptr)
 		LoadRouteChecker(setrc);
 
-	m_DepartureSequence = nullptr;
-
-	m_TrackedRecorder = new TrackedRecorder(this);
+	m_TrackedRecorder = std::make_unique<TrackedRecorder>(this);
 	const char* setar = GetDataFromSettings(SETTING_AUTO_RETRACK);
-	m_AutoRetrack = setar == nullptr ? 0 : stoi(setar);
+	m_AutoRetrack = setar == nullptr ? 0 : std::stoi(setar);
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
-	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : stoi(setff) != 0);
+	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : std::stoi(setff) != 0);
 
-	m_TransitionLevel = new TransitionLevel(this);
+	m_TransitionLevel = std::make_unique<TransitionLevel>(this);
 	const char* settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
 	if (settl != nullptr)
 		LoadTransitionLevel(settl);
@@ -140,7 +148,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	}
 
 	const char* setac = GetDataFromSettings(SETTING_AMEND_CFL);
-	m_AmendCFL = setac == nullptr ? 1 : stoi(setac);
+	m_AmendCFL = setac == nullptr ? 1 : std::stoi(setac);
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
@@ -179,20 +187,12 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
-		(string("MTEPlugin loaded! For help please refer to ") + GITHUB_LINK).c_str(),
+		(std::string("MTEPlugin loaded! For help please refer to ") + GITHUB_LINK).c_str(),
 		1, 0, 0, 0, 0);
 }
 
 CMTEPlugIn::~CMTEPlugIn(void)
 {
-	while (!m_ScreenStack.empty()) {
-		delete m_ScreenStack.top();
-		m_ScreenStack.pop();
-	}
-	delete m_TransitionLevel;
-	delete m_TrackedRecorder;
-	DeleteDepartureSequence();
-	UnloadRouteChecker();
 	CancelCustomCursor();
 }
 
@@ -226,9 +226,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
 		if (!FlightPlan.IsValid()) break;
-		string remarks;
+		std::string remarks;
 		remarks = FlightPlan.GetFlightPlanData().GetRemarks();
-		if (remarks.find("RMK/") != string::npos || remarks.find("STS/") != string::npos)
+		if (remarks.find("RMK/") != std::string::npos || remarks.find("STS/") != std::string::npos)
 			sprintf_s(sItemString, 2, "*");
 		else
 			sprintf_s(sItemString, 2, " ");
@@ -254,21 +254,21 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int altref;
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
 		int dspAlt;
-		char tmpStr[16];
+		std::string tmpStr;
 		if (!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign())) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
-			sprintf_s(tmpStr, 5, "%04d", OVRFLW4(dspAlt));
+			tmpStr = std::format("{:04d}", OVRFLW4(dspAlt));
 		}
 		else {
 			dspAlt = (int)round(rdrAlt / 100.0);
-			sprintf_s(tmpStr, 4, "%03d", OVRFLW3(dspAlt));
+			tmpStr = std::format("{:03d}", OVRFLW3(dspAlt));
 		}
-		string dspStr = tmpStr;
+		std::string dspStr = tmpStr;
 		if (altref == AltitudeReference::ALT_REF_QNH) {
-			for (auto& c : dspStr) {
-				// use custom number mapping
-				c = m_CustomNumMap[int(c - '0')];
-			}
+			// use custom number mapping
+			std::transform(dspStr.begin(), dspStr.end(), dspStr.begin(), [&](auto& c) {
+				return m_CustomNumMap[int(c - '0')];
+				});
 		}
 		else if (altref == AltitudeReference::ALT_REF_QFE) {
 			dspStr = "(" + dspStr + ")";
@@ -278,26 +278,23 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break; }
 	case TAG_ITEM_TYPE_CFL_FLX: {
 		if (!FlightPlan.IsValid()) break;
-		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
-		switch (cflAlt)
-		{
-		case 2: // cleared for visual approach
-			sprintf_s(sItemString, 3, "VA");
-			break;
-		case 1: // cleared for ILS approach
-			sprintf_s(sItemString, 4, "ILS");
-			break;
-		case 0: { // no cleared level or CFL==RFL
-			if (!IsCFLAssigned(FlightPlan)) {
-				sprintf_s(sItemString, 5, "    ");
-				break;
-			}
-			else {
-				cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
-			}
-			[[fallthrough]];
+		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
+			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
-		default: {// have a cleared level
+		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+		if (cflAlt == 2) { // cleared for visual approach
+			sprintf_s(sItemString, 3, "VA");
+		}
+		else if (cflAlt == 1) { // cleared for ILS approach
+			sprintf_s(sItemString, 4, "ILS");
+		}
+		else if (cflAlt <= 0 && !IsCFLAssigned(FlightPlan)) { // no cleared level or CFL==RFL
+			// TODO: sometimes FlightPlan.GetControllerAssignedData().GetClearedAltitude() returns -1.
+			sprintf_s(sItemString, 5, "    ");
+		}
+		else { // have a cleared level
+			cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
 			int dspAlt;
 			int trslvl, elev;
 			bool isQFE = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev).size() && elev && cflAlt < trslvl;
@@ -322,14 +319,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
 			}
 			if (isQFE) {
-				string qfeAltStr = "(" + string(sItemString) + ")";
+				std::string qfeAltStr = "(" + std::string(sItemString) + ")";
 				strcpy_s(sItemString, qfeAltStr.size() + 1, qfeAltStr.c_str());
 			}
-			break; }
-		}
-		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
-			*pColorCode = TAG_COLOR_REDUNDANT;
-			// TODO: customization
 		}
 		break; }
 	case TAG_ITEM_TYPE_CFL_MTR: {
@@ -358,6 +350,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (m_TrackedRecorder->IsSimilarCallsign(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 3, "SC");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_CS_SIMILR, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
@@ -374,7 +367,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_RVSM_IND: {
 		if (!FlightPlan.IsValid()) break;
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
-		string acinf = fpdata.GetAircraftInfo();
+		std::string acinf = fpdata.GetAircraftInfo();
 		if (!strcmp(fpdata.GetPlanType(), "V"))
 			sprintf_s(sItemString, 2, "V");
 		else if (acinf.size() <= 8) { // assume FAA format
@@ -386,8 +379,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			}
 		}
 		else { // assume ICAO format
-			string acet;
-			if (acinf.find('(') != string::npos && acinf.find(')') != string::npos) { // () in string, for TopSky. e.g. A321/L (SDE2E3FGIJ1RWY/H)
+			std::string acet;
+			if (acinf.find('(') != std::string::npos && acinf.find(')') != std::string::npos) { // () in string, for TopSky. e.g. A321/L (SDE2E3FGIJ1RWY/H)
 				int lc = acinf.find('(');
 				int rc = acinf.find(')');
 				acet = acinf.substr(lc + 1, rc - lc);
@@ -395,7 +388,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			else { // no () in string, for erroneous simbrief prefile. e.g. A333/H-SDE3GHIJ2J3J5M1RVWXY/LB2D1
 				acet = acinf.substr(acinf.find('-') + 1);
 			}
-			if (acet.substr(0, acet.find('/')).find('W') != string::npos)
+			if (acet.substr(0, acet.find('/')).find('W') != std::string::npos)
 				sprintf_s(sItemString, 2, " ");
 			else
 				sprintf_s(sItemString, 2, "X");
@@ -406,6 +399,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsCommEstablished(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 2, "C");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_COMM_ESTAB, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_RECAT_BC: {
@@ -424,7 +418,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_RTE_CHECK: {
-		if (m_RouteChecker == nullptr ||
+		if (!m_RouteChecker ||
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
@@ -436,14 +430,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case RouteCheckerConstants::INVALID:
 			sprintf_s(sItemString, 3, "X ");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_RC_INVALID, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::PARTIAL_NO_LEVEL:
 			sprintf_s(sItemString, 3, "PL");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_NO_LEVEL:
 			sprintf_s(sItemString, 3, "YL");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_NO_LEVEL:
 			sprintf_s(sItemString, 3, "YL");
@@ -451,10 +448,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
 			sprintf_s(sItemString, 3, "P ");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_OK_LEVEL:
 			sprintf_s(sItemString, 3, "Y ");
 			*pColorCode = TAG_COLOR_REDUNDANT;
+			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_OK_LEVEL:
 			sprintf_s(sItemString, 3, "Y ");
@@ -468,26 +467,29 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (m_TrackedRecorder->IsSquawkDUPE(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 5, "DUPE");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_SQ_DUPE, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_DEP_SEQ: {
 		if (!FlightPlan.IsValid()) break;
-		if (m_DepartureSequence == nullptr) m_DepartureSequence = new DepartureSequence();
+		if (!m_DepartureSequence) m_DepartureSequence = std::make_unique<DepartureSequence>();
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq > 0)
 			sprintf_s(sItemString, 3, "%02d", OVRFLW2(seq));
 		else if (seq < 0) { // reconnected
 			sprintf_s(sItemString, 3, "--");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_DS_NUMBR, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_TIEM_TYPE_DEP_STS: {
 		if (!FlightPlan.IsValid()) break;
-		string gsts = FlightPlan.GetGroundState();
+		std::string gsts = FlightPlan.GetGroundState();
 		if (gsts.size()) {
 			sprintf_s(sItemString, gsts.size() + 1, gsts.c_str());
 			if (!FlightPlan.GetClearenceFlag()) {
 				*pColorCode = TAG_COLOR_INFORMATION;
+				GetColorDefinition(SETTING_COLOR_DS_STATE, pColorCode, pRGB);
 			}
 		}
 		else if (FlightPlan.GetClearenceFlag()) {
@@ -498,6 +500,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (FlightPlan.IsValid() && FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
 			sprintf_s(sItemString, 3, "RV");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_RDRV_IND, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_RCNT_IND: {
@@ -505,6 +508,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_TrackedRecorder->IsActive(FlightPlan)) {
 			sprintf_s(sItemString, 2, "r");
 			*pColorCode = TAG_COLOR_INFORMATION;
+			GetColorDefinition(SETTING_COLOR_RECONT_IND, pColorCode, pRGB);
 		}
 		break; }
 	case TAG_ITEM_TYPE_ASPD_BND: {
@@ -512,11 +516,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.GetControllerAssignedData().GetAssignedSpeed() &&
 			!FlightPlan.GetControllerAssignedData().GetAssignedMach())
 			break; // not assigned
-		string strip = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(7); // on (2, 3) of annotation
-		if (strip.find("/s+/") != string::npos) {
+		std::string strip = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(7); // on (2, 3) of annotation
+		if (strip.find("/s+/") != std::string::npos) {
 			sprintf_s(sItemString, 2, "+");
 		}
-		else if (strip.find("/s-/") != string::npos) {
+		else if (strip.find("/s-/") != std::string::npos) {
 			sprintf_s(sItemString, 2, "-");
 		}
 		break; }
@@ -552,7 +556,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			}
 			else if (tgtAlt > 2 && m_AmendCFL == 1) {
 				int trslvl, elev;
-				string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+				std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 				tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
 			}
 			FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
@@ -560,7 +564,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET_EDIT: {
 		if (!FlightPlan.IsValid() || !strlen(sItemString)) break;
-		string input = MakeUpper(sItemString);
+		std::string input = MakeUpper(sItemString);
 		if (input == "F") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
 			break;
@@ -571,11 +575,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		int tgtAlt = -1;
 		// use regular expressions to match input
-		regex rxfd("^F([0-9]+)\\.$");
-		regex rxf("^F([0-9]+)$");
-		regex rxd("^([0-9]+)\\.$");
-		regex rxn("^([0-9]+)$");
-		smatch match;
+		std::regex rxfd("^F([0-9]+)\\.$");
+		std::regex rxf("^F([0-9]+)$");
+		std::regex rxd("^([0-9]+)\\.$");
+		std::regex rxn("^([0-9]+)$");
+		std::smatch match;
 		if (regex_match(input, match, rxfd)) {
 			tgtAlt = stoi(match[1]);
 		}
@@ -590,7 +594,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		if (tgtAlt > 2 && m_AmendCFL == 1) {
 			int trslvl, elev;
-			string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+			std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 			tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
 		}
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
@@ -610,7 +614,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "CFL Menu", 1);
 
 		int copxAlt = FlightPlan.GetExitCoordinationAltitude();
-		string copxName = FlightPlan.GetExitCoordinationPointName();
+		std::string copxName = FlightPlan.GetExitCoordinationPointName();
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		int ref;
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, ref);
@@ -620,14 +624,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		if (elev) { // QFE in use
 			cflAlt -= cflAlt > 2 && cflAlt < trslvl ? elev : 0;
 			// remove unavailable altitudes from list
-			for (auto it = m_alt.begin(); it != m_alt.end();) {
-				if (it->altitude < trslvl && it->altitude + elev >= trslvl) {
-					it = m_alt.erase(it);
-				}
-				else {
-					it++;
-				}
-			}
+			std::erase_if(m_alt, [&](const auto& i) { return i.altitude < trslvl && i.altitude + elev >= trslvl; });
 		}
 		int cmpAlt = cflAlt <= 2 ? rdrAlt : cflAlt;
 		if (copxAlt > 0 && copxAlt != FlightPlan.GetFinalAltitude()) {
@@ -644,7 +641,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 					double nextD = prevPos.DistanceTo(ExtractedRoute.GetPointPosition(i));
 					dtRun += nextD;
 					prevPos = ExtractedRoute.GetPointPosition(i);
-					string nextName = ExtractedRoute.GetPointName(i);
+					std::string nextName = ExtractedRoute.GetPointName(i);
 					int nextAlt = ExtractedRoute.GetPointCalculatedProfileAltitude(i);
 					if (copxName == nextName && copxAlt == nextAlt) {
 						double dtReq = abs((double)(rdrAlt - copxAlt)) * 0.004713;
@@ -659,14 +656,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			}
 		}
 		// pre-select altitude
-		int minDif(100000), minAlt(0); // a big enough number
-		for (auto it = m_alt.begin(); it != m_alt.end(); it++) {
-			int dif = abs(it->altitude - cmpAlt);
-			if (dif < minDif) {
-				minDif = dif;
-				minAlt = it->altitude;
-			}
-		}
+		int minAlt = std::ranges::min_element(m_alt, {}, [&](const auto& a) { return abs(a.altitude - cmpAlt); })->altitude;
 		for (auto it = m_alt.rbegin(); it != m_alt.rend(); it++) {
 			if (it->altitude > 3) { // not NONE, ILS, VA, EDIT
 				AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_CFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
@@ -703,7 +693,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_RFL_SET_EDIT: {
 		if (!FlightPlan.IsValid() || !strlen(sItemString)) break;
 		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
-		string input = MakeUpper(sItemString);
+		std::string input = MakeUpper(sItemString);
 		if (input == "F") {
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
 			break;
@@ -712,9 +702,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), false);
 			break;
 		}
-		regex rxm("^([0-9]{1,3})$");
-		regex rxf("^F([0-9]{1,3})$");
-		smatch match;
+		std::regex rxm("^([0-9]{1,3})$");
+		std::regex rxf("^F([0-9]{1,3})$");
+		std::smatch match;
 		if (regex_match(input, match, rxf)) {
 			ctrData.SetFinalAltitude(stoi(match[1]) * 100);
 		}
@@ -731,15 +721,8 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "RFL Menu", 1);
 		// pre-select altitude
 		int rflAlt = FlightPlan.GetFinalAltitude();
-		int minDif(100000), minAlt(0); // a big enough number
 		auto m_alt = MetricAlt::GetMenuItems(!m_TrackedRecorder->IsForceFeet(FlightPlan.GetCallsign()), 0);
-		for (auto it = m_alt.begin(); it != m_alt.end(); it++) {
-			int dif = abs(it->altitude - rflAlt);
-			if (dif < minDif) {
-				minDif = dif;
-				minAlt = it->altitude;
-			}
-		}
+		int minAlt = std::ranges::min_element(m_alt, {}, [&](const auto& a) { return abs(a.altitude - rflAlt); })->altitude;
 		for (auto it = m_alt.rbegin(); it != m_alt.rend(); it++) {
 			if (it->altitude > 3) {
 				AddPopupListElement(it->entry.c_str(), nullptr, TAG_ITEM_FUNCTION_RFL_SET_MENU, it->altitude == minAlt, POPUP_ELEMENT_NO_CHECKBOX, false, false);
@@ -760,7 +743,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_SC_LIST: {
 		if (!FlightPlan.IsValid()) break;
-		string cs = FlightPlan.GetCallsign();
+		std::string cs = FlightPlan.GetCallsign();
 		if (!m_TrackedRecorder->IsSimilarCallsign(cs)) // not a SC
 			break;
 		OpenPopupList(Area, "SC List", 1);
@@ -781,7 +764,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 		break; }
 	case TAG_ITEM_FUNCTION_RTE_INFO: {
-		if (m_RouteChecker == nullptr ||
+		if (!m_RouteChecker ||
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
@@ -792,7 +775,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_DSQ_MENU: {
 		if (!FlightPlan.IsValid()) break;
-		if (m_DepartureSequence == nullptr) break;
+		if (!m_DepartureSequence) break;
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq <= 0) { // reconnected or completely new
 			m_DepartureSequence->AddFlight(FlightPlan);
@@ -874,13 +857,12 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 {
 	if (!FlightPlan.IsValid())
 		return;
-	m_TrackedRecorder->UpdateFlight(FlightPlan);
 	if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE) {
 		if (m_AmendCFL == 2) { // amend only when mode 2 (all) is set
 			int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 			if (cflAlt > 2) { // exclude ILS, VA, NONE
 				int trslvl, elev;
-				string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+				std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 				if (aptgt.size() && cflAlt < trslvl && elev > 0) {
 					cflAlt += elev; // convert QNH to QFE
 					m_AmendCFL = 0;
@@ -898,11 +880,12 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 			}
 		}
 	}
-	if (m_RouteChecker != nullptr &&
+	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
-		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
+		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
+		//m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
-	if (m_DepartureSequence != nullptr &&
+	if (m_DepartureSequence &&
 		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
@@ -911,15 +894,16 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		!strlen(FlightPlan.GetGroundState())) {
 		CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
 	}
+	m_TrackedRecorder->UpdateFlight(FlightPlan);
 }
 
 void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
 {
 	if (!FlightPlan.IsValid())
 		return;
-	if (m_RouteChecker != nullptr)
+	if (m_RouteChecker)
 		m_RouteChecker->RemoveCache(FlightPlan);
-	if (m_DepartureSequence != nullptr)
+	if (m_DepartureSequence)
 		m_DepartureSequence->EditSequence(FlightPlan, -1);
 	if (FlightPlan.GetTrackingControllerIsMe())
 		m_TrackedRecorder->UpdateFlight(FlightPlan, false);
@@ -929,8 +913,9 @@ void CMTEPlugIn::OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan)
 {
 	if (!FlightPlan.IsValid())
 		return;
-	if (m_RouteChecker != nullptr) {
-		m_RouteChecker->CheckFlightPlan(FlightPlan, true);
+	if (m_RouteChecker) {
+		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
+		//m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
 }
 
@@ -942,28 +927,28 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 		m_TrackedRecorder->UpdateFlight(RadarTarget);
 	}
 	else if (m_AutoRetrack) {
-		bool r = m_TrackedRecorder->SetTrackedData(RadarTarget);
-		if (r && m_AutoRetrack == 2) {
-			string msg = string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
+		if (m_TrackedRecorder->SetTrackedData(RadarTarget) && m_AutoRetrack == 2) {
+			std::string msg = std::string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
 			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
 		}
 	}
+	std::thread(&TransitionLevel::UpdateRadarPosition, m_TransitionLevel.get(), RadarTarget).detach();
 }
 
 CRadarScreen* CMTEPlugIn::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated)
 {
-	CMTEPScreen* screen = new CMTEPScreen();
+	auto screen = std::make_shared<CMTEPScreen>();
 	m_ScreenStack.push(screen);
-	return screen;
+	return screen.get();
 }
 
 bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 {
-	string cmd = sCommandLine;
-	smatch match; // all regular expressions will ignore cases
+	std::string cmd = sCommandLine;
+	std::smatch match; // all regular expressions will ignore cases
 
 	// custom cursor
-	regex rxcc("^.MTEP CURSOR (ON|OFF)$", regex_constants::icase);
+	std::regex rxcc("^.MTEP CURSOR (ON|OFF)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxcc)) {
 		CancelCustomCursor();
 		bool cc = MakeUpper(match[1].str()) == "ON";
@@ -974,34 +959,34 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// flightradar24 and variflight
-	regex rxfr("^.MTEP (FR24|VARI) ([A-Z]{4})$", regex_constants::icase);
+	std::regex rxfr("^.MTEP (FR24|VARI) ([A-Z]{4})$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxfr)) {
-		string airport = MakeUpper(match[2].str());
+		std::string airport = MakeUpper(match[2].str());
 		CSectorElement se = SectorFileElementSelectFirst(SECTOR_ELEMENT_AIRPORT);
 		for (; se.IsValid() && airport != se.GetName();
 			se = SectorFileElementSelectNext(se, SECTOR_ELEMENT_AIRPORT));
 		CPosition pos;
 		if (se.GetPosition(&pos, 0)) {
-			string url_full = MakeUpper(match[1].str()) == "FR24" ? \
-				"https://www.flightradar24.com/" + to_string(pos.m_Latitude) + "," + to_string(pos.m_Longitude) + "/9":\
-				"https://flightadsb.variflight.com/tracker/" + to_string(pos.m_Longitude) + "," + to_string(pos.m_Latitude) + "/9";
+			std::string url_full = MakeUpper(match[1].str()) == "FR24" ? \
+				"https://www.flightradar24.com/" + std::to_string(pos.m_Latitude) + "," + std::to_string(pos.m_Longitude) + "/9":\
+				"https://flightadsb.variflight.com/tracker/" + std::to_string(pos.m_Longitude) + "," + std::to_string(pos.m_Latitude) + "/9";
 			ShellExecute(NULL, "open", url_full.c_str(), NULL, NULL, SW_SHOW);
 			return true;
 		}
 	}
 
 	// load route checker
-	regex rxrc("^.MTEP RC (.+\\.CSV)$", regex_constants::icase);
+	std::regex rxrc("^.MTEP RC (.+\\.CSV)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxrc)) {
 		LoadRouteChecker(match[1].str());
 		SaveDataToSettings(SETTING_ROUTE_CHECKER_CSV, "route checker csv file", match[1].str().c_str());
-		return m_RouteChecker != nullptr;
+		return (bool)m_RouteChecker;
 	}
 
 	// route checker get route info
-	regex rxrcod("^.MTEP RC ([A-Z]{4}) ([A-Z]{4})$", regex_constants::icase);
+	std::regex rxrcod("^.MTEP RC ([A-Z]{4}) ([A-Z]{4})$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxrcod)) {
-		string msg = DisplayRouteMessage(MakeUpper(match[1].str()), MakeUpper(match[2].str()));
+		std::string msg = DisplayRouteMessage(MakeUpper(match[1].str()), MakeUpper(match[2].str()));
 		if (msg.size()) {
 			// clipboard operation
 			HGLOBAL hGlobal;
@@ -1017,23 +1002,23 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// delete departure sequence
-	regex rxds("^.MTEP DS RESET$", regex_constants::icase);
+	std::regex rxds("^.MTEP DS RESET$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxds)) {
 		DeleteDepartureSequence();
 		return true;
 	}
 
 	// reset tracked recorder
-	regex rxtr("^.MTEP TR RESET$", regex_constants::icase);
+	std::regex rxtr("^.MTEP TR RESET$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxtr)) {
 		ResetTrackedRecorder();
 		return true;
 	}
 
 	// set auto retrack
-	regex rxtrrt("^.MTEP TR ([0-2])$", regex_constants::icase);
+	std::regex rxtrrt("^.MTEP TR ([0-2])$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxtrrt)) {
-		string res = match[1].str();
+		std::string res = match[1].str();
 		const char* descr = "auto retrack mode";
 		if (res == "1") {
 			m_AutoRetrack = 1;
@@ -1054,9 +1039,9 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// set force feet
-	regex rxff("^.MTEP TR (F|M)$", regex_constants::icase);
+	std::regex rxff("^.MTEP TR (F|M)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxff)) {
-		string res = MakeUpper(match[1].str());
+		std::string res = MakeUpper(match[1].str());
 		const char* descr = "force feet";
 		if (res == "F") {
 			m_TrackedRecorder->ResetAltitudeUnit(true);
@@ -1072,56 +1057,56 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// load transition level
-	regex rxtl("^.MTEP TL (.+\\.CSV)$", regex_constants::icase);
+	std::regex rxtl("^.MTEP TL (.+\\.CSV)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxtl)) {
 		SaveDataToSettings(SETTING_TRANS_LVL_CSV, "transition levels csv file", match[1].str().c_str());
 		return LoadTransitionLevel(match[1].str());
 	}
 
 	// set transition level for single airport
-	regex rxtlt("^.MTEP ([A-Z]{4}) TL (S|F)(\\d+)$", regex_constants::icase);
-	regex rxtlb("^.MTEP ([A-Z]{4}) (QNH|QFE)$", regex_constants::icase);
-	regex rxtlr("^.MTEP ([A-Z]{4}) R (\\d+)$", regex_constants::icase);
+	std::regex rxtlt("^.MTEP ([A-Z]{4}) TL (S|F)(\\d+)$", std::regex_constants::icase);
+	std::regex rxtlb("^.MTEP ([A-Z]{4}) (QNH|QFE)$", std::regex_constants::icase);
+	std::regex rxtlr("^.MTEP ([A-Z]{4}) R (\\d+)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxtlt)) {
-		string airport = MakeUpper(match[1].str());
+		std::string airport = MakeUpper(match[1].str());
 		int tl = stoi(MakeUpper(match[3].str())) * 100;
 		if (MakeUpper(match[2].str()) == "S") {
 			tl = MetricAlt::LvlMtoFeet(tl);
 		}
 		if (m_TransitionLevel->SetAirportParam(airport, tl, -1, -1)) {
-			string msg = airport + ", transition level is set to " + to_string(tl) + " ft.";
+			std::string msg = airport + " - transition level is set to " + std::to_string(tl) + " ft.";
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}
 	}
 	if (regex_match(cmd, match, rxtlb)) {
-		string airport = MakeUpper(match[1].str());
+		std::string airport = MakeUpper(match[1].str());
 		bool qfe = MakeUpper(match[2].str()) == "QFE";
 		if (m_TransitionLevel->SetAirportParam(airport, -1, qfe, -1)) {
-			string msg = airport + ", altitude reference is set to " + string(qfe ? "QFE." : "QNH.");
+			std::string msg = airport + " - altitude reference is set to " + std::string(qfe ? "QFE." : "QNH.");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}
 	}
 	if (regex_match(cmd, match, rxtlr)) {
-		string airport = MakeUpper(match[1].str());
+		std::string airport = MakeUpper(match[1].str());
 		int r = stoi(match[2].str());
 		if (m_TransitionLevel->SetAirportParam(airport, -1, -1, r)) {
-			string msg = airport + ", QNH/QFE range is set to " + match[2].str() + " miles.";
+			std::string msg = airport + " - QNH/QFE range is set to " + match[2].str() + " miles.";
 			DisplayUserMessage("MESSAGE", "MTEPlugin", msg.c_str(), 1, 0, 0, 0, 0);
 			return true;
 		}
 	}
 
 	// load MetricAlt settings
-	regex rxma("^.MTEP MA (.+\\.TXT)$", regex_constants::icase);
+	std::regex rxma("^.MTEP MA (.+\\.TXT)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxma)) {
 		SaveDataToSettings(SETTING_TRANS_MALT_TXT, "altitude menu definition txt file", match[1].str().c_str());
 		return LoadMetricAltitude(match[1].str());
 	}
 
 	// set custom number mapping
-	regex rxnm("^.MTEP NUM ([\\S]{10})$", regex_constants::icase);
+	std::regex rxnm("^.MTEP NUM ([\\S]{10})$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxnm)) {
 		m_CustomNumMap = match[1].str();
 		SaveDataToSettings(SETTING_CUSTOM_NUMBER_MAP, "custom number mapping (0-9)", m_CustomNumMap.c_str());
@@ -1130,9 +1115,9 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// set amend QFE in CFL
-	regex rxac("^.MTEP QFE ([0-2])$", regex_constants::icase);
+	std::regex rxac("^.MTEP QFE ([0-2])$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxac)) {
-		string res = match[1].str();
+		std::string res = match[1].str();
 		const char* descr = "amend QFE in CFL";
 		if (res == "1") {
 			m_AmendCFL = 1;
@@ -1155,16 +1140,29 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	return false;
 }
 
-void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area)
+void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area)
 {
 	while (!m_ScreenStack.empty()) {
-		auto s = m_ScreenStack.top();
+		auto& s = m_ScreenStack.top();
 		if (s->m_Opened)
 			return s->StartTagFunction(sCallsign, nullptr, 0, nullptr, nullptr, FunctionId, Pt, Area);
 		else {
-			delete s;
+			s.reset();
 			m_ScreenStack.pop();
 		}
+	}
+}
+
+void CMTEPlugIn::GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB)
+{
+	// If setting is not present or invalid, it will not touch anything
+	unsigned int r(256), g(256), b(256);
+	auto settingValue = GetDataFromSettings(setting);
+	if (settingValue != nullptr && sscanf_s(settingValue, "%u:%u:%u", &r, &g, &b) != 3)
+		return;
+	if (r <= 255 && g <= 255 && b <= 255) {
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = RGB(r, g, b);
 	}
 }
 
@@ -1184,146 +1182,140 @@ void CMTEPlugIn::CancelCustomCursor(void)
 	m_CustomCursor = false;
 }
 
-void CMTEPlugIn::LoadRouteChecker(string filename)
+void CMTEPlugIn::LoadRouteChecker(const std::string& filename)
 {
-	UnloadRouteChecker();
-	if (filename[0] == '@') {
-		filename = GetAbsolutePath(filename.substr(1));
+	m_RouteChecker.reset();
+	std::string fn = filename;
+	if (fn[0] == '@') {
+		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		m_RouteChecker = new RouteChecker(this, filename);
+		m_RouteChecker = make_unique<RouteChecker>(this, fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker is loaded successfully. CSV file name: " + filename).c_str(),
+			("Route checker is loaded successfully. CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
-	catch (string e) {
+	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			("Route checker failed to load (" + e + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
-		UnloadRouteChecker();
+		m_RouteChecker.reset();
 	}
-	catch (exception e) {
+	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker failed to load (" + string(e.what()) + "). CSV file name: " + filename).c_str(),
+			("Route checker failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
-		UnloadRouteChecker();
+		m_RouteChecker.reset();
 	}
 }
 
 void CMTEPlugIn::UnloadRouteChecker(void)
 {
-	if (m_RouteChecker != nullptr) {
-		delete m_RouteChecker;
-		m_RouteChecker = nullptr;
-		DisplayUserMessage("MESSAGE", "MTEPlugin", "Route checker is unloaded!", 1, 0, 0, 0, 0);
-	}
+	m_RouteChecker.reset();
+	DisplayUserMessage("MESSAGE", "MTEPlugin", "Route checker is unloaded!", 1, 0, 0, 0, 0);
 }
 
 void CMTEPlugIn::DeleteDepartureSequence(void)
 {
-	if (m_DepartureSequence != nullptr) {
-		delete m_DepartureSequence;
-		m_DepartureSequence = nullptr;
-		DisplayUserMessage("MESSAGE", "MTEPlugin", "Departure sequence is deleted!", 1, 0, 0, 0, 0);
-	}
+	m_DepartureSequence.reset();
+	DisplayUserMessage("MESSAGE", "MTEPlugin", "Departure sequence is deleted!", 1, 0, 0, 0, 0);
 }
 
 void CMTEPlugIn::ResetTrackedRecorder(void)
 {
-	if (m_TrackedRecorder != nullptr)
-		delete m_TrackedRecorder;
-	m_TrackedRecorder = new TrackedRecorder(this);
+	m_TrackedRecorder.reset(new TrackedRecorder(this));
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
-	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : stoi(setff) != 0);
+	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : std::stoi(setff) != 0);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 
-bool CMTEPlugIn::LoadTransitionLevel(string filename)
+bool CMTEPlugIn::LoadTransitionLevel(const std::string& filename)
 {
-	if (filename[0] == '@') {
-		filename = GetAbsolutePath(filename.substr(1));
+	std::string fn = filename;
+	if (fn[0] == '@') {
+		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		m_TransitionLevel->LoadCSV(filename);
+		m_TransitionLevel->LoadCSV(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels are loaded successfully. CSV file name: " + filename).c_str(),
+			("Transition levels are loaded successfully. CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
-	catch (string e) {
+	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels failed to load (" + e + "). CSV file name: " + filename).c_str(),
+			("Transition levels failed to load (" + e + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
-		delete m_TransitionLevel;
-		m_TransitionLevel = new TransitionLevel(this);
+		m_TransitionLevel.reset(new TransitionLevel(this));
 		return false;
 	}
-	catch (exception e) {
+	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels failed to load (" + string(e.what()) + "). CSV file name: " + filename).c_str(),
+			("Transition levels failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
-		delete m_TransitionLevel;
-		m_TransitionLevel = new TransitionLevel(this);
+		m_TransitionLevel.reset(new TransitionLevel(this));
 		return false;
 	}
 	return true;
 }
 
-bool CMTEPlugIn::LoadMetricAltitude(string filename)
+bool CMTEPlugIn::LoadMetricAltitude(const std::string& filename)
 {
-	if (filename[0] == '@') {
-		filename = GetAbsolutePath(filename.substr(1));
+	std::string fn = filename;
+	if (fn[0] == '@') {
+		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		MetricAlt::LoadAltitudeDefinition(filename);
+		MetricAlt::LoadAltitudeDefinition(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions are loaded successfully. TXT file name: " + filename).c_str(),
+			("Altitude menu definitions are loaded successfully. TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
-	catch (string e) {
+	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions failed to load (" + e + "). TXT file name: " + filename).c_str(),
+			("Altitude menu definitions failed to load (" + e + "). TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		return false;
 	}
-	catch (exception e) {
+	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions failed to load (" + string(e.what()) + "). TXT file name: " + filename).c_str(),
+			("Altitude menu definitions failed to load (" + std::string(e.what()) + "). TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		return false;
 	}
 	return true;
 }
 
-string CMTEPlugIn::DisplayRouteMessage(string departure, string arrival)
+std::string CMTEPlugIn::DisplayRouteMessage(const std::string& departure, const std::string& arrival)
 {
-	if (m_RouteChecker == nullptr) return "";
+	if (!m_RouteChecker) return "";
 	auto rinfo = m_RouteChecker->GetRouteInfo(departure, arrival);
 	if (!rinfo.size()) return "";
-	string res = departure + "-" + arrival;
-	DisplayUserMessage("MTEP-Route", res.c_str(), (to_string(rinfo.size()) + " route(s):").c_str(), 1, 1, 0, 0, 0);
-	for (auto& ri : rinfo) {
+	std::string res = departure + "-" + arrival;
+	DisplayUserMessage("MTEP-Route", res.c_str(), (std::to_string(rinfo.size()) + " route(s):").c_str(), 1, 1, 0, 0, 0);
+	for (const auto& ri : rinfo) {
 		DisplayUserMessage("MTEP-Route", nullptr, ri.c_str(), 1, 0, 0, 0, 0);
 		res += "\n" + ri;
 	}
 	return res;
 }
 
-string MakeUpper(string str)
+std::string MakeUpper(const std::string& str)
 {
-	for (auto& c : str) c = toupper(c);
-	return str;
+	std::string res;
+	std::transform(str.begin(), str.end(), back_inserter(res), ::toupper);
+	return res;
 }
 
-string GetAbsolutePath(string relativePath)
+std::string GetAbsolutePath(const std::string& relativePath)
 {
 	// add DLL directory before relative path
 	if (pluginModule != nullptr) {
 		TCHAR pBuffer[MAX_PATH] = { 0 };
 		GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
-		string currentPath = pBuffer;
+		std::string currentPath = pBuffer;
 		return currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + relativePath;
 	}
-	return string();
+	return std::string();
 }
 
 int CalculateVerticalSpeed(CRadarTarget RadarTarget)
@@ -1347,7 +1339,7 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 	if (FlightPlan.IsValid() && strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
 		CRadarTarget RadarTarget = FlightPlan.GetCorrelatedRadarTarget();
 		if (RadarTarget.IsValid()) {
-			string squawk = RadarTarget.GetPosition().GetSquawk();
+			std::string squawk = RadarTarget.GetPosition().GetSquawk();
 			if (!(squawk == "7700" || squawk == "7600" || squawk == "7500" || !RadarTarget.GetPosition().GetTransponderC()))
 				return true;
 		}

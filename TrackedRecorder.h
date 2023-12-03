@@ -5,29 +5,25 @@
 #include "pch.h"
 #include "SimilarCallsign.h"
 
-using namespace std;
-
-
 class TrackedRecorder
 {
-
 public:
 	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
 	~TrackedRecorder(void);
-	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, bool online = true);
+	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
-	bool IsCommEstablished(string callsign);
-	void SetCommEstablished(string callsign);
-	bool IsCFLConfirmed(string callsign);
-	void SetCFLConfirmed(string callsign, bool confirmed = true);
-	bool IsForceFeet(string callsign);
-	void SetAltitudeUnit(string callsign, bool feet);
-	void ResetAltitudeUnit(bool feet);
-	bool IsSquawkDUPE(string callsign);
+	bool IsCommEstablished(const std::string& callsign);
+	void SetCommEstablished(const std::string& callsign);
+	bool IsCFLConfirmed(const std::string& callsign);
+	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
+	bool IsForceFeet(const std::string& callsign);
+	void SetAltitudeUnit(const std::string& callsign, const bool& feet);
+	void ResetAltitudeUnit(const bool& feet);
+	bool IsSquawkDUPE(const std::string& callsign);
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
-	bool IsSimilarCallsign(string callsign);
-	unordered_set<string> GetSimilarCallsigns(string callsign);
+	bool IsSimilarCallsign(const std::string& callsign);
+	std::unordered_set<std::string> GetSimilarCallsigns(const std::string& callsign);
 	bool SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
@@ -36,16 +32,16 @@ private:
 
 	typedef struct _AsD {
 		// in the order of SDK
-		string m_Squawk;
+		std::string m_Squawk;
 		int m_FinalAlt;
 		int m_ClearedAlt;
 		char m_CommType;
-		string m_ScratchPad;
+		std::string m_ScratchPad;
 		int m_Speed;
 		int m_Mach;
 		int m_Rate;
 		int m_Heading;
-		string m_DCTName;
+		std::string m_DCTName;
 
 		_AsD(EuroScopePlugIn::CFlightPlan _fp) :
 			m_Squawk(_fp.GetControllerAssignedData().GetSquawk()),
@@ -61,14 +57,14 @@ private:
 		{};
 	}AssignedData;
 	typedef struct _TkD {
-		string m_SystemID;
+		std::string m_SystemID;
 		bool m_Offline;
 		bool m_CommEstbed;
 		bool m_CFLConfirmed;
 		bool m_ForceFeet;
 		AssignedData m_AssignedData;
 
-		_TkD(string _sID, AssignedData _asd, bool _fft) :
+		_TkD(std::string _sID, AssignedData _asd, bool _fft) :
 			m_SystemID(_sID),
 			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true),
 			m_ForceFeet(_fft),
@@ -77,9 +73,10 @@ private:
 	}TrackedData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
-	unordered_map<string, TrackedData> m_TrackedMap; // callsign
-	unordered_map<string, unordered_set<string>> m_SCSetMap; // callsign
+	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign
+	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign
+	std::shared_mutex sc_mutex;
 
-	unordered_map<string, TrackedData>::iterator GetTrackedDataBySystemID(string systemID);
+	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(const std::string& systemID);
 	void RefreshSimilarCallsign(void);
 };

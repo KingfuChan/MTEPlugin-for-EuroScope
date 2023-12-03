@@ -18,8 +18,8 @@ void DepartureSequence::AddFlight(EuroScopePlugIn::CFlightPlan FlightPlan)
 		fsd.iterator->active = fsd.state == GetFPGroundState(FlightPlan);
 	}
 	else if (fsd.sequence == 0) {
-		string state = GetFPGroundState(FlightPlan);
-		string callsign = FlightPlan.GetCallsign();
+		std::string state = GetFPGroundState(FlightPlan);
+		std::string callsign = FlightPlan.GetCallsign();
 		m_SequenceListMap[state].push_back(SeqData{ callsign, true });
 	}
 }
@@ -33,7 +33,7 @@ int DepartureSequence::GetSequence(EuroScopePlugIn::CFlightPlan FlightPlan)
 		return -1;
 }
 
-void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, int seq)
+void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, const int& sequence)
 {
 	// if seq is -1, will deactivate flight; if seq is 0, will remove from list
 	FlightSeqData fsd = FindData(FlightPlan);
@@ -43,37 +43,39 @@ void DepartureSequence::EditSequence(EuroScopePlugIn::CFlightPlan FlightPlan, in
 		fsd.iterator->active = GetFPGroundState(FlightPlan) == fsd.state;
 		return;
 	}
-	if (seq < 0)
+	int seq = sequence;
+	if (seq < 0) {
 		fsd.iterator->active = false;
-	else if (seq == 0)
-		m_SequenceListMap[fsd.state].erase(fsd.iterator);
+	}
 	else {
-		m_SequenceListMap[fsd.state].erase(fsd.iterator);
-		auto itm = m_SequenceListMap[fsd.state].begin();
-		for (; itm != m_SequenceListMap[fsd.state].end() && seq > 1; seq -= itm->active, itm++);
-		m_SequenceListMap[fsd.state].insert(itm, SeqData{ fsd.callsign, true });
+		auto& in_list = m_SequenceListMap[fsd.state];
+		in_list.erase(fsd.iterator);
+		if (seq != 0) {
+			auto itm = std::find_if(in_list.begin(), in_list.end(), [&seq](const auto& s) {seq -= s.active; return seq < 1; });
+			in_list.insert(itm, SeqData{ fsd.callsign, true });
+		}
 	}
 }
 
 DepartureSequence::FlightSeqData DepartureSequence::FindData(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	// sequence == -1: inactive, 0: not found
-	for (auto& itm : m_SequenceListMap) {
+	for (auto& [state, state_list] : m_SequenceListMap) {
 		int seq = 0;
-		for (auto itl = itm.second.begin(); itl != itm.second.end(); itl++) {
+		for (auto itl = state_list.begin(); itl != state_list.end(); itl++) {
 			seq += itl->active;
 			if (itl->callsign == FlightPlan.GetCallsign()) {
 				seq = itl->active ? seq : -1;
-				return FlightSeqData{ itl->callsign, itm.first, seq, itl };
+				return FlightSeqData{ itl->callsign, state, seq, itl };
 			}
 		}
 	}
 	return FlightSeqData{ "", "NONE", 0, seq_list::iterator() };
 }
 
-string DepartureSequence::GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan)
+std::string DepartureSequence::GetFPGroundState(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	string s = FlightPlan.GetGroundState();
+	std::string s = FlightPlan.GetGroundState();
 	s = s.length() ? s : FlightPlan.GetClearenceFlag() ? "CLRD" : "NSTS";
 	return s;
 }

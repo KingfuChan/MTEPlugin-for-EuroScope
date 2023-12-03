@@ -12,7 +12,6 @@
 #include "TrackedRecorder.h"
 #include "TransitionLevel.h"
 
-using namespace std;
 using namespace EuroScopePlugIn;
 
 class CMTEPlugIn :
@@ -33,24 +32,25 @@ public:
 	virtual bool OnCompileCommand(const char* sCommandLine);
 
 private:
-	stack<CMTEPScreen*> m_ScreenStack; // for StartTagFunction
-	RouteChecker* m_RouteChecker;
-	DepartureSequence* m_DepartureSequence;
-	TrackedRecorder* m_TrackedRecorder;
-	TransitionLevel* m_TransitionLevel;
+	std::stack<std::shared_ptr<CMTEPScreen>> m_ScreenStack; // for StartTagFunction
+	std::unique_ptr<RouteChecker> m_RouteChecker;
+	std::unique_ptr<DepartureSequence> m_DepartureSequence;
+	std::unique_ptr<TrackedRecorder> m_TrackedRecorder;
+	std::unique_ptr<TransitionLevel> m_TransitionLevel;
 	bool m_CustomCursor;
 	int m_AutoRetrack; // 0: off (default); 1: silent; 2: notified.
-	string m_CustomNumMap; // 0-9
-	int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
+	std::string m_CustomNumMap; // 0-9
+	std::atomic_int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
-	void CallNativeItemFunction(const char* sCallsign, int FunctionId, POINT Pt, RECT Area);
+	void CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area);
+	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
-	void LoadRouteChecker(string filename);
+	void LoadRouteChecker(const std::string& filename);
 	void UnloadRouteChecker(void);
 	void DeleteDepartureSequence(void);
 	void ResetTrackedRecorder(void);
-	bool LoadTransitionLevel(string filename);
-	bool LoadMetricAltitude(string filename);
-	string DisplayRouteMessage(string departure, string arrival);
+	bool LoadTransitionLevel(const std::string& filename);
+	bool LoadMetricAltitude(const std::string& filename);
+	std::string DisplayRouteMessage(const std::string& departure, const std::string& arrival);
 };

@@ -3,12 +3,10 @@
 #include "pch.h"
 #include "TransitionLevel.h"
 
-const int DISTANCE_THRESHOLD = 50; // nautical miles, for airport nearest RadarTarget
-
 TransitionLevel::TransitionLevel(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
-	m_DefaultLevel = m_PluginPtr->GetTransitionAltitude();
+	m_DefaultLevel = 0;
 	m_MaxLevel = 0;
 }
 
@@ -16,31 +14,32 @@ TransitionLevel::~TransitionLevel(void)
 {
 }
 
-void TransitionLevel::LoadCSV(string filename)
+void TransitionLevel::LoadCSV(const std::string& filename)
 {
+	std::unique_lock dlock(data_mutex);
 	m_AirportMap.clear();
-	m_DefaultLevel = m_PluginPtr->GetTransitionAltitude();
+	m_DefaultLevel = 0;
 	m_MaxLevel = 0;
 	int asteroid_level = 0;
 	int asteroid_range = 0;
 
 	// external file
-	ifstream inFile;
-	inFile.open(filename, ios::in);
+	std::ifstream inFile;
+	inFile.open(filename, std::ios::in);
 	if (!inFile.is_open()) // unable to open file
 	{
-		throw string("unable to open file");
+		throw std::string("unable to open file");
 	}
-	string line;
+	std::string line;
 	getline(inFile, line);
 	if (line != "Ident,TransLevel,Elevation,IsQFE,Range,Boundary") { // confirm header
 		inFile.close();
-		throw string("invalid column names");
+		throw std::string("invalid column names");
 	}
 	try {
 		while (getline(inFile, line)) {
-			istringstream ssin(line);
-			string apid, lvlstr, elevstr, qfestr, rngstr, bndstr;
+			std::istringstream ssin(line);
+			std::string apid, lvlstr, elevstr, qfestr, rngstr, bndstr;
 			getline(ssin, apid, ',');
 			getline(ssin, lvlstr, ',');
 			getline(ssin, elevstr, ',');
@@ -57,8 +56,8 @@ void TransitionLevel::LoadCSV(string filename)
 			sscanf_s(elevstr.c_str(), "%d", &elevft);
 			sscanf_s(qfestr.c_str(), "%d", &isqfe);
 			sscanf_s(rngstr.c_str(), "%d", &rngnm);
-			istringstream bdin(bndstr);
-			string ordstr;
+			std::istringstream bdin(bndstr);
+			std::string ordstr;
 			pos_vec bndvec;
 			while (bdin >> ordstr) {
 				double lon(0), lat(0);
@@ -91,6 +90,9 @@ void TransitionLevel::LoadCSV(string filename)
 		inFile.close();
 		throw;
 	}
+	if (m_AirportMap.empty()) {
+		throw std::string("no valid airport definitions");
+	}
 
 	// sector file
 	for (auto se = m_PluginPtr->SectorFileElementSelectFirst(EuroScopePlugIn::SECTOR_ELEMENT_AIRPORT);
@@ -111,12 +113,69 @@ void TransitionLevel::LoadCSV(string filename)
 	}
 }
 
+void TransitionLevel::UpdateRadarPosition(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	if (!RadarTarget.IsValid()) return;
+	std::shared_lock dlock(data_mutex);
+	if (m_AirportMap.empty() || !RadarTarget.IsValid()) return;
+	std::string sysID = RadarTarget.GetSystemID();
+	auto pos = RadarTarget.GetPosition().GetPosition();
+	// look up in cache and check validity
+	{
+		std::shared_lock clock(cache_mutex);
+		auto cached = m_RadarCache.find(sysID);
+		if (cached != m_RadarCache.end()) {
+			auto apitr = m_AirportMap.find(cached->second);
+			if (apitr != m_AirportMap.end()) {
+				if (IsinQNHBoundary(pos, apitr->second)) {
+					return; // no need to refresh
+				}
+			}
+		}
+	}
+	// use flight plan info
+	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+	if (FlightPlan.IsValid()) {
+		// check the closer one of origin/destination
+		std::string adep = FlightPlan.GetFlightPlanData().GetOrigin();
+		std::string aarr = FlightPlan.GetFlightPlanData().GetDestination();
+		double ddep = FlightPlan.GetDistanceFromOrigin();
+		double darr = FlightPlan.GetDistanceToDestination();
+		std::string acls = ddep < darr ? adep : aarr;
+		auto icls = m_AirportMap.find(acls);
+		if (icls != m_AirportMap.end() && IsinQNHBoundary(pos, icls->second)) {
+			std::unique_lock clock(cache_mutex);
+			m_RadarCache[sysID] = acls;
+			return;
+		}
+	}
+	// sort closest airport and check boundary
+	std::map<double, std::string> distance_airports;
+	for (const auto& ap : m_AirportMap) {
+		double d = ap.second.position.DistanceTo(pos);
+		distance_airports[d] = ap.first;
+	}
+	for (const auto& dstap : distance_airports) {
+		auto apitr = m_AirportMap.find(dstap.second);
+		if (IsinQNHBoundary(pos, apitr->second)) {
+			std::unique_lock clock(cache_mutex);
+			m_RadarCache[sysID] = dstap.second;
+			return;
+		}
+	}
+	{	// no match
+		std::unique_lock clock(cache_mutex);
+		m_RadarCache.erase(sysID);
+	}
+}
+
 int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget RadarTarget, int& reference)
 {
 	// returns radar display altitude and assign reference AltitudeReference::ALT_REF_xxx
 	if (!RadarTarget.IsValid()) return 0;
 	int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
 	int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
+	std::shared_lock dlock(data_mutex);
 	if (m_AirportMap.empty()) {
 		if (stdAlt >= m_PluginPtr->GetTransitionAltitude()) {
 			reference = AltitudeReference::ALT_REF_QNE;
@@ -127,30 +186,36 @@ int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget Radar
 			return qnhAlt;
 		}
 	}
-	if (stdAlt >= m_MaxLevel) {
+	else if (stdAlt >= m_MaxLevel) {
 		reference = AltitudeReference::ALT_REF_QNE;
 		return stdAlt;
 	}
-	apmap_iter apitr = GetTargetAirport(RadarTarget);
-	if (apitr == m_AirportMap.end()) { // no boundary match
-		if (stdAlt >= m_DefaultLevel) {
-			reference = AltitudeReference::ALT_REF_QNE;
-			return stdAlt;
-		}
-		else {
-			reference = AltitudeReference::ALT_REF_QNH;
-			return qnhAlt;
+	else { // use cache only
+		std::shared_lock clock(cache_mutex);
+		auto cached = m_RadarCache.find(RadarTarget.GetSystemID());
+		if (cached != m_RadarCache.end()) {
+			auto apitr = m_AirportMap.find(cached->second);
+			if (apitr != m_AirportMap.end()) {
+				int trslvl = apitr->second.trans_level > 0 ? apitr->second.trans_level : m_PluginPtr->GetTransitionAltitude();
+				if (stdAlt >= trslvl) {
+					reference = AltitudeReference::ALT_REF_QNE;
+					return stdAlt;
+				}
+				else if (apitr->second.is_QFE) {
+					reference = AltitudeReference::ALT_REF_QFE;
+					return qnhAlt - apitr->second.elevation;
+				}
+				else {
+					reference = AltitudeReference::ALT_REF_QNH;
+					return qnhAlt;
+				}
+			}
 		}
 	}
-	// match boundary/range
-	int trslvl = apitr->second.trans_level > 0 ? apitr->second.trans_level : m_PluginPtr->GetTransitionAltitude();
-	if (stdAlt >= trslvl) {
+	// no boundary match
+	if (stdAlt >= m_DefaultLevel) {
 		reference = AltitudeReference::ALT_REF_QNE;
 		return stdAlt;
-	}
-	else if (apitr->second.is_QFE) {
-		reference = AltitudeReference::ALT_REF_QFE;
-		return qnhAlt - apitr->second.elevation;
 	}
 	else {
 		reference = AltitudeReference::ALT_REF_QNH;
@@ -158,25 +223,39 @@ int TransitionLevel::GetRadarDisplayAltitude(EuroScopePlugIn::CRadarTarget Radar
 	}
 }
 
-string TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation)
+std::string TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan, int& trans_level, int& elevation)
 {
 	// returns airport ident and sets trans_level, elevation. Elevation will be 0 if not QFE. Doesn't consider altitude.
-	apmap_iter apitr = GetTargetAirport(FlightPlan);
-	if (apitr != m_AirportMap.end()) {
-		trans_level = apitr->second.trans_level > 0 ? apitr->second.trans_level : m_PluginPtr->GetTransitionAltitude();
-		elevation = apitr->second.is_QFE ? apitr->second.elevation : 0;
-		return apitr->first;
+	auto RadarTarget = FlightPlan.GetCorrelatedRadarTarget();
+	std::shared_lock dlock(data_mutex);
+	if (!RadarTarget.IsValid() || m_AirportMap.empty()) {
+		trans_level = !m_AirportMap.empty() && m_DefaultLevel > 0 ? m_DefaultLevel : m_PluginPtr->GetTransitionAltitude();
+		elevation = 0;
+		return std::string();
+	}
+	else {
+		std::shared_lock clock(cache_mutex);
+		auto cached = m_RadarCache.find(RadarTarget.GetSystemID());
+		if (cached != m_RadarCache.end()) {
+			auto apitr = m_AirportMap.find(cached->second);
+			if (apitr != m_AirportMap.end()) {
+				trans_level = apitr->second.trans_level > 0 ? apitr->second.trans_level : m_PluginPtr->GetTransitionAltitude();
+				elevation = apitr->second.is_QFE ? apitr->second.elevation : 0;
+				return apitr->first;
+			}
+		}
 	}
 	// not found, default values
 	trans_level = m_DefaultLevel;
 	elevation = 0;
-	return string();
+	return std::string();
 }
 
-bool TransitionLevel::SetAirportParam(string airport, int trans_level, int isQFE, int range)
+bool TransitionLevel::SetAirportParam(const std::string& airport, const int trans_level, const int isQFE, const int range)
 {
 	// default to -1 for ignoring. isQFE=0 means QNH, trans_level in feet, range in nm
-	apmap_iter apitr = m_AirportMap.find(airport);
+	std::unique_lock dlock(data_mutex);
+	auto apitr = m_AirportMap.find(airport);
 	if (apitr != m_AirportMap.end()) {
 		if (trans_level > 0)
 			apitr->second.trans_level = trans_level;
@@ -189,70 +268,24 @@ bool TransitionLevel::SetAirportParam(string airport, int trans_level, int isQFE
 	return false;
 }
 
-TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CFlightPlan FlightPlan)
-{
-	if (m_AirportMap.empty() || !FlightPlan.IsValid())
-		return m_AirportMap.end();
-	string callsign = FlightPlan.GetCallsign();
-	auto curPos = FlightPlan.GetFPTrackPosition().GetPosition();
-	string adep = FlightPlan.GetFlightPlanData().GetOrigin();
-	string aarr = FlightPlan.GetFlightPlanData().GetDestination();
-	double ddep = FlightPlan.GetDistanceFromOrigin();
-	double darr = FlightPlan.GetDistanceToDestination();
-
-	string acls = ddep < darr ? adep : aarr;
-	apmap_iter icls = m_AirportMap.find(acls);
-	if (icls != m_AirportMap.end() && IsinQNHBoundary(curPos, icls)) {
-		return icls;
-	}
-	else {
-		string afar = ddep > darr ? adep : aarr;
-		apmap_iter ifar = m_AirportMap.find(afar);
-		if (ifar != m_AirportMap.end() && IsinQNHBoundary(curPos, ifar)) {
-			return ifar;
-		}
-	}
-	return GetTargetAirport(curPos);
-}
-
-TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CRadarTarget RadarTarget)
-{
-	if (m_AirportMap.empty() || !RadarTarget.IsValid())
-		return m_AirportMap.end();
-	if (RadarTarget.GetCorrelatedFlightPlan().IsValid()) {
-		return GetTargetAirport(RadarTarget.GetCorrelatedFlightPlan());
-	}
-	else {
-		return GetTargetAirport(RadarTarget.GetPosition().GetPosition());
-	}
-}
-
-TransitionLevel::apmap_iter TransitionLevel::GetTargetAirport(EuroScopePlugIn::CPosition Position)
-{
-	apmap_iter apitr = m_AirportMap.begin();
-	for (; apitr != m_AirportMap.end() && !IsinQNHBoundary(Position, apitr);
-		apitr++);
-	return apitr;
-}
-
-bool TransitionLevel::IsinQNHBoundary(EuroScopePlugIn::CPosition pos, apmap_iter airport_iter)
+bool TransitionLevel::IsinQNHBoundary(const EuroScopePlugIn::CPosition pos, const AirportData airport_data)
 {
 	// only considers lateral boundary, need to check iter's validity before calling
 	// by range
-	if (airport_iter->second.in_sector && airport_iter->second.range) {
-		double distance = pos.DistanceTo(airport_iter->second.position);
-		if (distance < (double)airport_iter->second.range) {
+	if (airport_data.in_sector && airport_data.range) {
+		double distance = pos.DistanceTo(airport_data.position);
+		if (distance < (double)airport_data.range) {
 			return true;
 		}
 	}
 
 	// by boundary check
-	pos_vec boundary = airport_iter->second.boundary;
+	pos_vec boundary = airport_data.boundary;
 	if (boundary.empty())
 		return false;
-	vector<double> directions;
+	std::vector<double> directions;
 	for (size_t i = 0; i < boundary.size(); directions.push_back(pos.DirectionTo(boundary[i++])));
-	vector<double> angles;
+	std::vector<double> angles;
 	for (size_t i = 0; i < directions.size(); i++) {
 		size_t j = i + 1 < directions.size() ? i + 1 : 0;
 		double a = directions[j] - directions[i];
