@@ -1,14 +1,16 @@
 ﻿// MTEPlugin.cpp
 
+#pragma once
+
 #include "pch.h"
 #include "Version.h"
 #include "MTEPlugin.h"
 
 #ifndef COPYRIGHTS
-#define PLUGIN_NAME "MTEPlugin"
-#define PLUGIN_AUTHOR "Kingfu Chan"
-#define PLUGIN_COPYRIGHT "MIT License, Copyright (c) 2022 Kingfu Chan"
-#define GITHUB_LINK "https://github.com/KingfuChan/MTEPlugin-for-EuroScope"
+constexpr auto PLUGIN_NAME = "MTEPlugin";
+constexpr auto PLUGIN_AUTHOR = "Kingfu Chan";
+constexpr auto PLUGIN_COPYRIGHT = "MIT License, Copyright (c) 2022 Kingfu Chan";
+constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroScope";
 #endif // !COPYRIGHTS
 
 // TAG ITEM TYPE
@@ -55,36 +57,36 @@ const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registered)
 const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
 
 // COMPUTERISING RELATED
-constexpr double KN_KPH(const double& k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
-constexpr double KPH_KN(const double& k) { return k / 1.85184; } // 1.85184 kph = 1 knot
-constexpr int OVRFLW2(const int& t) { return t > 99 || t < 0 ? 99 : t; } // overflow pre-process 2 digits
-constexpr int OVRFLW3(const int& t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
-constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
+static constexpr double KN_KPH(const double& k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
+static constexpr double KPH_KN(const double& k) { return k / 1.85184; } // 1.85184 kph = 1 knot
+static constexpr int OVRFLW2(const int& t) { return t > 99 || t < 0 ? 99 : t; } // overflow pre-process 2 digits
+static constexpr int OVRFLW3(const int& t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
+static constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
 inline std::string MakeUpper(const std::string& str);
 inline std::string GetAbsolutePath(const std::string& relativePath);
 inline int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 inline bool IsCFLAssigned(CFlightPlan FlightPlan);
 
 // SETTING NAMES
-const char* SETTING_CUSTOM_CURSOR = "CustomCursor";
-const char* SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
-const char* SETTING_AUTO_RETRACK = "AutoRetrack";
-const char* SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9";
-const char* SETTING_TRANS_LVL_CSV = "TransLevelCSV";
-const char* SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
-const char* SETTING_AMEND_CFL = "AmendQFEinCFL";
-const char* SETTING_FORCE_FEET = "ForceFeet";
+constexpr auto SETTING_CUSTOM_CURSOR = "CustomCursor";
+constexpr auto SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV";
+constexpr auto SETTING_AUTO_RETRACK = "AutoRetrack";
+constexpr auto SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9";
+constexpr auto SETTING_TRANS_LVL_CSV = "TransLevelCSV";
+constexpr auto SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
+constexpr auto SETTING_AMEND_CFL = "AmendQFEinCFL";
+constexpr auto SETTING_FORCE_FEET = "ForceFeet";
 // COLOR DEFINITIONS
-const char* SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
-const char* SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
-const char* SETTING_COLOR_COMM_ESTAB = "Color/CommNoEstablish";
-const char* SETTING_COLOR_RC_INVALID = "Color/RouteInvalid";
-const char* SETTING_COLOR_RC_UNCERTN = "Color/RouteUncertain";
-const char* SETTING_COLOR_SQ_DUPE = "Color/SquawkDupe";
-const char* SETTING_COLOR_DS_NUMBR = "Color/DSRestore";
-const char* SETTING_COLOR_DS_STATE = "Color/DSNotCleared";
-const char* SETTING_COLOR_RDRV_IND = "Color/RadarVector";
-const char* SETTING_COLOR_RECONT_IND = "Color/Reconnected";
+constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
+constexpr auto SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
+constexpr auto SETTING_COLOR_COMM_ESTAB = "Color/CommNoEstablish";
+constexpr auto SETTING_COLOR_RC_INVALID = "Color/RouteInvalid";
+constexpr auto SETTING_COLOR_RC_UNCERTN = "Color/RouteUncertain";
+constexpr auto SETTING_COLOR_SQ_DUPE = "Color/SquawkDupe";
+constexpr auto SETTING_COLOR_DS_NUMBR = "Color/DSRestore";
+constexpr auto SETTING_COLOR_DS_STATE = "Color/DSNotCleared";
+constexpr auto SETTING_COLOR_RDRV_IND = "Color/RadarVector";
+constexpr auto SETTING_COLOR_RECONT_IND = "Color/Reconnected";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
