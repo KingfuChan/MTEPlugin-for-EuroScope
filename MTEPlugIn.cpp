@@ -205,6 +205,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	if (!FlightPlan.IsValid() && !RadarTarget.IsValid())
 		return;
 
+	if (GetAsyncKeyState(VK_MENU)) { // keyboard alt is pressed
+		// set ForceFeet for 10s
+	}
+
 	switch (ItemCode)
 	{
 	case TAG_ITEM_TYPE_GS_W_IND: {
@@ -885,7 +889,6 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
 		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
-		//m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
 	if (m_DepartureSequence &&
 		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
@@ -917,7 +920,6 @@ void CMTEPlugIn::OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan)
 		return;
 	if (m_RouteChecker) {
 		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
-		//m_RouteChecker->CheckFlightPlan(FlightPlan, true);
 	}
 }
 

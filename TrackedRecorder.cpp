@@ -6,16 +6,19 @@
 TrackedRecorder::TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
-	m_DefaultFeet = false;
+	sc_Thread = std::jthread(&TrackedRecorder::SimilarCallsignThread, this, sc_StopSrc.get_token());
 }
 
 TrackedRecorder::~TrackedRecorder(void)
 {
+	sc_StopSrc.request_stop();
+	sc_Thread.join();
 }
 
 void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online)
 {
 	// Pass online=false to deactivate when disconnecting.
+	if (m_SuppressUpdate == true) return;
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
 	if (r != m_TrackedMap.end()) {
 		if (FlightPlan.GetTrackingControllerIsMe()) {
@@ -48,6 +51,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, cons
 void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
 	// Only useful if correlated.
+	if (m_SuppressUpdate == true) return;
 	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
 	if (!FlightPlan.IsValid())
 		return;
@@ -161,13 +165,13 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 
 bool TrackedRecorder::IsSimilarCallsign(const std::string& callsign)
 {
-	std::shared_lock lock(sc_mutex);
+	std::shared_lock lock(sc_Mutex);
 	return m_SCSetMap.find(callsign) != m_SCSetMap.end();
 }
 
 std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(const std::string& callsign)
 {
-	std::shared_lock lock(sc_mutex);
+	std::shared_lock lock(sc_Mutex);
 	auto f = m_SCSetMap.find(callsign);
 	if (f != m_SCSetMap.end())
 		return f->second;
@@ -189,8 +193,9 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 		}
 	}
 	// flight plan
-	trd->second.m_Offline = true; // prevent following assigns removing
-	AssignedData tad(trd->second.m_AssignedData);
+	m_SuppressUpdate = true; // protect it from removing by following assigns
+	TrackedData trd1 = trd->second;
+	AssignedData tad(trd1.m_AssignedData);
 	auto asd = FlightPlan.GetControllerAssignedData();
 	asd.SetSquawk(tad.m_Squawk.c_str());
 	asd.SetFinalAltitude(tad.m_FinalAlt);
@@ -206,8 +211,13 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 		asd.SetAssignedHeading(tad.m_Heading);
 	else if (tad.m_DCTName.size())
 		asd.SetDirectToPointName(tad.m_DCTName.c_str());
-	trd->second.m_Offline = false;
+	for (size_t i = 0; i < 9; i++) {
+		asd.SetFlightStripAnnotation(i, tad.m_StripAnno[i].c_str());
+	}
+	trd1.m_Offline = false;
+	trd->second = trd1;
 	RefreshSimilarCallsign();
+	m_SuppressUpdate = false;
 	return FlightPlan.StartTracking();
 }
 
@@ -237,35 +247,62 @@ std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedR
 
 void TrackedRecorder::RefreshSimilarCallsign(void)
 {
-	std::thread threadRefresh([&] {
-		std::unique_lock lock(sc_mutex);
-		m_SCSetMap.clear();
-		std::unordered_set<std::string> setENG, setCHN;
-		for (const auto& [c, d] : m_TrackedMap) {
-			if (d.m_Offline || d.m_AssignedData.m_CommType == 'T') continue;
-			std::string cal = c.substr(0, 3);
-			if (m_CHNCallsign.find(cal) != m_CHNCallsign.end()) {
-				std::string scratch = d.m_AssignedData.m_ScratchPad;
-				transform(scratch.begin(), scratch.end(), scratch.begin(), ::toupper);
-				size_t epos = scratch.find("EN");
-				if (epos != std::string::npos && epos > 0) {
-					if (std::string("*/\\.").find(scratch[epos - 1]) != std::string::npos) {
+	sc_NeedRefresh = true;
+	sc_CondVar.notify_all();
+}
+
+void TrackedRecorder::SimilarCallsignThread(std::stop_token stoken)
+{
+	std::mutex t_mutex;
+	while (!stoken.stop_requested()) {
+		std::unique_lock t_lock(t_mutex);
+		sc_CondVar.wait(t_lock, stoken, [&] {
+			return sc_NeedRefresh || stoken.stop_requested();
+			});
+		sc_NeedRefresh = false;
+		if (!stoken.stop_requested()) {
+			// go on to refresh
+			std::unique_lock lock(sc_Mutex);
+			m_SCSetMap.clear();
+			std::unordered_set<std::string> setENG, setCHN;
+			for (const auto& [c, d] : m_TrackedMap) {
+				if (d.m_Offline ||
+					toupper(d.m_AssignedData.m_CommType) == 'T') {
+					continue;
+				}
+				std::string cal = c.substr(0, 3);
+				if (m_CHNCallsign.contains(cal)) {
+					std::string scratch = d.m_AssignedData.m_ScratchPad;
+					transform(scratch.begin(), scratch.end(), scratch.begin(), ::toupper);
+					size_t epos = scratch.find("EN");
+					if (epos != std::string::npos) {
+						char delim_l = epos > 0 ? scratch[epos - 1] : '\0';
+						char delim_r = epos + 2 < scratch.size() ? scratch[epos + 2] : '\0';
+						if (m_EngDelimiter.find(delim_l) != std::string::npos ||
+							m_EngDelimiter.find(delim_r) != std::string::npos) {
+							setENG.insert(c);
+						}
+						else {
+							setCHN.insert(c);
+						}
+					}
+					else {
 						setCHN.insert(c);
-						continue;
+					}
+				}
+				else {
+					setENG.insert(c);
+				}
+			}
+			for (const auto& cset : { setENG,setCHN }) {
+				for (const auto& c1 : cset) {
+					for (const auto& c2 : cset) {
+						if (c1 != c2 && CompareCallsign(c1, c2)) {
+							m_SCSetMap[c1].insert(c2);
+						}
 					}
 				}
 			}
-			setENG.insert(c);
 		}
-		for (const auto& cset : { setENG,setCHN }) {
-			for (const auto& c1 : cset) {
-				for (const auto& c2 : cset) {
-					if (c1 != c2 && CompareCallsign(c1, c2)) {
-						m_SCSetMap[c1].insert(c2);
-					}
-				}
-			}
-		}
-		});
-	threadRefresh.detach();
+	}
 }

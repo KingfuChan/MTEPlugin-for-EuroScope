@@ -10,6 +10,7 @@ class TrackedRecorder
 public:
 	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
 	~TrackedRecorder(void);
+
 	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
 	bool IsCommEstablished(const std::string& callsign);
@@ -28,7 +29,8 @@ public:
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 private:
-	bool m_DefaultFeet;
+	bool m_DefaultFeet = false;
+	bool m_SuppressUpdate = false;
 
 	typedef struct _AsD {
 		// in the order of SDK
@@ -42,20 +44,26 @@ private:
 		int m_Rate;
 		int m_Heading;
 		std::string m_DCTName;
+		std::array<std::string, 9> m_StripAnno;
 
-		_AsD(EuroScopePlugIn::CFlightPlan _fp) :
-			m_Squawk(_fp.GetControllerAssignedData().GetSquawk()),
-			m_FinalAlt(_fp.GetFinalAltitude()),
-			m_ClearedAlt(_fp.GetControllerAssignedData().GetClearedAltitude()),
-			m_CommType(_fp.IsTextCommunication() ? 'T' : _fp.GetControllerAssignedData().GetCommunicationType()),
-			m_ScratchPad(_fp.GetControllerAssignedData().GetScratchPadString()),
-			m_Speed(_fp.GetControllerAssignedData().GetAssignedSpeed()),
-			m_Mach(_fp.GetControllerAssignedData().GetAssignedMach()),
-			m_Rate(_fp.GetControllerAssignedData().GetAssignedRate()),
-			m_Heading(_fp.GetControllerAssignedData().GetAssignedHeading()),
-			m_DCTName(_fp.GetControllerAssignedData().GetDirectToPointName())
-		{};
+		_AsD(EuroScopePlugIn::CFlightPlan _fp) {
+			auto a = _fp.GetControllerAssignedData();
+			m_Squawk = a.GetSquawk();
+			m_FinalAlt = a.GetFinalAltitude();
+			m_ClearedAlt = a.GetClearedAltitude();
+			m_CommType = a.GetCommunicationType();
+			m_ScratchPad = a.GetScratchPadString();
+			m_Speed = a.GetAssignedSpeed();
+			m_Mach = a.GetAssignedMach();
+			m_Rate = a.GetAssignedRate();
+			m_Heading = a.GetAssignedHeading();
+			m_DCTName = a.GetDirectToPointName();
+			for (size_t i = 0; i < 9; i++) {
+				m_StripAnno[i] = a.GetFlightStripAnnotation(i);
+			}
+		};
 	}AssignedData;
+
 	typedef struct _TkD {
 		std::string m_SystemID;
 		bool m_Offline;
@@ -73,10 +81,19 @@ private:
 	}TrackedData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
-	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign
-	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign
-	std::shared_mutex sc_mutex;
+	// track map
+	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign -> TrackedData
+	std::shared_mutex tr_Mutex;
+	// for similar callsign
+	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign -> set<callsign>
+	std::shared_mutex sc_Mutex;
+	// callsign threading
+	std::jthread sc_Thread;
+	std::stop_source sc_StopSrc;
+	std::condition_variable_any sc_CondVar;
+	bool sc_NeedRefresh = false;
 
 	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(const std::string& systemID);
 	void RefreshSimilarCallsign(void);
+	void SimilarCallsignThread(std::stop_token stoken);
 };

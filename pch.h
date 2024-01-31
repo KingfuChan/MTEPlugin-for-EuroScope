@@ -10,27 +10,28 @@
 // 添加要在此处预编译的标头
 #include "framework.h"
 
-// std
+// string
 #include <string>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <regex>
-
-#include <stack>
+// containers
+#include <array>
+#include <vector>
 #include <list>
 #include <set>
 #include <unordered_set>
 #include <map>
 #include <unordered_map>
-#include <vector>
-
-#include <algorithm>
-#include <format>
+#include <stack>
+// threading
 #include <shared_mutex>
 #include <thread>
-#include <memory>
 #include <atomic>
-
+// others
+#include <algorithm>
+#include <memory>
 // project required
 #include "Resource.h"
 #include <EuroScopePlugIn.h>
