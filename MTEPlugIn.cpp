@@ -428,7 +428,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
-		switch (m_RouteChecker->CheckFlightPlan(FlightPlan))
+		switch (m_RouteChecker->CheckFlightPlan(FlightPlan, false, false))
 		{
 		case RouteCheckerConstants::NOT_FOUND:
 			sprintf_s(sItemString, 3, "? ");
@@ -774,7 +774,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
-		int rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true); // force a refresh here to avoid error
+		int rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true, false); // force a refresh here to avoid error
 		if (rc == RouteCheckerConstants::NOT_FOUND) break;
 		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 
@@ -888,7 +888,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 	}
 	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
-		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
+		m_RouteChecker->CheckFlightPlan(FlightPlan, true, true);
 	}
 	if (m_DepartureSequence &&
 		(DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG)) {
@@ -919,7 +919,7 @@ void CMTEPlugIn::OnFlightPlanFlightPlanDataUpdate(CFlightPlan FlightPlan)
 	if (!FlightPlan.IsValid())
 		return;
 	if (m_RouteChecker) {
-		std::thread(&RouteChecker::CheckFlightPlan, m_RouteChecker.get(), FlightPlan, true).detach();
+		m_RouteChecker->CheckFlightPlan(FlightPlan, true, true);
 	}
 }
 
