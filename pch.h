@@ -25,6 +25,7 @@
 #include <map>
 #include <unordered_map>
 #include <stack>
+#include <queue>
 // threading
 #include <shared_mutex>
 #include <thread>
