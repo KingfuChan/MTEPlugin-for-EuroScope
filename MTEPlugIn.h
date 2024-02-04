@@ -47,8 +47,7 @@ private:
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(const std::string& filename);
-	void UnloadRouteChecker(void);
-	void DeleteDepartureSequence(void);
+	void ResetDepartureSequence(void);
 	void ResetTrackedRecorder(void);
 	bool LoadTransitionLevel(const std::string& filename);
 	bool LoadMetricAltitude(const std::string& filename);

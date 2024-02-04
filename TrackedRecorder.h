@@ -17,7 +17,7 @@ public:
 	void SetCommEstablished(const std::string& callsign);
 	bool IsCFLConfirmed(const std::string& callsign);
 	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
-	bool IsForceFeet(const std::string& callsign);
+	bool IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget);
 	void SetAltitudeUnit(const std::string& callsign, const bool& feet);
 	void ResetAltitudeUnit(const bool& feet);
 	bool IsSquawkDUPE(const std::string& callsign);
@@ -27,6 +27,7 @@ public:
 	std::unordered_set<std::string> GetSimilarCallsigns(const std::string& callsign);
 	bool SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
+	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration = 5);
 
 private:
 	bool m_DefaultFeet = false;
@@ -84,6 +85,7 @@ private:
 	// track map
 	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign -> TrackedData
 	std::shared_mutex tr_Mutex;
+
 	// for similar callsign
 	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign -> set<callsign>
 	std::shared_mutex sc_Mutex;
@@ -92,6 +94,11 @@ private:
 	std::stop_source sc_StopSrc;
 	std::condition_variable_any sc_CondVar;
 	bool sc_NeedRefresh = false;
+
+	// toggle altitude unit
+	std::unordered_map<std::string, std::shared_ptr<std::jthread>> m_TempUnitThread; // systemID -> thread
+	std::set<std::string> m_TempUnitSysID; // only stores those different from default
+	std::shared_mutex uthrd_Mutex, usysi_Mutex;
 
 	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(const std::string& systemID);
 	void RefreshSimilarCallsign(void);
