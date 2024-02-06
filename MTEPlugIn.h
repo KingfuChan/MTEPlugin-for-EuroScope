@@ -42,7 +42,8 @@ private:
 	std::string m_CustomNumMap; // 0-9
 	std::atomic_int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
-	void CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area);
+	void CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area); // overload for ES internal function
+	void CallItemFunction(const char* sCallsign, const char* sItemPlugInName, int ItemCode, const char* sItemString, const char* sFunctionPlugInName, int FunctionId, POINT Pt, RECT Area);
 	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);

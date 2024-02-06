@@ -43,6 +43,7 @@ const int TAG_ITEM_FUNCTION_CFL_SET_EDIT = 10; // Set CFL from edit (not registe
 const int TAG_ITEM_FUNCTION_CFL_MENU = 11; // Open CFL popup menu
 const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit
 const int TAG_ITEM_FUNCTION_CFL_SET_MENU = 13; // Set CFL from menu (not registered)
+const int TAG_ITEM_FUNCTION_CFL_TOPSKY = 14; // Confirm CFL / Open Topsky CFL menu
 const int TAG_ITEM_FUNCTION_RFL_SET_EDIT = 20; // Set RFL from edit (not registered)
 const int TAG_ITEM_FUNCTION_RFL_MENU = 21; // Open RFL popup menu
 const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit
@@ -180,6 +181,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
 	RegisterTagItemFunction("Open CFL popup edit", TAG_ITEM_FUNCTION_CFL_EDIT);
+	RegisterTagItemFunction("Confirm CFL / Open Topsky CFL menu", TAG_ITEM_FUNCTION_CFL_TOPSKY);
 	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
 	RegisterTagItemFunction("Open RFL popup edit", TAG_ITEM_FUNCTION_RFL_EDIT);
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
@@ -686,6 +688,19 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_CFL_SET_EDIT, "");
 
 		break; }
+	case TAG_ITEM_FUNCTION_CFL_TOPSKY: {
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget)) break;
+		if (!FlightPlan.IsValid()) break;
+		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
+			// confirm previous CFL first
+			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign());
+			break;
+		}
+		CallItemFunction(FlightPlan.GetCallsign(), PLUGIN_NAME, FunctionId, sItemString, "TopSky plugin", 12, Pt, Area);
+		// 12 is learned from tag settings, that line may look like:
+		//  TAGITEM:6::0:0:12:12:MTEPlugin:0:1:TopSky plugin:MTEPlugin:3
+		// ________________^^__________________^^^^^^^^^^^^^____________
+		break; }
 	case TAG_ITEM_FUNCTION_RFL_SET_MENU: {
 		if (!FlightPlan.IsValid()) break;
 		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget));
@@ -801,11 +816,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetClearenceFlag()) {
 			// set cleared flag
-			CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, Pt, Area);
+			CallItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, Pt, Area);
 		}
 		else {
 			// set status
-			CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_GROUND_STATUS, Pt, Area);
+			CallItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_GROUND_STATUS, Pt, Area);
 		}
 		break; }
 	case TAG_ITEM_FUNCTION_SPD_SET: {
@@ -896,7 +911,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 	if (DataType == CTR_DATA_TYPE_GROUND_STATE &&
 		FlightPlan.GetClearenceFlag() &&
 		!strlen(FlightPlan.GetGroundState())) {
-		CallNativeItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
+		CallItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
 	}
 	m_TrackedRecorder->UpdateFlight(FlightPlan);
 }
@@ -1143,12 +1158,17 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	return false;
 }
 
-void CMTEPlugIn::CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area)
+void CMTEPlugIn::CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area)
+{
+	return CallItemFunction(sCallsign, nullptr, 0, nullptr, nullptr, FunctionId, Pt, Area);
+}
+
+void CMTEPlugIn::CallItemFunction(const char* sCallsign, const char* sItemPlugInName, int ItemCode, const char* sItemString, const char* sFunctionPlugInName, int FunctionId, POINT Pt, RECT Area)
 {
 	while (!m_ScreenStack.empty()) {
 		auto& s = m_ScreenStack.top();
 		if (s->m_Opened)
-			return s->StartTagFunction(sCallsign, nullptr, 0, nullptr, nullptr, FunctionId, Pt, Area);
+			return s->StartTagFunction(sCallsign, sItemPlugInName, ItemCode, sItemString, sFunctionPlugInName, FunctionId, Pt, Area);
 		else {
 			s.reset();
 			m_ScreenStack.pop();
