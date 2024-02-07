@@ -52,10 +52,15 @@ RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, const std::string& 
 		se = plugin->SectorFileElementSelectNext(se, EuroScopePlugIn::SECTOR_ELEMENT_SIDS_STARS)) {
 		m_SIDSTAR[se.GetAirportName()].insert(se.GetName());
 	}
+	// finishing initialization
+	m_PluginPtr = plugin;
+	q_Thread = std::jthread(std::bind_front(&RouteChecker::UpdateQueueThread, this));
 }
 
 RouteChecker::~RouteChecker(void)
 {
+	q_Thread.request_stop();
+	q_Thread.join();
 }
 
 std::vector<std::string> RouteChecker::GetRouteInfo(const std::string& departure, const std::string& arrival)
@@ -80,16 +85,31 @@ std::vector<std::string> RouteChecker::GetRouteInfo(const std::string& departure
 	return res;
 }
 
-int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const bool refresh)
+int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& refresh, const bool& delayed)
 {
-	// see RouteCheckerConstants for returns. => refresh=true will force refresh, otherwise will look up in cache
-
+	// see RouteCheckerConstants for returns. 
+	// => refresh=true will force refresh, otherwise will look up in cache
+	// => delayed=true will put the request in queue, and will return -1 (Not Found)
+	std::string callsign = FlightPlan.GetCallsign();
 	if (!refresh) {
 		std::shared_lock clock(cache_mutex);
-		auto r = m_Cache.find(FlightPlan.GetCallsign());
+		auto r = m_Cache.find(callsign);
 		if (r != m_Cache.end())
 			return r->second;
 	}
+	if (!delayed) {
+		return CheckFlightPlan(FlightPlan);
+	}
+	else { // add to queue and notify thread
+		std::lock_guard lock(queue_mutex);
+		m_UpdateQueue.push(callsign);
+		q_CondVar.notify_all();
+		return RouteCheckerConstants::NOT_FOUND;
+	}
+}
+
+int RouteChecker::CheckFlightPlan(EuroScopePlugIn::CFlightPlan FlightPlan)
+{
 	int res;
 	EuroScopePlugIn::CFlightPlanData fpd = FlightPlan.GetFlightPlanData();
 	std::string od = std::string(fpd.GetOrigin()) + std::string(fpd.GetDestination());
@@ -254,4 +274,33 @@ bool RouteChecker::IsLevelValid(const int& planalt, const std::string& evenodd, 
 		}
 	}
 	return false;
+}
+
+void RouteChecker::UpdateQueueThread(std::stop_token stoken)
+{
+	std::mutex t_mutex;
+	while (!stoken.stop_requested()) {
+		std::unique_lock t_lock(t_mutex);
+		bool queueing = q_CondVar.wait(t_lock, stoken, [&] {
+			std::lock_guard qlock(queue_mutex);
+			return !m_UpdateQueue.empty() && !stoken.stop_requested();
+			});
+		if (!queueing) continue;
+		// updates radar cache
+		std::string callsign;
+		{
+			std::lock_guard qlock(queue_mutex);
+			if (m_UpdateQueue.empty()) {
+				break;
+			}
+			else {
+				callsign = m_UpdateQueue.front();
+				m_UpdateQueue.pop();
+			}
+		}
+		auto fp = m_PluginPtr->FlightPlanSelect(callsign.c_str());
+		if (fp.IsValid()) {
+			CheckFlightPlan(fp);
+		}
+	}
 }

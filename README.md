@@ -43,14 +43,16 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
    + CFL popup edit supports (standalone or in-menu): **`xxx`** for metric RVSM levels, **`Fxxx`** for FLxxx, **`550.`** for 550m, **`F4500.`** for 4500ft, etc. Enter **`0`** to clear CFL.
    + RFL popup edit supports: **`xxx`** for metric, **`Fxxx`** for FLxxx. Enter **`0`** to reset RFL to the final altitude in flight plan.
    + Enter a **`F`** or **`M`** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit, only for tracked aircrafts.
-5. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
-6. **Show route checker info** - route checker function, see [**RC**](#route-checker-rc) below.
-7. **Set departure sequence** - departure sequence function.
-8. **Set departure status** - departure sequence function.
+5. **Confirm CFL / Open Topsky CFL menu** - confirm CFL if not yet confirmed (see [**TR**](#tracked-recorder-tr)), otherwise opens Topsky CFL Menu.
+   + Hold ALT key down while calling these CFL/RFL menu/edit functions to temporarily switch altitude unit for 5 seconds. This is also functional for uncorrelated radar targets.
+6. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
+7. **Show route checker info** - route checker function, see [**RC**](#route-checker-rc) below.
+8. **Set departure sequence** - departure sequence function.
+9.  **Set departure status** - departure sequence function.
     + See [**DS**](#departure-sequence-ds) below.
-9. **Set COMM ESTB** - tracked recorder function.
-10. **Open similar callsign list** - tracked recorder function.
-11. **Restore assigned data** - tracked recorder function.
+10. **Set COMM ESTB** - tracked recorder function.
+11. **Open similar callsign list** - tracked recorder function.
+12. **Restore assigned data** - tracked recorder function.
     + See [**TR**](#tracked-recorder-tr) below.
 
 ## Customizable CFL/RFL Menu (MA)
@@ -61,19 +63,19 @@ This module provides the ability to change menu definitions in **Open CFL popup 
 
 A TSV (tab-separated-value) file is required for customization. File extension need to be ".txt". TSV files don't contain the header below. Empty cells are accepted.
 
-Altitude|Metric|Imperial|Metric (Alternative)|Imperial (Alternative)
-:---:|:---:|:---:|:---:|:---:
-0|----|----||
-2|VA |VA ||
-1|ILS|ILS||
-3|[  ]|[]||
-2000|0060|F020|600m|2000
-3000|0090|F030||3000
-3900|0120|||
-4000||F040||4000
-9800|0300|||
-10000||F100||
-10800|0330|||
+| Altitude | Metric | Imperial | Metric (Alternative) | Imperial (Alternative) |
+| :------: | :----: | :------: | :------------------: | :--------------------: |
+|    0     |  ----  |   ----   |                      |                        |
+|    2     |   VA   |    VA    |                      |                        |
+|    1     |  ILS   |   ILS    |                      |                        |
+|    3     |  [  ]  |    []    |                      |                        |
+|   2000   |  0060  |   F020   |         600m         |          2000          |
+|   3000   |  0090  |   F030   |                      |          3000          |
+|   3900   |  0120  |          |                      |                        |
+|   4000   |        |   F040   |                      |          4000          |
+|   9800   |  0300  |          |                      |                        |
+|  10000   |        |   F100   |                      |                        |
+|  10800   |  0330  |          |                      |                        |
 
 + ***Altitude*** is in feet.
   + 0-3 have special meanings noted above and will be fixed in menu, so please make sure they are placed at the top of TSV file. 0, 1, 2 are also used by EuroScope internally. 3 is used to open popup edit.
@@ -89,7 +91,7 @@ You need to use a command line to load the TSV file: **`.MTEP MA PATH`** (case-i
 
 ### MA - Schematic
 
-+ ***Metric/Imperial*** column will be according to aircraft's altitude unit setting. Altitudes are ignored if the corresponding cell for the given unit is blank.
++ ***Metric/Imperial*** column will be used according to aircraft's altitude unit setting. Altitudes are ignored if the corresponding cell for the given unit is blank.
 + Alternative columns will override items below transition level, except NONE, VA, ILS and popup edit (0-3).
 + CFL/RFL popup edits are not affected by this module.
 
@@ -99,15 +101,15 @@ This module will automatically check route validity. Requires a CSV file in the 
 
 ### RC - CSV Configuration
 
-Dep|Arr|Name|EvenOdd|AltList|MinAlt|Route|Remarks
-:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:
-ZBAA/ZBAD|ZSSS/ZSPD|test|SE/SO/FE/FO|S81/S89/S107/F350/F450|9800|ELKUR .... SASAN|test only
+|    Dep    |    Arr    | Name  |   EvenOdd   |        AltList         | MinAlt |      Route       |  Remarks  |
+| :-------: | :-------: | :---: | :---------: | :--------------------: | :----: | :--------------: | :-------: |
+| ZBAA/ZBAD | ZSSS/ZSPD | test  | SE/SO/FE/FO | S81/S89/S107/F350/F450 |  9800  | ELKUR .... SASAN | test only |
 
-+ ***Dep, Arr*** can be a list seperated by "/".
++ ***Dep, Arr*** can be a list delimited by "/".
 + ***Name*** no need to explain.
-+ ***EvenOdd*** should be a combination of SE(metric, even) SO(metric, odd) FE(imperial, even) FO(imperial, odd). No seperation mark is required.
-+ ***AltList*** means level restriction, which can also be a list seperated by "/".
-  + Only exact altitudes will be valid. When ***AltList*** is not empty, ***EvenOdd*** will be deprecated.
++ ***EvenOdd*** should be a combination of SE(metric, even) SO(metric, odd) FE(imperial, even) FO(imperial, odd). No delimiter is required.
++ ***AltList*** means level restriction, which can also be a list delimited by "/".
+  + Only exact altitudes will be valid. When ***AltList*** is not empty, ***EvenOdd*** will be ignored.
   + For metric altitudes, use Sxxx, e.g. S81 for 8100m, S107 for 10700m.
   + For imperial flight levels, use Fxxx, e.g. F350 for FL350.
 + ***MinAlt*** should be in feet. If the flight plan final altitude is lower than given value, it should be an invalid flight plan.
@@ -126,14 +128,14 @@ You need to use a command line to load the CSV file: **`.MTEP RC PATH`** (case-i
 
 Tag item type **Route validity** shows:
 
-||Route|Final Altitude|
-|:--|:--:|:--:|
-|**Y**|Yes|Yes|
-|**P**|Partial|Yes|
-|**YL**|Yes|No|
-|**PL**|Partial|No|
-|**X**|No|/|
-|**?**|Not Found|/|
+|        |   Route   | Final Altitude |
+| :----- | :-------: | :------------: |
+| **Y**  |    Yes    |      Yes       |
+| **P**  |  Partial  |      Yes       |
+| **YL** |    Yes    |       No       |
+| **PL** |  Partial  |       No       |
+| **X**  |    No     |       /        |
+| **?**  | Not Found |       /        |
 
 + Blanks out when route checker is not configured or clearance received flag is set.
 + Different colors are used to distinguish two methods. Default color implies text-comparison method (**Y/YL/?**). Color of [`Color/RouteUncertain`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant` implies structurized-comparison method, in which case it could be inaccurate. Color of [`Color/RouteInvalid`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information` implies invalid route (**X**) with both methods.
@@ -197,8 +199,8 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ### TR - Tag Item Types
 
-+ **Cleared flight level (m/FL)** - confirmed status is stored in tracked recorder.
-  + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`,if a new flight level is cleared but not confirmed.
++ **Cleared flight level (m/FL)** - confirm status is stored in tracked recorder.
+  + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`, after a new CFL is issued but not confirmed.
 + **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - altitude display unit follows individual setting by entering **`F`** or **`M`** in CFL/RFL popup edit or global setting by [command line](#tr---command-line-functions).
 + **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
   + Considers Chinese/English crews and ignores those text-only.
@@ -213,7 +215,7 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ### TR - Tag Item Functions
 
-+ **Open CFL popup menu**, **Open CFL popup edit**  - will confirm previous CFL before opening.
++ **Open CFL popup menu**, **Open CFL popup edit**, **Confirm CFL / Open Topsky CFL menu**  - will confirm previous CFL before opening.
 + **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
 + **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
   + Selecting one will toggle native **`.find`** command.
@@ -231,19 +233,19 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ## Transition Level (TL)
 
-EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
+EuroScope native transition altitude cannot be separately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
 
 ### TL - CSV Configuration
 
 A CSV file is required for the customization, in the format below.
 
-Ident|TransLevel|Elevation|IsQFE|Range|Boundary
-:---:|:---:|:---:|:---:|:---:|:---:
-ZGSZ|S33|13|0||112.7/21.0 112.5/21.9 112.5/22.2 ...
-ZPLJ|S66|7359|0|50|
-ZGNN|S36|420|1||109.1/23.1 109.1/22.5 108.6/22.0 ...
-ZSWH||148|1|50|
-VHHH|F110|28|0||113.6/22.2 113.8/22.4 114.2/22.6 ...
+| Ident | TransLevel | Elevation | IsQFE | Range |               Boundary               |
+| :---: | :--------: | :-------: | :---: | :---: | :----------------------------------: |
+| ZGSZ  |    S33     |    13     |   0   |       | 112.7/21.0 112.5/21.9 112.5/22.2 ... |
+| ZPLJ  |    S66     |   7359    |   0   |  50   |                                      |
+| ZGNN  |    S36     |    420    |   1   |       | 109.1/23.1 109.1/22.5 108.6/22.0 ... |
+| ZSWH  |            |    148    |   1   |  50   |                                      |
+| VHHH  |    F110    |    28     |   0   |       | 113.6/22.2 113.8/22.4 114.2/22.6 ... |
 
 + ***Ident*** is the ICAO identification for a single airport.
   + Use an asteroid **(\*)** for all undefined airports within sector file. Only ***TransLevel*** and ***Range*** in this line will be used.

@@ -42,13 +42,13 @@ private:
 	std::string m_CustomNumMap; // 0-9
 	std::atomic_int m_AmendCFL; // 0: off; 1: MTEP (default); 2: all.
 
-	void CallNativeItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area);
+	void CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area); // overload for ES internal function
+	void CallItemFunction(const char* sCallsign, const char* sItemPlugInName, int ItemCode, const char* sItemString, const char* sFunctionPlugInName, int FunctionId, POINT Pt, RECT Area);
 	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(const std::string& filename);
-	void UnloadRouteChecker(void);
-	void DeleteDepartureSequence(void);
+	void ResetDepartureSequence(void);
 	void ResetTrackedRecorder(void);
 	bool LoadTransitionLevel(const std::string& filename);
 	bool LoadMetricAltitude(const std::string& filename);

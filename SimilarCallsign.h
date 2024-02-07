@@ -20,5 +20,6 @@ const std::unordered_set<std::string> m_CHNCallsign = {
 	"UEA","UNA","UTP","VGA","VRE","WFH","WLF","WUA","XAI","XTH",
 	"YZR",
 };
+const std::string m_EngDelimiter = R"(*/\.,-_+=;'`!@#$%^&)";
 
 bool CompareCallsign(const std::string& callsign1, const std::string& callsign2);

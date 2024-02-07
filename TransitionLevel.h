@@ -25,7 +25,7 @@ public:
 
 private:
 	typedef std::vector<EuroScopePlugIn::CPosition> pos_vec;
-	typedef struct {
+	typedef struct _ApD {
 		int trans_level;
 		int elevation;
 		bool is_QFE;
@@ -44,6 +44,18 @@ private:
 	// If m_AirportMap is empty, use m_PluginPtr->GetTransitionAltitude() for all.
 	// If not defined, a/c ouside of all boundaries will use 0 as trans_level.
 	int m_MaxLevel;
+
+	// for threading queue control
+	typedef struct _QuD {
+		std::string system_id;
+		EuroScopePlugIn::CPosition position;
+		std::string concerned_airport;
+	}QueueData;
+	std::queue<QueueData> m_UpdateQueue; // systemID -> position
+	std::mutex queue_mutex;
+	std::jthread q_Thread;
+	std::condition_variable_any q_CondVar;
+	void UpdateQueueThread(std::stop_token stoken);
 
 	bool IsinQNHBoundary(const EuroScopePlugIn::CPosition pos, const AirportData airport_iter);
 };
