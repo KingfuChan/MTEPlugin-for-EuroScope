@@ -43,15 +43,16 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
    + CFL popup edit supports (standalone or in-menu): **`xxx`** for metric RVSM levels, **`Fxxx`** for FLxxx, **`550.`** for 550m, **`F4500.`** for 4500ft, etc. Enter **`0`** to clear CFL.
    + RFL popup edit supports: **`xxx`** for metric, **`Fxxx`** for FLxxx. Enter **`0`** to reset RFL to the final altitude in flight plan.
    + Enter a **`F`** or **`M`** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit, only for tracked aircrafts.
-   + Hold ALT key down while calling these menu/edit functions to temporarily switch altitude unit for 5 seconds. This is also functional for uncorrelated radar targets.
-5. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
-6. **Show route checker info** - route checker function, see [**RC**](#route-checker-rc) below.
-7. **Set departure sequence** - departure sequence function.
-8. **Set departure status** - departure sequence function.
+5. **Confirm CFL / Open Topsky CFL menu** - confirm CFL if not yet confirmed (see [**TR**](#tracked-recorder-tr)), otherwise opens Topsky CFL Menu.
+   + Hold ALT key down while calling these CFL/RFL menu/edit functions to temporarily switch altitude unit for 5 seconds. This is also functional for uncorrelated radar targets.
+6. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
+7. **Show route checker info** - route checker function, see [**RC**](#route-checker-rc) below.
+8. **Set departure sequence** - departure sequence function.
+9.  **Set departure status** - departure sequence function.
     + See [**DS**](#departure-sequence-ds) below.
-9. **Set COMM ESTB** - tracked recorder function.
-10. **Open similar callsign list** - tracked recorder function.
-11. **Restore assigned data** - tracked recorder function.
+10. **Set COMM ESTB** - tracked recorder function.
+11. **Open similar callsign list** - tracked recorder function.
+12. **Restore assigned data** - tracked recorder function.
     + See [**TR**](#tracked-recorder-tr) below.
 
 ## Customizable CFL/RFL Menu (MA)
@@ -90,7 +91,7 @@ You need to use a command line to load the TSV file: **`.MTEP MA PATH`** (case-i
 
 ### MA - Schematic
 
-+ ***Metric/Imperial*** column will be according to aircraft's altitude unit setting. Altitudes are ignored if the corresponding cell for the given unit is blank.
++ ***Metric/Imperial*** column will be used according to aircraft's altitude unit setting. Altitudes are ignored if the corresponding cell for the given unit is blank.
 + Alternative columns will override items below transition level, except NONE, VA, ILS and popup edit (0-3).
 + CFL/RFL popup edits are not affected by this module.
 
@@ -104,11 +105,11 @@ This module will automatically check route validity. Requires a CSV file in the 
 | :-------: | :-------: | :---: | :---------: | :--------------------: | :----: | :--------------: | :-------: |
 | ZBAA/ZBAD | ZSSS/ZSPD | test  | SE/SO/FE/FO | S81/S89/S107/F350/F450 |  9800  | ELKUR .... SASAN | test only |
 
-+ ***Dep, Arr*** can be a list seperated by "/".
++ ***Dep, Arr*** can be a list delimited by "/".
 + ***Name*** no need to explain.
-+ ***EvenOdd*** should be a combination of SE(metric, even) SO(metric, odd) FE(imperial, even) FO(imperial, odd). No seperation mark is required.
-+ ***AltList*** means level restriction, which can also be a list seperated by "/".
-  + Only exact altitudes will be valid. When ***AltList*** is not empty, ***EvenOdd*** will be deprecated.
++ ***EvenOdd*** should be a combination of SE(metric, even) SO(metric, odd) FE(imperial, even) FO(imperial, odd). No delimiter is required.
++ ***AltList*** means level restriction, which can also be a list delimited by "/".
+  + Only exact altitudes will be valid. When ***AltList*** is not empty, ***EvenOdd*** will be ignored.
   + For metric altitudes, use Sxxx, e.g. S81 for 8100m, S107 for 10700m.
   + For imperial flight levels, use Fxxx, e.g. F350 for FL350.
 + ***MinAlt*** should be in feet. If the flight plan final altitude is lower than given value, it should be an invalid flight plan.
@@ -198,8 +199,8 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ### TR - Tag Item Types
 
-+ **Cleared flight level (m/FL)** - confirmed status is stored in tracked recorder.
-  + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`,if a new flight level is cleared but not confirmed.
++ **Cleared flight level (m/FL)** - confirm status is stored in tracked recorder.
+  + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`, after a new CFL is issued but not confirmed.
 + **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - altitude display unit follows individual setting by entering **`F`** or **`M`** in CFL/RFL popup edit or global setting by [command line](#tr---command-line-functions).
 + **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
   + Considers Chinese/English crews and ignores those text-only.
@@ -214,7 +215,7 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ### TR - Tag Item Functions
 
-+ **Open CFL popup menu**, **Open CFL popup edit**  - will confirm previous CFL before opening.
++ **Open CFL popup menu**, **Open CFL popup edit**, **Confirm CFL / Open Topsky CFL menu**  - will confirm previous CFL before opening.
 + **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
 + **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
   + Selecting one will toggle native **`.find`** command.
@@ -232,7 +233,7 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ## Transition Level (TL)
 
-EuroScope native transition altitude cannot be seperately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
+EuroScope native transition altitude cannot be separately applied to airports with different transition altitudes. This module allows such practice, and improves display logic. AFL originally use QNH altitudes when below transition altitude and use QNE altitudes when above transition altitude. This plugin considers transition level instead of transition altitude for better results. In addition, this module provides QFE altitudes on demand.
 
 ### TL - CSV Configuration
 
