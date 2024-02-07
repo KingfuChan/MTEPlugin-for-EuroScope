@@ -91,7 +91,6 @@ private:
 	std::shared_mutex sc_Mutex;
 	// callsign threading
 	std::jthread sc_Thread;
-	std::stop_source sc_StopSrc;
 	std::condition_variable_any sc_CondVar;
 	bool sc_NeedRefresh = false;
 

@@ -50,7 +50,6 @@ private:
 	std::queue<std::string> m_UpdateQueue; // systemID -> position
 	std::mutex queue_mutex;
 	std::jthread q_Thread;
-	std::stop_source q_StopSrc;
 	std::condition_variable_any q_CondVar;
 	void UpdateQueueThread(std::stop_token stoken);
 

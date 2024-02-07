@@ -54,12 +54,12 @@ RouteChecker::RouteChecker(EuroScopePlugIn::CPlugIn* plugin, const std::string& 
 	}
 	// finishing initialization
 	m_PluginPtr = plugin;
-	q_Thread = std::jthread(&RouteChecker::UpdateQueueThread, this, q_StopSrc.get_token());
+	q_Thread = std::jthread(std::bind_front(&RouteChecker::UpdateQueueThread, this));
 }
 
 RouteChecker::~RouteChecker(void)
 {
-	q_StopSrc.request_stop();
+	q_Thread.request_stop();
 	q_Thread.join();
 }
 
@@ -281,26 +281,26 @@ void RouteChecker::UpdateQueueThread(std::stop_token stoken)
 	std::mutex t_mutex;
 	while (!stoken.stop_requested()) {
 		std::unique_lock t_lock(t_mutex);
-		q_CondVar.wait(t_lock, stoken, [&] {
-			return !m_UpdateQueue.empty() || stoken.stop_requested();
+		bool queueing = q_CondVar.wait(t_lock, stoken, [&] {
+			std::lock_guard qlock(queue_mutex);
+			return !m_UpdateQueue.empty() && !stoken.stop_requested();
 			});
-		while (true) {
-			// updates radar cache
-			std::string callsign;
-			{
-				std::lock_guard qlock(queue_mutex);
-				if (m_UpdateQueue.empty()) {
-					break;
-				}
-				else {
-					callsign = m_UpdateQueue.front();
-					m_UpdateQueue.pop();
-				}
+		if (!queueing) continue;
+		// updates radar cache
+		std::string callsign;
+		{
+			std::lock_guard qlock(queue_mutex);
+			if (m_UpdateQueue.empty()) {
+				break;
 			}
-			auto fp = m_PluginPtr->FlightPlanSelect(callsign.c_str());
-			if (fp.IsValid()) {
-				CheckFlightPlan(fp);
+			else {
+				callsign = m_UpdateQueue.front();
+				m_UpdateQueue.pop();
 			}
+		}
+		auto fp = m_PluginPtr->FlightPlanSelect(callsign.c_str());
+		if (fp.IsValid()) {
+			CheckFlightPlan(fp);
 		}
 	}
 }

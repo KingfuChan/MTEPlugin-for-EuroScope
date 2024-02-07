@@ -8,12 +8,12 @@ TransitionLevel::TransitionLevel(EuroScopePlugIn::CPlugIn* plugin)
 	m_PluginPtr = plugin;
 	m_DefaultLevel = 0;
 	m_MaxLevel = 0;
-	q_Thread = std::jthread(&TransitionLevel::UpdateQueueThread, this, q_StopSrc.get_token());
+	q_Thread = std::jthread(std::bind_front(&TransitionLevel::UpdateQueueThread, this));
 }
 
 TransitionLevel::~TransitionLevel(void)
 {
-	q_StopSrc.request_stop();
+	q_Thread.request_stop();
 	q_Thread.join();
 }
 
@@ -149,73 +149,68 @@ void TransitionLevel::UpdateQueueThread(std::stop_token stoken)
 	} DistanceToAirport;
 	while (!stoken.stop_requested()) {
 		std::unique_lock t_lock(t_mutex);
-		q_CondVar.wait(t_lock, stoken, [&] {
-			return !m_UpdateQueue.empty() || stoken.stop_requested();
+		bool queueing = q_CondVar.wait(t_lock, stoken, [&] {
+			std::lock_guard qlock(queue_mutex);
+			return !m_UpdateQueue.empty() && !stoken.stop_requested();
 			});
-		while (true) {
-			// updates radar cache
-			QueueData qd;
-			{
-				std::lock_guard qlock(queue_mutex);
-				if (m_UpdateQueue.empty()) {
-					break;
-				}
-				else {
-					qd = m_UpdateQueue.front();
-					m_UpdateQueue.pop();
-				}
-			}
-			std::shared_lock dlock(data_mutex);
-			if (m_AirportMap.empty()) continue;
-			bool updated = false;
-			std::string sysID = qd.system_id;
-			auto pos = qd.position;
-			// look up in cache and check validity
-			{
-				std::shared_lock clock(cache_mutex);
-				auto cached = m_RadarCache.find(sysID);
-				if (cached != m_RadarCache.end()) {
-					auto apitr = m_AirportMap.find(cached->second);
-					if (apitr != m_AirportMap.end()) {
-						if (IsinQNHBoundary(pos, apitr->second)) {
-							updated = true;// no need to refresh
-						}
+		if (!queueing) continue;
+		// updates radar cache
+		QueueData qd;
+		{
+			std::lock_guard qlock(queue_mutex);
+			qd = m_UpdateQueue.front();
+			m_UpdateQueue.pop();
+		}
+		std::shared_lock dlock(data_mutex);
+		if (m_AirportMap.empty()) continue;
+		bool updated = false;
+		std::string sysID = qd.system_id;
+		auto pos = qd.position;
+		// look up in cache and check validity
+		{
+			std::shared_lock clock(cache_mutex);
+			auto cached = m_RadarCache.find(sysID);
+			if (cached != m_RadarCache.end()) {
+				auto apitr = m_AirportMap.find(cached->second);
+				if (apitr != m_AirportMap.end()) {
+					if (IsinQNHBoundary(pos, apitr->second)) {
+						updated = true;// no need to refresh
 					}
 				}
 			}
-			if (updated) continue;
-			// use concerned airport
-			std::string acls = qd.concerned_airport;
-			auto icls = m_AirportMap.find(acls);
-			if (icls != m_AirportMap.end() && IsinQNHBoundary(pos, icls->second)) {
-				std::unique_lock clock(cache_mutex);
-				m_RadarCache[sysID] = acls;
-				updated = true;
-			}
-			if (updated) continue;
-			// sort closest airport and check boundary
-			std::vector<DistanceToAirport> distance_airports;
-			std::transform(m_AirportMap.begin(), m_AirportMap.end(), std::back_inserter(distance_airports),
-				[pos](std::pair<const std::string, AirportData>& m) {
-					double d = pos.DistanceTo(m.second.position);
-					return DistanceToAirport({ m.first,d });
-				});
-			std::sort(distance_airports.begin(), distance_airports.end(),
-				[](const auto& d1, const auto& d2) {
-					return d1.distance < d2.distance;
-				});
-			auto daitr = std::find_if(distance_airports.begin(), distance_airports.end(),
-				[&](const auto& d) {
-					return IsinQNHBoundary(pos, m_AirportMap.find(d.airport)->second);
-				});
-			if (daitr != distance_airports.end()) {
-				std::unique_lock clock(cache_mutex);
-				m_RadarCache[sysID] = daitr->airport;
-			}
-			else { // no match
-				std::unique_lock clock(cache_mutex);
-				m_RadarCache.erase(sysID);
-			}
+		}
+		if (updated) continue;
+		// use concerned airport
+		std::string acls = qd.concerned_airport;
+		auto icls = m_AirportMap.find(acls);
+		if (icls != m_AirportMap.end() && IsinQNHBoundary(pos, icls->second)) {
+			std::unique_lock clock(cache_mutex);
+			m_RadarCache[sysID] = acls;
+			updated = true;
+		}
+		if (updated) continue;
+		// sort closest airport and check boundary
+		std::vector<DistanceToAirport> distance_airports;
+		std::transform(m_AirportMap.begin(), m_AirportMap.end(), std::back_inserter(distance_airports),
+			[pos](std::pair<const std::string, AirportData>& m) {
+				double d = pos.DistanceTo(m.second.position);
+				return DistanceToAirport({ m.first,d });
+			});
+		std::sort(distance_airports.begin(), distance_airports.end(),
+			[](const auto& d1, const auto& d2) {
+				return d1.distance < d2.distance;
+			});
+		auto daitr = std::find_if(distance_airports.begin(), distance_airports.end(),
+			[&](const auto& d) {
+				return IsinQNHBoundary(pos, m_AirportMap.find(d.airport)->second);
+			});
+		if (daitr != distance_airports.end()) {
+			std::unique_lock clock(cache_mutex);
+			m_RadarCache[sysID] = daitr->airport;
+		}
+		else { // no match
+			std::unique_lock clock(cache_mutex);
+			m_RadarCache.erase(sysID);
 		}
 	}
 }

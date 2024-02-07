@@ -6,19 +6,12 @@
 TrackedRecorder::TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
-	sc_Thread = std::jthread(&TrackedRecorder::SimilarCallsignThread, this, sc_StopSrc.get_token());
+	sc_Thread = std::jthread(std::bind_front(&TrackedRecorder::SimilarCallsignThread, this));
 }
 
 TrackedRecorder::~TrackedRecorder(void)
 {
-	std::unique_lock ulock(uthrd_Mutex);
-	for (auto utitr = m_TempUnitThread.begin(); utitr != m_TempUnitThread.end();) {
-		utitr->second->request_stop();
-		utitr->second->join();
-		utitr = m_TempUnitThread.erase(utitr);
-	}
-	ulock.unlock();
-	sc_StopSrc.request_stop();
+	sc_Thread.request_stop();
 	sc_Thread.join();
 }
 
@@ -289,26 +282,15 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 	if (ucitr != m_TempUnitSysID.end()) { // there is a previous toggle
 		m_TempUnitSysID.erase(ucitr);
 		uslock.unlock();
-		auto utitr = m_TempUnitThread.find(systemid);
-		if (utitr != m_TempUnitThread.end()) {
-			utitr->second->request_stop();
-			utitr->second->join();
-			m_TempUnitThread.erase(utitr);
-		}
+		m_TempUnitThread.erase(systemid); // implies stop request
 		utlock.unlock();
 	}
 	else { // start new toggle
 		// clean up previous thread
-		for (auto utitr = m_TempUnitThread.begin(); utitr != m_TempUnitThread.end();) {
-			if (!m_TempUnitSysID.contains(utitr->first)) {
-				utitr->second->request_stop();
-				utitr->second->join();
-				utitr = m_TempUnitThread.erase(utitr);
-			}
-			else {
-				utitr++;
-			}
-		}
+		std::erase_if(m_TempUnitThread, [this](const auto& thrd) {
+			const auto& [i, t] = thrd;
+			return !m_TempUnitSysID.contains(i);
+			});
 		m_TempUnitSysID.insert(systemid);
 		uslock.unlock();
 		auto jt = std::make_shared<std::jthread>([this, systemid, duration](std::stop_token stoken) {
@@ -345,51 +327,50 @@ void TrackedRecorder::SimilarCallsignThread(std::stop_token stoken)
 	std::mutex t_mutex;
 	while (!stoken.stop_requested()) {
 		std::unique_lock t_lock(t_mutex);
-		sc_CondVar.wait(t_lock, stoken, [&] {
-			return sc_NeedRefresh || stoken.stop_requested();
+		bool refreshing = sc_CondVar.wait(t_lock, stoken, [this, stoken] {
+			return sc_NeedRefresh && !stoken.stop_requested();
 			});
+		if (!refreshing) continue;
 		sc_NeedRefresh = false;
-		if (!stoken.stop_requested()) {
-			// go on to refresh
-			std::unique_lock lock(sc_Mutex);
-			m_SCSetMap.clear();
-			std::unordered_set<std::string> setENG, setCHN;
-			std::shared_lock mlock(tr_Mutex);
-			for (const auto& [c, d] : m_TrackedMap) {
-				if (d.m_Offline ||
-					toupper(d.m_AssignedData.m_CommType) == 'T') {
-					continue;
-				}
-				std::string cal = c.substr(0, 3);
-				if (m_CHNCallsign.contains(cal)) {
-					std::string scratch = d.m_AssignedData.m_ScratchPad;
-					transform(scratch.begin(), scratch.end(), scratch.begin(), ::toupper);
-					size_t epos = scratch.find("EN");
-					if (epos != std::string::npos) {
-						char delim_l = epos > 0 ? scratch[epos - 1] : '\0';
-						char delim_r = epos + 2 < scratch.size() ? scratch[epos + 2] : '\0';
-						if (m_EngDelimiter.find(delim_l) != std::string::npos ||
-							m_EngDelimiter.find(delim_r) != std::string::npos) {
-							setENG.insert(c);
-						}
-						else {
-							setCHN.insert(c);
-						}
+		// go on to refresh
+		std::unique_lock lock(sc_Mutex);
+		m_SCSetMap.clear();
+		std::unordered_set<std::string> setENG, setCHN;
+		std::shared_lock mlock(tr_Mutex);
+		for (const auto& [c, d] : m_TrackedMap) {
+			if (d.m_Offline ||
+				toupper(d.m_AssignedData.m_CommType) == 'T') {
+				continue;
+			}
+			std::string cal = c.substr(0, 3);
+			if (m_CHNCallsign.contains(cal)) {
+				std::string scratch = d.m_AssignedData.m_ScratchPad;
+				transform(scratch.begin(), scratch.end(), scratch.begin(), ::toupper);
+				size_t epos = scratch.find("EN");
+				if (epos != std::string::npos) {
+					char delim_l = epos > 0 ? scratch[epos - 1] : '\0';
+					char delim_r = epos + 2 < scratch.size() ? scratch[epos + 2] : '\0';
+					if (m_EngDelimiter.find(delim_l) != std::string::npos ||
+						m_EngDelimiter.find(delim_r) != std::string::npos) {
+						setENG.insert(c);
 					}
 					else {
 						setCHN.insert(c);
 					}
 				}
 				else {
-					setENG.insert(c);
+					setCHN.insert(c);
 				}
 			}
-			for (const auto& cset : { setENG,setCHN }) {
-				for (const auto& c1 : cset) {
-					for (const auto& c2 : cset) {
-						if (c1 != c2 && CompareCallsign(c1, c2)) {
-							m_SCSetMap[c1].insert(c2);
-						}
+			else {
+				setENG.insert(c);
+			}
+		}
+		for (const auto& cset : { setENG,setCHN }) {
+			for (const auto& c1 : cset) {
+				for (const auto& c2 : cset) {
+					if (c1 != c2 && CompareCallsign(c1, c2)) {
+						m_SCSetMap[c1].insert(c2);
 					}
 				}
 			}

@@ -33,6 +33,7 @@
 // others
 #include <algorithm>
 #include <memory>
+#include <functional>
 // project required
 #include "Resource.h"
 #include <EuroScopePlugIn.h>

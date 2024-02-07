@@ -696,7 +696,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign());
 			break;
 		}
-		CallItemFunction(FlightPlan.GetCallsign(), PLUGIN_NAME, FunctionId, sItemString, "TopSky plugin", 12, Pt, Area);
+		CallItemFunction(FlightPlan.GetCallsign(), nullptr, 0, sItemString, "TopSky plugin", 12, Pt, Area);
 		// 12 is learned from tag settings, that line may look like:
 		//  TAGITEM:6::0:0:12:12:MTEPlugin:0:1:TopSky plugin:MTEPlugin:3
 		// ________________^^__________________^^^^^^^^^^^^^____________
@@ -1207,13 +1207,12 @@ void CMTEPlugIn::CancelCustomCursor(void)
 
 void CMTEPlugIn::LoadRouteChecker(const std::string& filename)
 {
-	m_RouteChecker.reset();
 	std::string fn = filename;
 	if (fn[0] == '@') {
 		fn = GetAbsolutePath(fn.substr(1));
 	}
 	try {
-		m_RouteChecker = make_unique<RouteChecker>(this, fn);
+		m_RouteChecker.reset(new RouteChecker(this, fn));
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Route checker is loaded successfully. CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
