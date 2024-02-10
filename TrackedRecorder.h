@@ -13,21 +13,32 @@ public:
 
 	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
+
 	bool IsCommEstablished(const std::string& callsign);
 	void SetCommEstablished(const std::string& callsign);
+
 	bool IsCFLConfirmed(const std::string& callsign);
 	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
+
 	bool IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget);
 	void SetAltitudeUnit(const std::string& callsign, const bool& feet);
 	void ResetAltitudeUnit(const bool& feet);
+	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration = 5);
+
 	bool IsSquawkDUPE(const std::string& callsign);
+
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
+
 	bool IsSimilarCallsign(const std::string& callsign);
 	std::unordered_set<std::string> GetSimilarCallsigns(const std::string& callsign);
+
 	bool SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget);
-	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration = 5);
+
+	bool IsDisplayVerticalSpeed(const std::string& systemID);
+	void ToggleVerticalSpeed(const std::string& systemID);
+	void ToggleVerticalSpeed(const bool& display);
 
 private:
 	bool m_DefaultFeet = false;
@@ -96,8 +107,13 @@ private:
 
 	// toggle altitude unit
 	std::unordered_map<std::string, std::shared_ptr<std::jthread>> m_TempUnitThread; // systemID -> thread
-	std::set<std::string> m_TempUnitSysID; // only stores those different from default
+	std::set<std::string> m_TempUnitSysID; // systemID, only stores those different from default
 	std::shared_mutex uthrd_Mutex, usysi_Mutex;
+
+	// toggle vertical speed display
+	bool m_GlobalVS = true; // global vs display, true=display
+	std::set<std::string> m_DisplayVS; // systemID, only stores those different from default
+	std::shared_mutex vsdsp_Mutex;
 
 	std::unordered_map<std::string, TrackedData>::iterator GetTrackedDataBySystemID(const std::string& systemID);
 	void RefreshSimilarCallsign(void);

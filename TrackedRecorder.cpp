@@ -121,7 +121,6 @@ void TrackedRecorder::SetCFLConfirmed(const std::string& callsign, const bool co
 
 bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	// input callsign can be RadarTarget SystemID as well
 	// priority: m_TempUnitSysID (SystemID) > m_TrackedMap (Callsign) >= m_TrackedMap (SystemID)
 	bool isfeet = m_DefaultFeet;
 	std::string callsign = FlightPlan.IsValid() ? FlightPlan.GetCallsign() : "";
@@ -308,6 +307,30 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 		utlock.unlock();
 	}
 	return true;
+}
+
+bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
+{
+	std::shared_lock v_lock(vsdsp_Mutex);
+	if (m_DisplayVS.contains(systemID)) {
+		return !m_GlobalVS;
+	}
+	return m_GlobalVS;
+}
+
+void TrackedRecorder::ToggleVerticalSpeed(const std::string& systemID)
+{
+	std::unique_lock v_lock(vsdsp_Mutex);
+	if (!m_DisplayVS.erase(systemID)) {
+		m_DisplayVS.insert(systemID);
+	}
+}
+
+void TrackedRecorder::ToggleVerticalSpeed(const bool& display)
+{
+	std::unique_lock v_lock(vsdsp_Mutex);
+	m_DisplayVS.clear();
+	m_GlobalVS = display;
 }
 
 std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(const std::string& systemID)

@@ -40,6 +40,7 @@ const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH)
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
 const int TAG_ITEM_FUNCTION_RCNT_RST = 2; // Restore assigned data
+const int TAG_ITEM_FUNCTION_VS_DISP = 3; // Toggle vertical speed display
 const int TAG_ITEM_FUNCTION_CFL_SET_EDIT = 10; // Set CFL from edit (not registered)
 const int TAG_ITEM_FUNCTION_CFL_MENU = 11; // Open CFL popup menu
 const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit
@@ -78,6 +79,7 @@ constexpr auto SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 constexpr auto SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
 constexpr auto SETTING_AMEND_CFL = "AmendQFEinCFL";
 constexpr auto SETTING_FORCE_FEET = "ForceFeet";
+constexpr auto SETTING_VS_DISP = "DisplayVS";
 // COLOR DEFINITIONS
 constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
 constexpr auto SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
@@ -133,6 +135,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	m_AutoRetrack = setar == nullptr ? 0 : std::stoi(setar);
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
 	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : std::stoi(setff) != 0);
+	const char* setvs = GetDataFromSettings(SETTING_VS_DISP);
+	m_TrackedRecorder->ToggleVerticalSpeed(setvs == nullptr ? true : std::stoi(setvs) != 0);
 
 	m_TransitionLevel = std::make_unique<TransitionLevel>(this);
 	const char* settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
@@ -182,6 +186,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
+	RegisterTagItemFunction("Toggle vertical speed display", TAG_ITEM_FUNCTION_VS_DISP);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
 	RegisterTagItemFunction("Open CFL popup edit", TAG_ITEM_FUNCTION_CFL_EDIT);
 	RegisterTagItemFunction("Confirm CFL / Open Topsky CFL menu", TAG_ITEM_FUNCTION_CFL_TOPSKY);
@@ -253,6 +258,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 
 		break; }
 	case TAG_ITEM_TYPE_VS_FPM: {
+		if (!RadarTarget.IsValid() || !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID()))
+			break;
 		int vs = abs(CalculateVerticalSpeed(RadarTarget));
 		if (vs > 100)
 			sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
@@ -562,6 +569,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_RCNT_RST: {
 		if (!FlightPlan.IsValid()) break;
 		m_TrackedRecorder->SetTrackedData(FlightPlan);
+
+		break; }
+	case TAG_ITEM_FUNCTION_VS_DISP: {
+		if (!RadarTarget.IsValid()) break;
+		m_TrackedRecorder->ToggleVerticalSpeed(std::string(RadarTarget.GetSystemID()));
 
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET_MENU: {
@@ -1088,6 +1100,24 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		return true;
 	}
 
+	// set vertical speed display
+	std::regex rxvs("^.MTEP VS (ON|OFF)$", std::regex_constants::icase);
+	if (regex_match(cmd, match, rxvs)) {
+		std::string res = MakeUpper(match[1].str());
+		const char* descr = "display vertical speed";
+		if (res == "ON") {
+			m_TrackedRecorder->ToggleVerticalSpeed(true);
+			SaveDataToSettings(SETTING_VS_DISP, descr, "1");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is ON", 1, 0, 0, 0, 0);
+		}
+		else if (res == "OFF") {
+			m_TrackedRecorder->ToggleVerticalSpeed(false);
+			SaveDataToSettings(SETTING_VS_DISP, descr, "0");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is OFF", 1, 0, 0, 0, 0);
+		}
+		return true;
+	}
+
 	// load transition level
 	std::regex rxtl("^.MTEP TL (.+\\.CSV)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxtl)) {
@@ -1256,6 +1286,8 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	m_TrackedRecorder.reset(new TrackedRecorder(this));
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
 	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : std::stoi(setff) != 0);
+	const char* setvs = GetDataFromSettings(SETTING_VS_DISP);
+	m_TrackedRecorder->ToggleVerticalSpeed(setvs == nullptr ? false : std::stoi(setvs) != 0);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 
