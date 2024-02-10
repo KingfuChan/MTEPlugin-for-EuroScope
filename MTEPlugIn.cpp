@@ -14,11 +14,11 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 #endif // !COPYRIGHTS
 
 // TAG ITEM TYPE
-const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS(KPH) with trend indicator
+const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS (KPH) with trend indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_FPM = 3; // Vertical speed (4-digit FPM)
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb/Descend/Level indicator
-const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m)
+const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m/ft)
 const int TAG_ITEM_TYPE_CFL_FLX = 6; // Cleared flight level (m/FL)
 const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level (ICAO)
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
@@ -35,6 +35,7 @@ const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_TIEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
+const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -88,6 +89,7 @@ constexpr auto SETTING_COLOR_DS_NUMBR = "Color/DSRestore";
 constexpr auto SETTING_COLOR_DS_STATE = "Color/DSNotCleared";
 constexpr auto SETTING_COLOR_RDRV_IND = "Color/RadarVector";
 constexpr auto SETTING_COLOR_RECONT_IND = "Color/Reconnected";
+constexpr auto SETTING_COLOR_RVSM_IND = "Color/RVSMIndicator";
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -155,11 +157,11 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
-	RegisterTagItemType("GS(KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
+	RegisterTagItemType("GS (KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("Vertical speed (4-digit FPM)", TAG_ITEM_TYPE_VS_FPM);
 	RegisterTagItemType("Climb/Descend/Level indicator", TAG_ITEM_TYPE_LVL_IND);
-	RegisterTagItemType("Actual altitude (m)", TAG_ITEM_TYPE_AFL_MTR);
+	RegisterTagItemType("Actual altitude (m/ft)", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("Cleared flight level (m/FL)", TAG_ITEM_TYPE_CFL_FLX);
 	RegisterTagItemType("Final flight level (ICAO)", TAG_ITEM_TYPE_RFL_ICAO);
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
@@ -176,6 +178,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Departure status", TAG_TIEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
+	RegisterTagItemType("Calculated GS (KPH)", TAG_ITEM_TYPE_GS_CALC);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -225,6 +228,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int dspgs = curgs ? curgs : RadarTarget.GetGS();
 		dspgs = (int)round(KN_KPH((double)dspgs) / 10.0);
 		sprintf_s(sItemString, 5, "%03d%c", OVRFLW3(dspgs), gsTrend);
+
+		break; }
+	case TAG_ITEM_TYPE_GS_CALC: {
+		if (!RadarTarget.IsValid()) break;
+		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
+		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
+		double distance = prepos.GetPosition().DistanceTo(curpos.GetPosition()); // n miles
+		int elapsed = prepos.GetReceivedTime() - curpos.GetReceivedTime(); // seconds
+		double gscal = distance / elapsed * 3600.0; // knots
+		int dspgs = KN_KPH((double)gscal) / 10.0;
+		std::string strgs = std::format("{:03d}", OVRFLW3(dspgs));
+		strcpy_s(sItemString, strgs.size() + 1, strgs.c_str());
 
 		break; }
 	case TAG_ITEM_TYPE_RMK_IND: {
@@ -371,15 +386,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
 		std::string acinf = fpdata.GetAircraftInfo();
+		char ind = ' ';
 		if (!strcmp(fpdata.GetPlanType(), "V"))
-			sprintf_s(sItemString, 2, "V");
+			ind = 'V';
 		else if (acinf.size() <= 8) { // assume FAA format
 			char capa = fpdata.GetCapibilities();
-			if (capa == 'H' || capa == 'W' || capa == 'J' || capa == 'K' || capa == 'L' || capa == 'Z' || capa == '?')
-				sprintf_s(sItemString, 2, " ");
-			else {
-				sprintf_s(sItemString, 2, "X");
-			}
+			if (std::string("HWJKLZ?").find(capa) == std::string::npos)
+				ind = 'X';
 		}
 		else { // assume ICAO format
 			std::string acet;
@@ -391,11 +404,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			else { // no () in string, for erroneous simbrief prefile. e.g. A333/H-SDE3GHIJ2J3J5M1RVWXY/LB2D1
 				acet = acinf.substr(acinf.find('-') + 1);
 			}
-			if (acet.substr(0, acet.find('/')).find('W') != std::string::npos)
-				sprintf_s(sItemString, 2, " ");
-			else
-				sprintf_s(sItemString, 2, "X");
+			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
+				ind = 'X';
 		}
+		sprintf_s(sItemString, 2, "%c", ind);
+		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
+
 		break; }
 	case TAG_ITEM_TYPE_COMM_IND: {
 		if (!FlightPlan.IsValid()) break;
