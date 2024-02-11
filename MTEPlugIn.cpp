@@ -58,6 +58,8 @@ const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit
 const int TAG_ITEM_FUNCTION_DSQ_STS = 52; // Set departure status
 const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registered)
 const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
+const int TAG_ITEM_FUNCTION_UNIT_MENU = 70; // Open unit settings popup menu
+const int TAG_ITEM_FUNCTION_UNIT_SET = 71; // Set unit from menu (not registered)
 
 // COMPUTERISING RELATED
 static constexpr double KN_KPH(const double& k) { return 1.85184 * k; } // 1 knot = 1.85184 kph
@@ -197,6 +199,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
 	RegisterTagItemFunction("Set departure status", TAG_ITEM_FUNCTION_DSQ_STS);
 	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
+	RegisterTagItemFunction("Open unit settings popup menu", TAG_ITEM_FUNCTION_UNIT_MENU);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
 		(std::string("MTEPlugin loaded! For help please refer to ") + GITHUB_LINK).c_str(),
@@ -280,7 +283,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
 		int dspAlt;
 		std::string tmpStr;
-		if (!m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget)) {
+		if (!m_TrackedRecorder->IsForceFeet(RadarTarget)) {
 			dspAlt = (int)round(MetricAlt::FeettoM(rdrAlt) / 10.0);
 			tmpStr = std::format("{:04d}", OVRFLW4(dspAlt));
 		}
@@ -324,7 +327,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			int trslvl, elev;
 			bool isQFE = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev).size() && elev && cflAlt < trslvl;
 			cflAlt -= isQFE ? elev : 0;
-			bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget);
+			bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan);
 			if (!isfeet) {
 				if (MetricAlt::RflFeettoM(cflAlt, dspAlt)) { // is metric RVSM
 					dspAlt = dspAlt / 10;
@@ -360,7 +363,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int dspMtr;
-		if (MetricAlt::RflFeettoM(rflAlt, dspMtr) && !m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget)) {
+		if (MetricAlt::RflFeettoM(rflAlt, dspMtr) && !m_TrackedRecorder->IsForceFeet(FlightPlan)) {
 			// is metric RVSM and not forced feet
 			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
 			sprintf_s(sItemString, 6, "%c%04d", trsMrk, OVRFLW4(dspMtr / 10));
@@ -379,14 +382,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break; }
 	case TAG_ITEM_TYPE_RFL_IND: {
-		if (!FlightPlan.IsValid() ||
-			!FlightPlan.GetTrackingControllerIsMe() ||
-			m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget))
-			break;
+		if (!FlightPlan.IsValid()) break;
+		bool plnfeet = m_TrackedRecorder->IsForceFeet(FlightPlan);
 		int rflAlt = FlightPlan.GetFinalAltitude();
 		int _meter;
-		if (!MetricAlt::RflFeettoM(rflAlt, _meter))  // not metric RVSM
-			sprintf_s(sItemString, 2, "#");
+		bool rflfeet = !MetricAlt::RflFeettoM(rflAlt, _meter);
+		if (plnfeet != rflfeet)  // discrepancy
+			strcpy_s(sItemString, 2, "#");
 
 		break; }
 	case TAG_ITEM_TYPE_RVSM_IND: {
@@ -578,7 +580,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_CFL_SET_MENU: {
 		if (!FlightPlan.IsValid()) break;
-		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget));
+		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackedRecorder->IsForceFeet(FlightPlan));
 		if (tgtAlt > MetricAlt::ALT_MAP_NOT_FOUND) {
 			if (tgtAlt == 1 || tgtAlt == 2) { // ILS or VA
 				FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
@@ -595,11 +597,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		if (!FlightPlan.IsValid() || !strlen(sItemString)) break;
 		std::string input = MakeUpper(sItemString);
 		if (input == "F") {
-			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
+			m_TrackedRecorder->SetAltitudeUnit(FlightPlan, true);
 			break;
 		}
 		else if (input == "M") {
-			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), false);
+			m_TrackedRecorder->SetAltitudeUnit(FlightPlan, false);
 			break;
 		}
 		int tgtAlt = -1;
@@ -650,7 +652,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, ref);
 		int trslvl, elev;
 		m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
-		auto m_alt = MetricAlt::GetMenuItems(!m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget), trslvl);
+		auto m_alt = MetricAlt::GetMenuItems(!m_TrackedRecorder->IsForceFeet(FlightPlan), trslvl);
 		if (elev) { // QFE in use
 			cflAlt -= cflAlt > 2 && cflAlt < trslvl ? elev : 0;
 			// remove unavailable altitudes from list
@@ -729,7 +731,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_RFL_SET_MENU: {
 		if (!FlightPlan.IsValid()) break;
-		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget));
+		int tgtAlt = MetricAlt::GetAltitudeFromMenuItem(sItemString, !m_TrackedRecorder->IsForceFeet(FlightPlan));
 		if (tgtAlt > MetricAlt::ALT_MAP_NOT_FOUND) {
 			FlightPlan.GetControllerAssignedData().SetFinalAltitude(tgtAlt);
 		}
@@ -739,11 +741,11 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		CFlightPlanControllerAssignedData ctrData = FlightPlan.GetControllerAssignedData();
 		std::string input = MakeUpper(sItemString);
 		if (input == "F") {
-			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), true);
+			m_TrackedRecorder->SetAltitudeUnit(FlightPlan, true);
 			break;
 		}
 		else if (input == "M") {
-			m_TrackedRecorder->SetAltitudeUnit(FlightPlan.GetCallsign(), false);
+			m_TrackedRecorder->SetAltitudeUnit(FlightPlan, false);
 			break;
 		}
 		std::regex rxm("^([0-9]{1,3})$");
@@ -766,7 +768,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupList(Area, "RFL Menu", 1);
 		// pre-select altitude
 		int rflAlt = FlightPlan.GetFinalAltitude();
-		auto m_alt = MetricAlt::GetMenuItems(!m_TrackedRecorder->IsForceFeet(FlightPlan, RadarTarget), 0);
+		auto m_alt = MetricAlt::GetMenuItems(!m_TrackedRecorder->IsForceFeet(FlightPlan), 0);
 		int minAlt = std::ranges::min_element(m_alt, {}, [&](const auto& a) { return abs(a.altitude - rflAlt); })->altitude;
 		for (auto it = m_alt.rbegin(); it != m_alt.rend(); it++) {
 			if (it->altitude > 3) {
@@ -892,6 +894,42 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 				AddPopupListElement(mc, nullptr, TAG_ITEM_FUNCTION_SPD_SET, amac ? amac == m : m == 80);
 			}
 			AddPopupListElement("----", nullptr, TAG_ITEM_FUNCTION_SPD_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, true);
+		}
+		break; }
+	case TAG_ITEM_FUNCTION_UNIT_MENU: {
+		bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan) || m_TrackedRecorder->IsForceFeet(RadarTarget);
+		bool isknot = false;
+		bool showvs = m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.IsValid() ? RadarTarget.GetSystemID() : "");
+		OpenPopupList(Area, "Units", 2);
+		std::vector<std::string> unitvec = {
+			std::format("{}{}","ALT:", isfeet ? "F" : "M"),
+			std::format("{}{}","SPD:" , isknot ? "S" : "K"),
+			std::format("{}{}","VS :" , showvs ? "O" : "X"),
+		}; // fix length=5
+		for (const auto& s : unitvec) {
+			AddPopupListElement(s.c_str(), "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
+		}
+		break; }
+	case TAG_ITEM_FUNCTION_UNIT_SET: {
+		std::string type = sItemString;
+		char c = type.at(4);
+		if (type.substr(0, 3) == "ALT") {
+			if (RadarTarget.IsValid()) {
+				m_TrackedRecorder->SetAltitudeUnit(RadarTarget, c != 'F');
+			}
+			else if (FlightPlan.IsValid()) {
+				m_TrackedRecorder->SetAltitudeUnit(FlightPlan, c != 'F');
+			}
+		}
+		else if (type.substr(0, 3) == "SPD") {
+			if (RadarTarget.IsValid()) {
+				// TODO
+			}
+		}
+		else if (type.substr(0, 3) == "VS ") {
+			if (RadarTarget.IsValid()) {
+				m_TrackedRecorder->ToggleVerticalSpeed(RadarTarget.GetSystemID());
+			}
 		}
 		break; }
 	default:
@@ -1287,7 +1325,7 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
 	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : std::stoi(setff) != 0);
 	const char* setvs = GetDataFromSettings(SETTING_VS_DISP);
-	m_TrackedRecorder->ToggleVerticalSpeed(setvs == nullptr ? false : std::stoi(setvs) != 0);
+	m_TrackedRecorder->ToggleVerticalSpeed(setvs == nullptr ? true : std::stoi(setvs) != 0);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is reset!", 1, 0, 0, 0, 0);
 }
 
