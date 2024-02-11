@@ -341,6 +341,35 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 	return true;
 }
 
+bool TrackedRecorder::IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	std::shared_lock slock(speed_Mutex);
+	if (RadarTarget.IsValid() && m_SpeedUnitSysID.contains(RadarTarget.GetSystemID())) {
+		return !m_DefaultKnot;
+	}
+	return m_DefaultKnot;
+}
+
+void TrackedRecorder::SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot)
+{
+	if (!RadarTarget.IsValid()) return;
+	std::unique_lock slock(speed_Mutex);
+	std::string systemID = RadarTarget.GetSystemID();
+	if (knot == m_DefaultKnot) {
+		m_SpeedUnitSysID.erase(systemID);
+	}
+	else {
+		m_SpeedUnitSysID.insert(systemID);
+	}
+}
+
+void TrackedRecorder::SetSpeedUnit(const bool& knot)
+{
+	std::unique_lock slock(speed_Mutex);
+	m_SpeedUnitSysID.clear();
+	m_DefaultKnot = knot;
+}
+
 bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
 {
 	std::shared_lock v_lock(vsdsp_Mutex);

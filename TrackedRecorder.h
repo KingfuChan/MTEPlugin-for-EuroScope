@@ -27,6 +27,10 @@ public:
 	void ResetAltitudeUnit(const bool& feet);
 	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration = 5);
 
+	bool IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget);
+	void SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot);
+	void SetSpeedUnit(const bool& knot);
+
 	bool IsSquawkDUPE(const std::string& callsign);
 
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
@@ -111,6 +115,11 @@ private:
 	std::set<std::string> m_AltUnitTempo; // systemID, only stores those being temporarily toggled
 	std::unordered_map<std::string, std::shared_ptr<std::jthread>> m_TempUnitThread; // systemID -> thread
 	std::shared_mutex uthrd_Mutex, usysi_Mutex, ucals_Mutex, utemp_Mutex;
+
+	// speed unit
+	bool m_DefaultKnot = false;
+	std::set<std::string> m_SpeedUnitSysID; // systemID, only stores those different from default
+	std::shared_mutex speed_Mutex;
 
 	// toggle vertical speed display
 	bool m_GlobalVS = true; // global vs display, true=display

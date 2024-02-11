@@ -35,7 +35,7 @@ const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_TIEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
-const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH)
+const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH/KTS)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -81,6 +81,7 @@ constexpr auto SETTING_TRANS_LVL_CSV = "TransLevelCSV";
 constexpr auto SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT";
 constexpr auto SETTING_AMEND_CFL = "AmendQFEinCFL";
 constexpr auto SETTING_FORCE_FEET = "ForceFeet";
+constexpr auto SETTING_FORCE_KNOT = "ForceKnot";
 constexpr auto SETTING_VS_DISP = "DisplayVS";
 // COLOR DEFINITIONS
 constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
@@ -137,6 +138,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	m_AutoRetrack = setar == nullptr ? 0 : std::stoi(setar);
 	const char* setff = GetDataFromSettings(SETTING_FORCE_FEET);
 	m_TrackedRecorder->ResetAltitudeUnit(setff == nullptr ? 0 : std::stoi(setff) != 0);
+	const char* setfn = GetDataFromSettings(SETTING_FORCE_KNOT);
+	m_TrackedRecorder->SetSpeedUnit(setfn == nullptr ? 0 : std::stoi(setfn) != 0);
 	const char* setvs = GetDataFromSettings(SETTING_VS_DISP);
 	m_TrackedRecorder->ToggleVerticalSpeed(setvs == nullptr ? true : std::stoi(setvs) != 0);
 
@@ -184,7 +187,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Departure status", TAG_TIEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
-	RegisterTagItemType("Calculated GS (KPH)", TAG_ITEM_TYPE_GS_CALC);
+	RegisterTagItemType("Calculated GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -244,9 +247,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 		double distance = prepos.GetPosition().DistanceTo(curpos.GetPosition()); // n miles
 		int elapsed = prepos.GetReceivedTime() - curpos.GetReceivedTime(); // seconds
-		double gscal = distance / elapsed * 3600.0; // knots
-		int dspgs = KN_KPH((double)gscal) / 10.0;
-		std::string strgs = std::format("{:03d}", OVRFLW3(dspgs));
+		double gskts = distance / elapsed * 3600.0; // knots
+		std::string strgs = "";
+		if (m_TrackedRecorder->IsForceKnot(RadarTarget)) { // force knot
+			strgs = gskts < 995 ? std::format("{:02d} ", (int)round(gskts / 10.0)) : "++ "; // due to rounding
+		}
+		else { //convert to kph
+			double gskph = KN_KPH(gskts);
+			strgs = gskph < 1995 ? std::format("{:03d}", (int)round(gskph / 10.0)) : "+++"; // due to rounding
+		}
 		strcpy_s(sItemString, strgs.size() + 1, strgs.c_str());
 
 		break; }
@@ -898,7 +907,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break; }
 	case TAG_ITEM_FUNCTION_UNIT_MENU: {
 		bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan) || m_TrackedRecorder->IsForceFeet(RadarTarget);
-		bool isknot = false;
+		bool isknot = m_TrackedRecorder->IsForceKnot(RadarTarget);
 		bool showvs = m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.IsValid() ? RadarTarget.GetSystemID() : "");
 		OpenPopupList(Area, "Units", 2);
 		std::vector<std::string> unitvec = {
@@ -923,12 +932,12 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		else if (type.substr(0, 3) == "SPD") {
 			if (RadarTarget.IsValid()) {
-				// TODO
+				m_TrackedRecorder->SetSpeedUnit(RadarTarget, c != 'S');
 			}
 		}
 		else if (type.substr(0, 3) == "VS ") {
 			if (RadarTarget.IsValid()) {
-				m_TrackedRecorder->ToggleVerticalSpeed(RadarTarget.GetSystemID());
+				m_TrackedRecorder->ToggleVerticalSpeed(std::string(RadarTarget.GetSystemID()));
 			}
 		}
 		break; }
@@ -1120,20 +1129,30 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		return true;
 	}
 
-	// set force feet
-	std::regex rxff("^.MTEP TR (F|M)$", std::regex_constants::icase);
+	// set force feet and force knot
+	std::regex rxff("^.MTEP TR (F|M|S|K)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxff)) {
 		std::string res = MakeUpper(match[1].str());
 		const char* descr = "force feet";
 		if (res == "F") {
 			m_TrackedRecorder->ResetAltitudeUnit(true);
-			SaveDataToSettings(SETTING_FORCE_FEET, descr, "1");
+			SaveDataToSettings(SETTING_FORCE_FEET, "force feet", "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Altitude unit is set to feet", 1, 0, 0, 0, 0);
 		}
 		else if (res == "M") {
 			m_TrackedRecorder->ResetAltitudeUnit(false);
-			SaveDataToSettings(SETTING_FORCE_FEET, descr, "0");
+			SaveDataToSettings(SETTING_FORCE_FEET, "force feet", "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Altitude unit is set to meter", 1, 0, 0, 0, 0);
+		}
+		else if (res == "S") {
+			m_TrackedRecorder->SetSpeedUnit(true);
+			SaveDataToSettings(SETTING_FORCE_KNOT, "force knot", "1");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Speed unit is set to KTS", 1, 0, 0, 0, 0);
+		}
+		else if (res == "K") {
+			m_TrackedRecorder->SetSpeedUnit(false);
+			SaveDataToSettings(SETTING_FORCE_KNOT, "force knot", "0");
+			DisplayUserMessage("MESSAGE", "MTEPlugin", "Speed unit is set to KPH", 1, 0, 0, 0, 0);
 		}
 		return true;
 	}
