@@ -31,6 +31,8 @@ public:
 	void SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot);
 	void SetSpeedUnit(const bool& knot);
 
+	bool IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget);
+
 	bool IsSquawkDUPE(const std::string& callsign);
 
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);

@@ -36,6 +36,7 @@ const int TAG_TIEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
 const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH/KTS)
+const int TAG_ITEM_TYPE_UNIT_IND = 23; // Unit indicator
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -188,6 +189,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
 	RegisterTagItemType("Calculated GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
+	RegisterTagItemType("Unit indicator", TAG_ITEM_TYPE_UNIT_IND);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -557,6 +559,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		else if (strip.find("/s-/") != std::string::npos) {
 			sprintf_s(sItemString, 2, "-");
+		}
+		break; }
+	case TAG_ITEM_TYPE_UNIT_IND: {
+		if (!RadarTarget.IsValid()) break;
+		if (!m_TrackedRecorder->IsDifferentUnit(RadarTarget)) {
+			strcpy_s(sItemString, 2, " ");
 		}
 		break; }
 	default:

@@ -126,8 +126,8 @@ bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan)
 	auto RadarTarget = FlightPlan.GetCorrelatedRadarTarget();
 	std::shared_lock clock(ucals_Mutex), slock(usysi_Mutex), tlock(utemp_Mutex);
 	bool revc = m_AltUnitCallsign.contains(FlightPlan.GetCallsign());
-	bool revs = RadarTarget.IsValid() ? m_AltUnitSysID.contains(RadarTarget.GetSystemID()) : false;
-	bool revt = RadarTarget.IsValid() ? m_AltUnitTempo.contains(RadarTarget.GetSystemID()) : false;
+	bool revs = RadarTarget.IsValid() && m_AltUnitSysID.contains(RadarTarget.GetSystemID());
+	bool revt = RadarTarget.IsValid() && m_AltUnitTempo.contains(RadarTarget.GetSystemID());
 	return revt != ((revc || revs) != m_DefaultFeet);
 }
 
@@ -137,7 +137,7 @@ bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget)
 	if (!RadarTarget.IsValid()) return m_DefaultFeet;
 	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
 	std::shared_lock clock(ucals_Mutex), slock(usysi_Mutex), tlock(utemp_Mutex);
-	bool revc = FlightPlan.IsValid() ? m_AltUnitCallsign.contains(FlightPlan.GetCallsign()) : false;
+	bool revc = FlightPlan.IsValid() && m_AltUnitCallsign.contains(FlightPlan.GetCallsign());
 	bool revs = m_AltUnitSysID.contains(RadarTarget.GetSystemID());
 	bool revt = m_AltUnitTempo.contains(RadarTarget.GetSystemID());
 	return revt != ((revc || revs) != m_DefaultFeet);
@@ -368,6 +368,18 @@ void TrackedRecorder::SetSpeedUnit(const bool& knot)
 	std::unique_lock slock(speed_Mutex);
 	m_SpeedUnitSysID.clear();
 	m_DefaultKnot = knot;
+}
+
+bool TrackedRecorder::IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	if (!RadarTarget.IsValid()) return false;
+	std::shared_lock aclock(ucals_Mutex), ailock(usysi_Mutex), slock(speed_Mutex);
+	std::string callsign = RadarTarget.GetCorrelatedFlightPlan().IsValid() ? RadarTarget.GetCorrelatedFlightPlan().GetCallsign() : "";
+	std::string systemID = RadarTarget.GetSystemID();
+	bool revc = callsign.size() && m_AltUnitCallsign.contains(callsign);
+	bool revi = m_AltUnitSysID.contains(systemID);
+	bool revs = m_SpeedUnitSysID.contains(systemID);
+	return revc || revi || revs;
 }
 
 bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
