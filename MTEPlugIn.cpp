@@ -16,7 +16,7 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 // TAG ITEM TYPE
 const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS (KPH) with trend indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
-const int TAG_ITEM_TYPE_VS_FPM = 3; // Vertical speed (4-digit FPM)
+const int TAG_ITEM_TYPE_VS_AHIDE = 3; // Vertical speed (FPM, auto-hide)
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb/Descend/Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m/ft)
 const int TAG_ITEM_TYPE_CFL_FLX = 6; // Cleared flight level (m/FL)
@@ -37,6 +37,7 @@ const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
 const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH/KTS)
 const int TAG_ITEM_TYPE_UNIT_IND = 23; // Unit indicator
+const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, toggled)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -169,7 +170,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	RegisterTagItemType("GS (KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
-	RegisterTagItemType("Vertical speed (4-digit FPM)", TAG_ITEM_TYPE_VS_FPM);
+	RegisterTagItemType("Vertical speed (FPM, auto-hide)", TAG_ITEM_TYPE_VS_AHIDE);
 	RegisterTagItemType("Climb/Descend/Level indicator", TAG_ITEM_TYPE_LVL_IND);
 	RegisterTagItemType("Actual altitude (m/ft)", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("Cleared flight level (m/FL)", TAG_ITEM_TYPE_CFL_FLX);
@@ -190,6 +191,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
 	RegisterTagItemType("Calculated GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
 	RegisterTagItemType("Unit indicator", TAG_ITEM_TYPE_UNIT_IND);
+	RegisterTagItemType("Vertical speed (FPM, toggled)", TAG_ITEM_TYPE_VS_TOGGL);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -249,7 +251,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 		double distance = prepos.GetPosition().DistanceTo(curpos.GetPosition()); // n miles
 		int elapsed = prepos.GetReceivedTime() - curpos.GetReceivedTime(); // seconds
-		double gskts = distance / elapsed * 3600.0; // knots
+		double gskts = abs(distance / elapsed * 3600.0); // knots
 		std::string strgs = "";
 		if (m_TrackedRecorder->IsForceKnot(RadarTarget)) { // force knot
 			strgs = gskts < 995 ? std::format("{:02d} ", (int)round(gskts / 10.0)) : "++ "; // due to rounding
@@ -271,12 +273,19 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 2, " ");
 
 		break; }
-	case TAG_ITEM_TYPE_VS_FPM: {
-		if (!RadarTarget.IsValid() || !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID()))
-			break;
+	case TAG_ITEM_TYPE_VS_AHIDE: {
+		if (!RadarTarget.IsValid()) break;
 		int vs = abs(CalculateVerticalSpeed(RadarTarget));
 		if (vs > 100)
 			sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
+
+		break; }
+	case TAG_ITEM_TYPE_VS_TOGGL: {
+		if (!RadarTarget.IsValid() || !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID()))
+			break;
+		int vs = abs(CalculateVerticalSpeed(RadarTarget));
+		vs = vs > 100 ? vs : 0;
+		sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 
 		break; }
 	case TAG_ITEM_TYPE_LVL_IND: {
@@ -1450,13 +1459,10 @@ int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 	if (!RadarTarget.IsValid()) return 0;
 	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-	double curAlt = curpos.GetPressureAltitude();
-	double preAlt = prepos.GetPressureAltitude();
-	double preT = prepos.GetReceivedTime();
-	double curT = curpos.GetReceivedTime();
-	double deltaT = preT - curT;
+	double deltaA = curpos.GetFlightLevel() - prepos.GetFlightLevel();
+	double deltaT = prepos.GetReceivedTime() - curpos.GetReceivedTime();
 	deltaT = deltaT ? deltaT : INFINITE;
-	return (int)round((curAlt - preAlt) / deltaT * 60.0);
+	return (int)round(deltaA / deltaT * 60.0);
 }
 
 bool IsCFLAssigned(CFlightPlan FlightPlan)
