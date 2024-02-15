@@ -119,41 +119,72 @@ void TrackedRecorder::SetCFLConfirmed(const std::string& callsign, const bool co
 		r->second.m_CFLConfirmed = confirmed;
 }
 
-bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan, EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
-	// input callsign can be RadarTarget SystemID as well
-	// priority: m_TempUnitSysID (SystemID) > m_TrackedMap (Callsign) >= m_TrackedMap (SystemID)
-	bool isfeet = m_DefaultFeet;
-	std::string callsign = FlightPlan.IsValid() ? FlightPlan.GetCallsign() : "";
-	std::string systemid = RadarTarget.IsValid() ? RadarTarget.GetSystemID() : "";
-	std::shared_lock mlock(tr_Mutex), ulock(usysi_Mutex);
-	auto r = std::find_if(m_TrackedMap.begin(), m_TrackedMap.end(),
-		[callsign, systemid](const auto& tr) {
-			return tr.first == callsign || tr.second.m_SystemID == systemid;
-		});
-	std::string newid = systemid;
-	if (r != m_TrackedMap.end()) {
-		isfeet = r->second.m_ForceFeet;
-		newid = r->second.m_SystemID;
-	}
-	return !newid.empty() && m_TempUnitSysID.contains(newid) ? !isfeet : isfeet;
+	// either m_AltUnitCallsign or m_AltUnitSysID will reverse default unit
+	if (!FlightPlan.IsValid()) return m_DefaultFeet;
+	auto RadarTarget = FlightPlan.GetCorrelatedRadarTarget();
+	std::shared_lock clock(ucals_Mutex), slock(usysi_Mutex), tlock(utemp_Mutex);
+	bool revc = m_AltUnitCallsign.contains(FlightPlan.GetCallsign());
+	bool revs = RadarTarget.IsValid() && m_AltUnitSysID.contains(RadarTarget.GetSystemID());
+	bool revt = RadarTarget.IsValid() && m_AltUnitTempo.contains(RadarTarget.GetSystemID());
+	return revt != ((revc || revs) != m_DefaultFeet);
 }
 
-void TrackedRecorder::SetAltitudeUnit(const std::string& callsign, const bool& feet)
+bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	std::unique_lock mlock(tr_Mutex);
-	auto r = m_TrackedMap.find(callsign);
-	if (r != m_TrackedMap.end())
-		r->second.m_ForceFeet = feet;
+	// either m_AltUnitCallsign or m_AltUnitSysID will reverse default unit
+	if (!RadarTarget.IsValid()) return m_DefaultFeet;
+	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
+	std::shared_lock clock(ucals_Mutex), slock(usysi_Mutex), tlock(utemp_Mutex);
+	bool revc = FlightPlan.IsValid() && m_AltUnitCallsign.contains(FlightPlan.GetCallsign());
+	bool revs = m_AltUnitSysID.contains(RadarTarget.GetSystemID());
+	bool revt = m_AltUnitTempo.contains(RadarTarget.GetSystemID());
+	return revt != ((revc || revs) != m_DefaultFeet);
+}
+
+void TrackedRecorder::SetAltitudeUnit(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& feet)
+{
+	if (!FlightPlan.IsValid() || IsForceFeet(FlightPlan) == feet) return; // no need to change
+	std::unique_lock uclock(ucals_Mutex), uslock(usysi_Mutex);
+	std::string callsign = FlightPlan.GetCallsign();
+	std::string systemID = FlightPlan.GetCorrelatedRadarTarget().IsValid() ? FlightPlan.GetCorrelatedRadarTarget().GetSystemID() : "";
+	if (feet != m_DefaultFeet) {
+		m_AltUnitCallsign.insert(callsign);
+		if (systemID.size()) {
+			m_AltUnitSysID.insert(systemID);
+		}
+	}
+	else {
+		m_AltUnitCallsign.erase(callsign);
+		m_AltUnitSysID.erase(systemID);
+	}
+}
+
+void TrackedRecorder::SetAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& feet)
+{
+	if (!RadarTarget.IsValid() || IsForceFeet(RadarTarget) == feet) return;
+	std::unique_lock uclock(ucals_Mutex), uslock(usysi_Mutex);
+	std::string systemID = RadarTarget.GetSystemID();
+	std::string callsign = RadarTarget.GetCorrelatedFlightPlan().IsValid() ? RadarTarget.GetCorrelatedFlightPlan().GetCallsign() : "";
+	if (feet != m_DefaultFeet) {
+		m_AltUnitSysID.insert(systemID);
+		if (callsign.size()) {
+			m_AltUnitCallsign.insert(callsign);
+		}
+	}
+	else {
+		m_AltUnitSysID.erase(systemID);
+		m_AltUnitCallsign.erase(callsign);
+	}
 }
 
 void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
 {
 	m_DefaultFeet = feet;
-	std::unique_lock mlock(tr_Mutex);
-	for (auto& [c, d] : m_TrackedMap) {
-		d.m_ForceFeet = feet;
-	}
+	std::shared_lock clock(ucals_Mutex), slock(usysi_Mutex);
+	m_AltUnitSysID.clear();
+	m_AltUnitCallsign.clear();
 }
 
 bool TrackedRecorder::IsSquawkDUPE(const std::string& callsign)
@@ -275,12 +306,12 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 {
 	// set TR->ForceFeet for duration seconds, return true is keyboard alt is pressed
 	if (!RadarTarget.IsValid() || !(GetAsyncKeyState(VK_MENU) & 0x8000)) return false; // keyboard alt is not pressed
-	std::unique_lock uslock(usysi_Mutex);
+	std::unique_lock uslock(utemp_Mutex);
 	std::unique_lock utlock(uthrd_Mutex);
 	std::string systemid = RadarTarget.GetSystemID();
-	auto ucitr = m_TempUnitSysID.find(systemid);
-	if (ucitr != m_TempUnitSysID.end()) { // there is a previous toggle
-		m_TempUnitSysID.erase(ucitr);
+	auto ucitr = m_AltUnitTempo.find(systemid);
+	if (ucitr != m_AltUnitTempo.end()) { // there is a previous toggle
+		m_AltUnitTempo.erase(ucitr);
 		uslock.unlock();
 		m_TempUnitThread.erase(systemid); // implies stop request
 		utlock.unlock();
@@ -289,9 +320,9 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 		// clean up previous thread
 		std::erase_if(m_TempUnitThread, [this](const auto& thrd) {
 			const auto& [i, t] = thrd;
-			return !m_TempUnitSysID.contains(i);
+			return !m_AltUnitTempo.contains(i);
 			});
-		m_TempUnitSysID.insert(systemid);
+		m_AltUnitTempo.insert(systemid);
 		uslock.unlock();
 		auto jt = std::make_shared<std::jthread>([this, systemid, duration](std::stop_token stoken) {
 			std::mutex t_mutex;
@@ -300,14 +331,79 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 				return false;
 				});
 			if (!stoken.stop_requested()) {
-				std::unique_lock uclock1(usysi_Mutex);
-				m_TempUnitSysID.erase(systemid);
+				std::unique_lock uclock1(utemp_Mutex);
+				m_AltUnitTempo.erase(systemid);
 			}
 			});
 		m_TempUnitThread.insert({ systemid,jt });
 		utlock.unlock();
 	}
 	return true;
+}
+
+bool TrackedRecorder::IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	std::shared_lock slock(speed_Mutex);
+	if (RadarTarget.IsValid() && m_SpeedUnitSysID.contains(RadarTarget.GetSystemID())) {
+		return !m_DefaultKnot;
+	}
+	return m_DefaultKnot;
+}
+
+void TrackedRecorder::SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot)
+{
+	if (!RadarTarget.IsValid()) return;
+	std::unique_lock slock(speed_Mutex);
+	std::string systemID = RadarTarget.GetSystemID();
+	if (knot == m_DefaultKnot) {
+		m_SpeedUnitSysID.erase(systemID);
+	}
+	else {
+		m_SpeedUnitSysID.insert(systemID);
+	}
+}
+
+void TrackedRecorder::SetSpeedUnit(const bool& knot)
+{
+	std::unique_lock slock(speed_Mutex);
+	m_SpeedUnitSysID.clear();
+	m_DefaultKnot = knot;
+}
+
+bool TrackedRecorder::IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget)
+{
+	if (!RadarTarget.IsValid()) return false;
+	std::shared_lock aclock(ucals_Mutex), ailock(usysi_Mutex), slock(speed_Mutex);
+	std::string callsign = RadarTarget.GetCorrelatedFlightPlan().IsValid() ? RadarTarget.GetCorrelatedFlightPlan().GetCallsign() : "";
+	std::string systemID = RadarTarget.GetSystemID();
+	bool revc = callsign.size() && m_AltUnitCallsign.contains(callsign);
+	bool revi = m_AltUnitSysID.contains(systemID);
+	bool revs = m_SpeedUnitSysID.contains(systemID);
+	return revc || revi || revs;
+}
+
+bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
+{
+	std::shared_lock v_lock(vsdsp_Mutex);
+	if (systemID.size() && m_DisplayVS.contains(systemID)) {
+		return !m_GlobalVS;
+	}
+	return m_GlobalVS;
+}
+
+void TrackedRecorder::ToggleVerticalSpeed(const std::string& systemID)
+{
+	std::unique_lock v_lock(vsdsp_Mutex);
+	if (!m_DisplayVS.erase(systemID)) {
+		m_DisplayVS.insert(systemID);
+	}
+}
+
+void TrackedRecorder::ToggleVerticalSpeed(const bool& display)
+{
+	std::unique_lock v_lock(vsdsp_Mutex);
+	m_DisplayVS.clear();
+	m_GlobalVS = display;
 }
 
 std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(const std::string& systemID)

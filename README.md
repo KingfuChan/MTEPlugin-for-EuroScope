@@ -4,56 +4,90 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 
 ## Tag Item Types
 
-1. **GS(KPH) with trend indicator** - ground speed in kph, with accel(A) and decel(L) indicator. Trend threshold is 5 KPH compared to last radar position.
-2. **RMK/STS indicator** - shows a **\*** if RMK/ or STS/ is found in flight plan remarks.
-3. **Vertical speed (4-digit FPM)** - vertical speed in xxxx, will not display if vs<=100 fpm.
-4. **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator. Threshold is 100 fpm.
-5. **Actual altitude (m)** - uses QNH/QFE altitude below transition level and STD altitude above.
-    + Allows custom number mapping if below transition level. See [below](#other-command-line-features).
-    + Transition level and QFE settings can be customized. See [**TL**](#transition-level-tl) below.
-6. **Cleared flight level (m/FL)** - shows Chinese metric RVSM levels if matches (4 digits), or FLxxx (3 digits), otherwise calculated meters (4 digits).
-7. **Cleared flight level (m)** - shows Chinese metric RVSM levels if matches, otherwise calculated meters.
-    + Similar to item 6, but won't show ILS/VA. More useful in a Sweatbox simulator session.
-8. **Final flight level (ICAO)** - shows Chinese metric RVSM levels if matches, otherwise flight level.
-    + Sxxx (above transition level), Mxxx (below transition level), Fxxx (regardless of transition level).
-9. **RFL unit indicator** - shows **#** if final altitude of tracked aircraft does not match Chinese metric RVSM levels.
-10. **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
-11. **RECAT-CN (H-B/C)** - wake turbulence re-categorization (RECAT-CN) for H(eavy) aircrafts. Only includes **-B -C**.
-12. **RECAT-CN (LMCBJ)** - wake turbulence re-categorization (RECAT-CN) for all aircrafts. Includes **L M C B J**.
-13. **Route validity** - route checker item, see [**RC**](#route-checker-rc) below.
-14. **Departure sequence** - departure sequence item.
-15. **Departure status** - departure sequence item.
-    + See [**DS**](#departure-sequence-ds) below.
-16. **Radar vector indicator** - shows **RV** for tracked aircraft with heading assigned.
-    + In the color of [`Color/RadarVector`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
-17. **COMM ESTB indicator** - tracked recorder item.
-18. **Tracked DUPE warning** - tracked recorder item.
-19. **Similar callsign indicator** - tracked recorder item.
-20. **Reconnected indicator** - tracked recorder item.
-    + See [**TR**](#tracked-recorder-tr) below.
-21. **Assigned speed bound (Topsky, +/-)** - shows a corresponding speed bound (**+**/**-**) assigned by Topsky.
+### Speed Related Items
+
++ **GS(KPH) with trend indicator** - ground speed in KPH, with accel(A) and decel(L) indicator. Trend threshold is 5 KPH compared to last radar position.
++ **Calculated GS (KPH/KTS)** - always use system-calculated GS. Shows 3-digit-KPH or 2-digit-KTS/Knots.
+  + E.g. **080** for 800 KPH, **45** for 450 Knots.
+  + Shows **+++** when GS > 1994 KPH, or shows **++** when GS > 994 KTS.
+  + The unit of this item can be configured or toggled, see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Assigned speed bound (Topsky, +/-)** - shows a corresponding speed bound (**+**/**-**) assigned by Topsky.
+
+### Altitude Related Items
+
++ **Actual altitude (m)** - uses QNH/QFE altitude below transition level and STD altitude above. Also known as **AFL** or **CRL**.
+  + Allows custom number mapping if below transition level. See [below](#other-command-line-features).
+  + Transition level and QFE settings can be customized. See [**Transition Level**](#transition-level-tl).
++ **Cleared flight level (m/FL)** - includes ILS or VA. Also known as **CFL**. Will match value in the following order.
+  + 4-digit [Chinese metric RVSM levels](https://www.vatprc.net/rvsm)
+  + 3-digit flight levels
+  + Convert to 4-digit meters
++ **Cleared flight level (m)** - (deprecated) always shows CFL in meters. More useful in a SweatBox session.
++ **Final flight level (ICAO)** - matches Chinese metric RVSM levels, or FLxxx. Also known as **RFL**.
+  + Metric: Sxxx (above transition level), Mxxx (below transition level)
+  + Imperial: Fxxx (regardless of transition level).
+
+### VS related Items
+
++ **Vertical speed (FPM, auto-hide)** - vertical speed in 4-digit feet-per-minute, hidden below 100 FPM.
++ **Vertical speed (FPM, toggled)** - vertical speed in 4-digit feet-per-minute, visible when toggled on (no threshold).
+  + Toggle this item by [**Toggle vertical speed display**](#tag-display-related-functions) or [**Open unit settings popup menu**](#tag-display-related-functions)
++ **Climb/Descend/Level indicator** - combination of climb, descent, level flight indicator. Threshold is 100 FPM.
+
+### Indicator and Warning Sign Items
+
++ **RMK/STS indicator** - shows **\*** if RMK/ or STS/ is found in flight plan remarks.
++ **RFL unit indicator** - shows **#** if RFL and current tag are using different altitude unit.
++ **Unit indicator** - shows **A SPACE** i the tag is not using golbal altitude or speed unit.
++ **RVSM indicator** - shows **V** for VFR flights, **A SPACE** if aircraft has RVSM capability, **X** if not.
+  + In the color of [`Color/RVSMIndicator`](#tag-item-type-colors) if defined.
++ **COMM ESTB indicator** - see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Tracked DUPE warning** - see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Similar callsign indicator** - see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Reconnected indicator** - see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Radar vector indicator** - shows **RV** for tracked aircraft with an assigned heading.
+  + In the color of [`Color/RadarVector`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`.
+
+### Other Items
+
++ **RECAT-CN (H-B/C)** - wake turbulence re-categorization (RECAT-CN) for H(eavy) aircrafts. Only includes **-B -C**.
++ **RECAT-CN (LMCBJ)** - wake turbulence re-categorization (RECAT-CN) for all aircrafts. Includes **L M C B J**.
++ **Route validity** - see [**Route Checker**](#route-checker-rc).
++ **Departure sequence** - see [**Departure Sequence**](#departure-sequence-ds).
++ **Departure status** - see [**Departure Sequence**](#departure-sequence-ds).
 
 ## Tag Item Functions
 
-1. **Open CFL popup menu** - Chinese metric RVSM altitudes. Includes ILS/VA/NONE options.
-2. **Open RFL popup menu** - Chinese metric RVSM altitudes.
-   + Menu items are customizable, see [**MA**](#customizable-cflrfl-menu-ma) below.
-3. **Open CFL popup edit** - Chinese metric RVSM altitudes.
-4. **Open RFL popup edit** - Chinese metric RVSM altitudes.
-   + CFL popup edit supports (standalone or in-menu): **`xxx`** for metric RVSM levels, **`Fxxx`** for FLxxx, **`550.`** for 550m, **`F4500.`** for 4500ft, etc. Enter **`0`** to clear CFL.
-   + RFL popup edit supports: **`xxx`** for metric, **`Fxxx`** for FLxxx. Enter **`0`** to reset RFL to the final altitude in flight plan.
-   + Enter a **`F`** or **`M`** (case-insensitive) will force all altitude displays for this aircraft in imperial or metric unit, only for tracked aircrafts.
-5. **Confirm CFL / Open Topsky CFL menu** - confirm CFL if not yet confirmed (see [**TR**](#tracked-recorder-tr)), otherwise opens Topsky CFL Menu.
-   + Hold ALT key down while calling these CFL/RFL menu/edit functions to temporarily switch altitude unit for 5 seconds. This is also functional for uncorrelated radar targets.
-6. **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
-7. **Show route checker info** - route checker function, see [**RC**](#route-checker-rc) below.
-8. **Set departure sequence** - departure sequence function.
-9.  **Set departure status** - departure sequence function.
-    + See [**DS**](#departure-sequence-ds) below.
-10. **Set COMM ESTB** - tracked recorder function.
-11. **Open similar callsign list** - tracked recorder function.
-12. **Restore assigned data** - tracked recorder function.
-    + See [**TR**](#tracked-recorder-tr) below.
+### Altiutude Related Functions
+
+Hold ALT key down while calling any of the following functions to temporarily switch altitude unit for 5 seconds. This is also functional for uncorrelated radar targets.
+
++ **Open CFL popup menu** - includes Chinese metric RVSM altitudes, ILS/VA/NONE and popup-edit option.
++ **Open RFL popup menu** - includes Chinese metric RVSM altitudes and popup-edit option.
+  + Menu items are customizable, see [**Customizable CFL/RFL Menu**](#customizable-cflrfl-menu-ma).
++ **Open CFL popup edit**, **Open RFL popup edit**.
+  + CFL popup edit supports (standalone or in-menu): **`xxx`** for metric RVSM levels, **`Fxxx`** for FLxxx, **`550.`** for 550m, **`F4500.`** for 4500ft, etc. Enter **`0`** to clear CFL.
+  + RFL popup edit supports: **`xxx`** for metric, **`Fxxx`** for FLxxx. Enter **`0`** to reset RFL to the final altitude in flight plan.
+  + Enter **`F`** or **`M`** (case-insensitive) to change AFL/CRL, CFL and RFL tag itmes to imperial or metric unit.
++ **Confirm CFL / Open Topsky CFL menu** - confirm CFL if not yet confirmed (see [**Tracked Recorder**](#tracked-recorder-tr)), otherwise opens Topsky CFL Menu.
+
+### Speed Related Functions
+
++ **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
+
+### Tag Display Related Functions
+
++ **Toggle vertical speed display** - shows or hides [**Vertical speed (FPM, toggled)**](#vs-related-items).
++ **Open unit settings popup menu** - allow for changing tag display units including ALT (altitude), SPD (speed), and showing/hiding [**Vertical speed (FPM, toggled)**](#vs-related-items).
+
+### Other Functions
+
++ **Show route checker info** - see [**Route Checker**](#route-checker-rc).
++ **Set departure sequence** - see [**Departure Sequence**](#departure-sequence-ds).
++ **Set departure status** - see [**Departure Sequence**](#departure-sequence-ds).
++ **Set COMM ESTB** - see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Open similar callsign list** - see [**Tracked Recorder**](#tracked-recorder-tr).
++ **Restore assigned data** - see [**Tracked Recorder**](#tracked-recorder-tr).
 
 ## Customizable CFL/RFL Menu (MA)
 
@@ -195,13 +229,22 @@ Command line function: **`.MTEP DS RESET`** resets all memories.
 
 ## Tracked Recorder (TR)
 
-Some of the tag item types and functions are viable through this module. This module stores data of aircrafts tracked by myself.
+This module stores data of aircrafts either tracked by myself or with tag display settings.
 
 ### TR - Tag Item Types
 
-+ **Cleared flight level (m/FL)** - confirm status is stored in tracked recorder.
++ **Cleared flight level (m/FL)** - provide a colored confirmed indicator.
   + In the color of [`Color/CFLNeedConfirm`](#tag-item-type-colors) or `Symbology Settings->Datablock->Redundant`, after a new CFL is issued but not confirmed.
-+ **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - altitude display unit follows individual setting by entering **`F`** or **`M`** in CFL/RFL popup edit or global setting by [command line](#tr---command-line-functions).
++ **Actual altitude (m), Cleared flight level (m/FL), Final flight level (ICAO)** - customizable altitude unit.
+  + Enter **`F`** or **`M`** in CFL/RFL popup edit to set individually.
+  + Use **Open unit settings popup menu** to set individually.
+  + Set global unit through [command line](#tr---command-line-functions).
++ **Calculated GS (KPH/KTS)** - customizable speed unit.
+  + Use **Open unit settings popup menu** to set individually.
+  + Set global unit through [command line](#tr---command-line-functions).
++ **Vertical speed (FPM, toggled)** - toggle status is saved in this module.
+  + Individually toggled by **Toggle vertical speed display** and **Open unit settings popup menu**.
+  + Globally set through [command line](#tr---command-line-functions).
 + **Similar callsign indicator** - shows **SC** if similar callsigns in tracked flights are detected.
   + Considers Chinese/English crews and ignores those text-only.
   + Reads scratch pad to distinguish Chinese airlines speaking English.
@@ -215,12 +258,12 @@ Some of the tag item types and functions are viable through this module. This mo
 
 ### TR - Tag Item Functions
 
-+ **Open CFL popup menu**, **Open CFL popup edit**, **Confirm CFL / Open Topsky CFL menu**  - will confirm previous CFL before opening.
++ **Open CFL popup menu**, **Open CFL popup edit**, **Confirm CFL / Open Topsky CFL menu** - will confirm previous CFL before opening.
 + **Set COMM ESTB** - establish communication and extinguishes **COMM ESTB indicator**.
 + **Open similar callsign list** - shows a list of all callsigns that are similar to the current one.
   + Selecting one will toggle native **`.find`** command.
 + **Restore assigned data** - restore previously assigned data for reconnected flights and start tracking.
-  + Assigned data includes: *communication type, squawk, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, scratch pad*.
+  + Assigned data includes: *communication type, squawk, heading/DCT point, cleared altitude, final altitude, speed/Mach, rate, scratch pad, flight strip annotations*.
 
 ### TR - Command Line Functions
 
@@ -228,8 +271,15 @@ Some of the tag item types and functions are viable through this module. This mo
   + **`0`** no auto retrack;
   + **`1`** auto retrack, no notifications;
   + **`2`** auto retrack, notified through *`MTEP-Recorder`* message.
-+ **`.MTEP TR F/M`** - sets default feet/metric as altitude unit for aircrafts including untracked ones. Equivalent to entering an **`F`** or **`M`** in **Open CFL popup menu**, **Open CFL popup edit** and **Open RFL popup menu**.
-+ **`.MTEP TR RESET`** - resets tracked recorder. Use this command if this module is not working properly. Note that it also deletes all saved data for reconnected flights.
++ **`.MTEP TR F/M`** - sets global altitude unit to feet(**`F`**) or metric(**`M`**).
++ **`.MTEP TR S/K`** - sets global speed unit to knots(**`S`**) or KPH(**`K`**).
+  + Remove all individually set tag item units after setting global unit.
+  + Global unit will be saved in plugin settings.
++ **`.MTEP VS ON/OFF`** - toggle **Vertical speed (FPM, toggled)** globally. Will be saved in plugin settings.
++ **`.MTEP TR RESET`** - resets tracked recorder. Use this command if this module is not working properly.
+  + Clears all saved data for reconnected flights
+  + Clears all individually set altitude/speed units.
+  + Restore **Vertical speed (FPM, toggled)** to previously saved global status.
 
 ## Transition Level (TL)
 
@@ -291,6 +341,7 @@ MTEPlugin:Color/DSRestore:0:0:255
 MTEPlugin:Color/DSNotCleared:0:0:255
 MTEPlugin:Color/RadarVector:0:255:0
 MTEPlugin:Color/Reconnected:150:0:0
+MTEPlugin:Color/RVSMIndicator:255:255:255
 END
 ```
 
@@ -298,6 +349,6 @@ END
 
 All command line functions are case-insensitive, including those mentioned above.
 
-1. **`.MTEP FR24 ICAO / .MTEP VARI ICAO`** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **`ICAO`** airport. Only works with airports within sector file.
-2. **`.MTEP CURSOR ON/OFF`** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. On Windows 10 1607 or later systems, the size of cursor is set according to current EuroScope Hi-DPI setting. This setting will be saved in your EuroScope plugin settings.
-3. **`.MTEP NUM 0123456789`** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings file should work.
++ **`.MTEP FR24 ICAO / .MTEP VARI ICAO`** - opens [Flightradar24](https://www.flightradar24.com/) / [飞常准ADS-B](https://flightadsb.variflight.com/) in web browser and centers the map on the given **`ICAO`** airport. Only works with airports within sector file.
++ **`.MTEP CURSOR ON/OFF`** - turns mouse cursor into Topsky or Eurocat style; may conflict with other plugins. On Windows 10 1607 or later systems, the size of cursor is set according to current EuroScope Hi-DPI setting. This setting will be saved in your EuroScope plugin settings.
++ **`.MTEP NUM 0123456789`** - sets custom number mapping to replace corresponding 0-9 characters, which will be used in **Actual altitude (m)** if below transition level (Tips: use with custom font, e.g. number underscores). Use at own risk of crashing EuroScope (offline setting recommended). This setting will be saved in your EuroScope plugin settings. Note that not all characters are available through command line, in which case a direct modification in settings file should work.
