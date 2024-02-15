@@ -15,19 +15,19 @@ Miscellaneous Tag Enhancement Plugin for EuroScope (MTEPlugin)
 
 ### Altitude Related Items
 
-+ **Actual altitude (m)** - uses QNH/QFE altitude below transition level and STD altitude above. Also known as **AFL** or **CRL**.
++ **Actual altitude (m/ft)** - uses QNH/QFE for altitudes below transition level and QNE for above. Also known as **AFL** or **CRL**.
   + Allows custom number mapping if below transition level. See [below](#other-command-line-features).
   + Transition level and QFE settings can be customized. See [**Transition Level**](#transition-level-tl).
 + **Cleared flight level (m/FL)** - includes ILS or VA. Also known as **CFL**. Will match value in the following order.
   + 4-digit [Chinese metric RVSM levels](https://www.vatprc.net/rvsm)
   + 3-digit flight levels
   + Convert to 4-digit meters
-+ **Cleared flight level (m)** - (deprecated) always shows CFL in meters. More useful in a SweatBox session.
++ **Cleared flight level (m)** (deprecated) - always shows CFL in meters. More useful in a SweatBox session.
 + **Final flight level (ICAO)** - matches Chinese metric RVSM levels, or FLxxx. Also known as **RFL**.
   + Metric: Sxxx (above transition level), Mxxx (below transition level)
   + Imperial: Fxxx (regardless of transition level).
 
-### VS related Items
+### VS Related Items
 
 + **Vertical speed (FPM, auto-hide)** - vertical speed in 4-digit feet-per-minute, hidden below 100 FPM.
 + **Vertical speed (FPM, toggled)** - vertical speed in 4-digit feet-per-minute, visible when toggled on (no threshold).
@@ -64,16 +64,20 @@ Hold ALT key down while calling any of the following functions to temporarily sw
 
 + **Open CFL popup menu** - includes Chinese metric RVSM altitudes, ILS/VA/NONE and popup-edit option.
 + **Open RFL popup menu** - includes Chinese metric RVSM altitudes and popup-edit option.
-  + Menu items are customizable, see [**Customizable CFL/RFL Menu**](#customizable-cflrfl-menu-ma).
+  + See [**Customizable CFL/RFL Menu**](#customizable-cflrfl-menu-ma).
+
+  ---
 + **Open CFL popup edit**, **Open RFL popup edit**.
   + CFL popup edit supports (standalone or in-menu): **`xxx`** for metric RVSM levels, **`Fxxx`** for FLxxx, **`550.`** for 550m, **`F4500.`** for 4500ft, etc. Enter **`0`** to clear CFL.
   + RFL popup edit supports: **`xxx`** for metric, **`Fxxx`** for FLxxx. Enter **`0`** to reset RFL to the final altitude in flight plan.
   + Enter **`F`** or **`M`** (case-insensitive) to change AFL/CRL, CFL and RFL tag itmes to imperial or metric unit.
+
+  ---
 + **Confirm CFL / Open Topsky CFL menu** - confirm CFL if not yet confirmed (see [**Tracked Recorder**](#tracked-recorder-tr)), otherwise opens Topsky CFL Menu.
 
 ### Speed Related Functions
 
-+ **Open assigned speed popup list** - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
++ **Open assigned speed popup list** (deprecated) - open IAS or MACH assign list based on current altitude. IAS for 7500m/FL246 and below, MACH for above.
 
 ### Tag Display Related Functions
 
@@ -117,6 +121,7 @@ A TSV (tab-separated-value) file is required for customization. File extension n
 + ***Metric***, ***Imperial*** - at least one should contain value.
 + ***Metric (Alternative)***, ***Imperial (Alternative)*** - optional.
 
+---
 You need to use a command line to load the TSV file: **`.MTEP MA PATH`** (case-insensitive). **`PATH`** should be replace by the TSV file path and file name.
 
 + If you use relative path, please note it's based on working directory where EuroScope.exe is running.
@@ -152,9 +157,10 @@ This module will automatically check route validity. Requires a CSV file in the 
 
 CSV files with incorrect column names or not in the given order, will not be loaded. Empty cells are accepted. However it's still possible to cause unpredicted issues if any cells doesn't follow the rules above.
 
-You need to use a command line to load the CSV file: **`.MTEP RC PATH`** (case-insensitive). **`PATH`** should be replace by the CSV file path and file name.
+---
+You need to use a command line to load the CSV file: **`.MTEP RC PATH`** (case-insensitive). **`PATH`** should be replaced by the CSV file path and file name.
 
-+ If you use relative path, please note it's based on working directory where EuroScope.exe is running.
++ If you use relative path, be aware that it's based on working directory where EuroScope.exe is running.
 + Or you can insert **`@`** to the front of the path to make it relative to the DLL file.
 + The file setting will be saved in your EuroScope plugin settings.
 
@@ -178,6 +184,7 @@ Tag item type **Route validity** shows:
 
 Tag item function **Show route checker info**: Displays a *`MTEP-Route`* message in chat list and shows route information for current DEP-ARR if seleted flight plan is invalid.
 
+---
 Command line function: **`.MTEP RC DDDD AAAA`** will display the valid routes from **`DDDD`** to **`AAAA`** and copy to clipboard.
 
 ## Departure Sequence (DS)
@@ -191,6 +198,7 @@ Tag item type **Departure status** provides a compound display for ground status
 + **CLRD** is shown when clearance received flag is set and no ground status.
 + In the color of [`Color/DSNotCleared`](#tag-item-type-colors) or `Symbology Settings->Datablock->Information`, when there is a ground status but clearanced received flag hasn't been set.
 
+---
 Tag item type **Departure sequence** shows:
 
 + **two digits number 01~99** - the sequence of the flight.
@@ -205,6 +213,7 @@ Tag item function **Set departure status** is used to set clearance received fla
 + Setting **NSTS** will reset clearance received flag if no ground status is present.
 + This function requires permission to draw on display types. Go to `Plug-ins settings->Allow to draw on types` and add ALL display types.
 
+---
 Tag item function **Set departure sequence** is used to:
 
 + initiate a sequence - if no previous sequence at all.
@@ -212,12 +221,14 @@ Tag item function **Set departure sequence** is used to:
 + re-activate a sequence - if the flight has just reconnected.
 + delete a sequence - entering 0 in the popup edit.
 
+---
 There are 3 ways to remove a flight from the queue:
 
 + entering 0 in popup edit.
 + set any of the ground states (NSTS, STUP, PUSH, TAXI, DEPA).
 + setting clearance flag for flights without a ground state (NSTS).
 
+---
 There are 2 ways to re-activate reconnected flights and restoring previous sequence:
 
 + resetting previous ground state.
@@ -225,7 +236,7 @@ There are 2 ways to re-activate reconnected flights and restoring previous seque
 
 ### DS - Command Line Function
 
-Command line function: **`.MTEP DS RESET`** resets all memories.
+Command line function: **`.MTEP DS RESET`** resets all sequences.
 
 ## Tracked Recorder (TR)
 
@@ -271,11 +282,17 @@ This module stores data of aircrafts either tracked by myself or with tag displa
   + **`0`** no auto retrack;
   + **`1`** auto retrack, no notifications;
   + **`2`** auto retrack, notified through *`MTEP-Recorder`* message.
+  
+  ---
 + **`.MTEP TR F/M`** - sets global altitude unit to feet(**`F`**) or metric(**`M`**).
 + **`.MTEP TR S/K`** - sets global speed unit to knots(**`S`**) or KPH(**`K`**).
   + Remove all individually set tag item units after setting global unit.
   + Global unit will be saved in plugin settings.
+  
+  ---
 + **`.MTEP VS ON/OFF`** - toggle **Vertical speed (FPM, toggled)** globally. Will be saved in plugin settings.
+
+  ---
 + **`.MTEP TR RESET`** - resets tracked recorder. Use this command if this module is not working properly.
   + Clears all saved data for reconnected flights
   + Clears all individually set altitude/speed units.
@@ -312,17 +329,20 @@ It's recommended to fill in either ***Range*** or ***Boundary***. If an aircraft
 
 ### TL - Command Line Functions
 
-+ **`.MTEP TL PATH`** - **`PATH`** should be replace by the CSV file path and file name. Rules for **Route Checker** also applies.
-+ **`.MTEP ICAO TL S/Fxxx`** - sets the transition level for airport **ICAO**. Use the same altitude format as the csv.
++ **`.MTEP TL PATH`** - **`PATH`** should be replace by the CSV file path and file name. Same format as [**Route Checker**](#rc---csv-configuration).
+
+  ---
++ **`.MTEP ICAO TL S/Fxxx`** - sets the transition level for airport **`ICAO`**. Use the same altitude format as the csv.
 + **`.MTEP ICAO QFE/QNH`** - sets QFE or QNH for the airport.
 + **`.MTEP ICAO R xx`** - sets the range (in nautical miles) for the airport.
-+ **`.MTEP QFE 0/1/2`** - sets the behaviour of CFL changes when QFE is in use.
+  + All customizations for single airport through command line functions won't be saved to the csv file.
+
+  ---
++ **`.MTEP QFE 0/1/2`** - sets the behaviour of CFL changes when QFE is in use. Saves to plugin settings
   + **`0`** QFE will not be amended;
   + **`1`** CFL changes made by MTEP functions (**Open CFL popup menu** and **Open CFL popup edit**) will be amended;
   + **`2`** all CFL changes will be amended.
   + This feature will automatically convert elevation (QFE) to altitude (QNH), by adding the elevation of airport to EuroScope internal cleared altitude. This helps eliminate CLAM warnings for airports at higher altitudes, but will cause discrepancy between **Cleared flight level (m/FL)** and all other native item types (e.g. Matias).
-
-All customizations for single airport through command line functions won't be saved to the csv file.
 
 ## Tag Item Type Colors
 
