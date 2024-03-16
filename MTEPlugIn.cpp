@@ -73,6 +73,7 @@ inline std::string MakeUpper(const std::string& str);
 inline std::string GetAbsolutePath(const std::string& relativePath);
 inline int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 inline bool IsCFLAssigned(CFlightPlan FlightPlan);
+static int GetLastRadarInterval(CRadarTarget RadarTarget);
 
 // SETTING NAMES
 constexpr auto SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -250,8 +251,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 		double distance = prepos.GetPosition().DistanceTo(curpos.GetPosition()); // n miles
-		int elapsed = prepos.GetReceivedTime() - curpos.GetReceivedTime(); // seconds
-		elapsed = elapsed >= 4 && elapsed <= 6 ? 5 : elapsed; // a workaround for inconsistent update
+		double elapsed = GetLastRadarInterval(RadarTarget);
 		double gskts = abs(distance / (double)elapsed * 3600.0); // knots
 		std::string strgs = "";
 		if (m_TrackedRecorder->IsForceKnot(RadarTarget)) { // force knot
@@ -1484,11 +1484,9 @@ std::string GetAbsolutePath(const std::string& relativePath)
 int CalculateVerticalSpeed(CRadarTarget RadarTarget)
 {
 	if (!RadarTarget.IsValid()) return 0;
-	CRadarTargetPositionData curpos = RadarTarget.GetPosition();
-	CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-	double deltaA = curpos.GetFlightLevel() - prepos.GetFlightLevel();
-	double deltaT = prepos.GetReceivedTime() - curpos.GetReceivedTime();
-	deltaT = deltaT ? deltaT : INFINITE;
+	auto curpos = RadarTarget.GetPosition();
+	double deltaA = curpos.GetFlightLevel() - RadarTarget.GetPreviousPosition(curpos).GetFlightLevel();
+	double deltaT = GetLastRadarInterval(RadarTarget);
 	return (int)round(deltaA / deltaT * 60.0);
 }
 
@@ -1505,6 +1503,23 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 		}
 	}
 	return false;
+}
+
+static int GetLastRadarInterval(CRadarTarget RadarTarget)
+{
+	// work-around for 4/6 second interval and prevents divided by 0
+	auto curpos = RadarTarget.GetPosition();
+	auto prepos = RadarTarget.GetPreviousPosition(curpos);
+	int t = prepos.GetReceivedTime() - curpos.GetReceivedTime();
+	if (t > 0) {
+		if (t >= 4 && t <= 6) {
+			t = 5;
+		}
+	}
+	else {
+		t = 1;
+	}
+	return t;
 }
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
