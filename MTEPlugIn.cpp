@@ -35,7 +35,7 @@ const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_ITEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
-const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated GS (KPH/KTS)
+const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated/Reported GS (KPH/KTS)
 const int TAG_ITEM_TYPE_UNIT_IND = 23; // Unit indicator
 const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, toggled)
 
@@ -71,9 +71,8 @@ static constexpr int OVRFLW3(const int& t) { return t > 999 || t < 0 ? 999 : t; 
 static constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
 inline std::string MakeUpper(const std::string& str);
 inline std::string GetAbsolutePath(const std::string& relativePath);
-inline int CalculateVerticalSpeed(CRadarTarget RadarTarget);
 inline bool IsCFLAssigned(CFlightPlan FlightPlan);
-static int GetLastRadarInterval(CRadarTarget RadarTarget);
+inline int GetLastRadarInterval(CRadarTargetPositionData pos1, CRadarTargetPositionData pos2);
 
 // SETTING NAMES
 constexpr auto SETTING_CUSTOM_CURSOR = "CustomCursor";
@@ -86,6 +85,9 @@ constexpr auto SETTING_AMEND_CFL = "AmendQFEinCFL";
 constexpr auto SETTING_FORCE_FEET = "ForceFeet";
 constexpr auto SETTING_FORCE_KNOT = "ForceKnot";
 constexpr auto SETTING_VS_DISP = "DisplayVS";
+constexpr auto SETTING_VS_THRD = "VSThreshold";
+constexpr auto SETTING_VS_ROUND = "VSRounding";
+constexpr auto SETTING_GS_CALC = "GSSource";
 // COLOR DEFINITIONS
 constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
 constexpr auto SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
@@ -190,7 +192,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Departure status", TAG_ITEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
-	RegisterTagItemType("Calculated GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
+	RegisterTagItemType("Calculated/Reported GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
 	RegisterTagItemType("Unit indicator", TAG_ITEM_TYPE_UNIT_IND);
 	RegisterTagItemType("Vertical speed (FPM, toggled)", TAG_ITEM_TYPE_VS_TOGGL);
 
@@ -248,11 +250,21 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_GS_CALC: {
 		if (!RadarTarget.IsValid()) break;
+		// determine if using calculated or reported
+		auto stsource = GetDataFromSettings(SETTING_GS_CALC);
+		int threshold = 0; // knots
+		// threshold <=0 : always use calculated, 
+		// threshold > 0: when the gap is smaller than this value, use reported, otherwise use calculated.
+		if (stsource != nullptr) {
+			sscanf_s(stsource, "%d", &threshold);
+		}
 		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
+		double gsrpt = curpos.GetReportedGS(); // can be 0 but should not affect consequent selection
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
 		double distance = prepos.GetPosition().DistanceTo(curpos.GetPosition()); // n miles
-		double elapsed = GetLastRadarInterval(RadarTarget);
-		double gskts = abs(distance / (double)elapsed * 3600.0); // knots
+		double elapsed = GetLastRadarInterval(curpos, prepos);
+		double gscal = abs(distance / elapsed * 3600.0); // knots
+		double gskts = threshold <= 0 || abs(gsrpt - gscal) > (double)threshold ? gscal : gsrpt;
 		std::string strgs = "";
 		if (m_TrackedRecorder->IsForceKnot(RadarTarget)) { // force knot
 			strgs = gskts < 995 ? std::format("{:02d} ", (int)round(gskts / 10.0)) : "++ "; // due to rounding
@@ -276,24 +288,24 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_VS_AHIDE: {
 		if (!RadarTarget.IsValid()) break;
-		int vs = abs(CalculateVerticalSpeed(RadarTarget));
-		if (vs > 100)
+		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
+		if (vs >= GetVerticalSpeedThreshold())
 			sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 		break;
 	}
 	case TAG_ITEM_TYPE_VS_TOGGL: {
 		if (!RadarTarget.IsValid() || !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID()))
 			break;
-		int vs = abs(CalculateVerticalSpeed(RadarTarget));
-		vs = vs > 100 ? vs : 0;
+		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
+		vs = vs >= GetVerticalSpeedThreshold() ? vs : 0;
 		sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 		break;
 	}
 	case TAG_ITEM_TYPE_LVL_IND: {
 		int vs = CalculateVerticalSpeed(RadarTarget);
-		if (vs > 100)
+		if (vs >= GetVerticalSpeedThreshold())
 			sprintf_s(sItemString, 2, "^");
-		else if (vs < -100)
+		else if (vs <= -GetVerticalSpeedThreshold())
 			sprintf_s(sItemString, 2, "|");
 		else
 			sprintf_s(sItemString, 2, ">");
@@ -1303,6 +1315,41 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	return false;
 }
 
+inline int CMTEPlugIn::GetVerticalSpeedThreshold(void)
+{
+	// use setting from SETTING_VS_THRD, by default 100, will ensure >=1
+	auto stthrd = GetDataFromSettings(SETTING_VS_THRD);
+	int thrd = 100;
+	if (stthrd != nullptr) {
+		sscanf_s(stthrd, "%d", &thrd);
+		thrd = max(thrd, 1);
+	}
+	return thrd;
+}
+
+inline int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded)
+{
+	// if rounded = true, will use setting from SETTING_VS_ROUND, default is 1 (no rounding), will ensure >=1
+	if (!RadarTarget.IsValid()) return 0;
+	auto curpos = RadarTarget.GetPosition();
+	auto prepos = RadarTarget.GetPreviousPosition(curpos);
+	double deltaA = curpos.GetFlightLevel() - prepos.GetFlightLevel();
+	double deltaT = GetLastRadarInterval(curpos, prepos);
+	int vs = (int)round(deltaA / deltaT * 60.0);
+	if (rounded) {
+		auto setrnd = GetDataFromSettings(SETTING_VS_ROUND);
+		if (setrnd != nullptr) {
+			int rnd = 1;
+			sscanf_s(setrnd, "%d", &rnd);
+			rnd = max(1, rnd); // prevent 0 or negative
+			int rem1 = vs % rnd;
+			int rem2 = rnd - rem1;
+			vs += rem1 <= rem2 ? -rem1 : rem2;
+		}
+	}
+	return vs;
+}
+
 void CMTEPlugIn::CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area)
 {
 	return CallItemFunction(sCallsign, nullptr, 0, nullptr, nullptr, FunctionId, Pt, Area);
@@ -1481,15 +1528,6 @@ std::string GetAbsolutePath(const std::string& relativePath)
 	return std::string();
 }
 
-int CalculateVerticalSpeed(CRadarTarget RadarTarget)
-{
-	if (!RadarTarget.IsValid()) return 0;
-	auto curpos = RadarTarget.GetPosition();
-	double deltaA = curpos.GetFlightLevel() - RadarTarget.GetPreviousPosition(curpos).GetFlightLevel();
-	double deltaT = GetLastRadarInterval(RadarTarget);
-	return (int)round(deltaA / deltaT * 60.0);
-}
-
 bool IsCFLAssigned(CFlightPlan FlightPlan)
 {
 	// tell when cleared altitude is 0, is CFL not assigned or assigned to RFL
@@ -1505,12 +1543,10 @@ bool IsCFLAssigned(CFlightPlan FlightPlan)
 	return false;
 }
 
-static int GetLastRadarInterval(CRadarTarget RadarTarget)
+inline int GetLastRadarInterval(CRadarTargetPositionData pos1, CRadarTargetPositionData pos2)
 {
 	// work-around for 4/6 second interval and prevents divided by 0
-	auto curpos = RadarTarget.GetPosition();
-	auto prepos = RadarTarget.GetPreviousPosition(curpos);
-	int t = prepos.GetReceivedTime() - curpos.GetReceivedTime();
+	int t = abs(pos1.GetReceivedTime() - pos2.GetReceivedTime());
 	if (t > 0) {
 		if (t >= 4 && t <= 6) {
 			t = 5;
