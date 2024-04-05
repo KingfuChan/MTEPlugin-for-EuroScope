@@ -16,7 +16,7 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 // TAG ITEM TYPE
 const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS (KPH) with trend indicator
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
-const int TAG_ITEM_TYPE_VS_AHIDE = 3; // Vertical speed (FPM, auto-hide)
+const int TAG_ITEM_TYPE_VS_AHIDE = 3; // Vertical speed (FPM)
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb/Descend/Level indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m/ft)
 const int TAG_ITEM_TYPE_CFL_FLX = 6; // Cleared flight level (m/FL)
@@ -37,7 +37,7 @@ const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
 const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated/Reported GS (KPH/KTS)
 const int TAG_ITEM_TYPE_UNIT_IND = 23; // Unit indicator
-const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, toggled)
+const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, duplicate)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -173,7 +173,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	RegisterTagItemType("GS (KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
-	RegisterTagItemType("Vertical speed (FPM, auto-hide)", TAG_ITEM_TYPE_VS_AHIDE);
+	RegisterTagItemType("Vertical speed (FPM)", TAG_ITEM_TYPE_VS_AHIDE);
 	RegisterTagItemType("Climb/Descend/Level indicator", TAG_ITEM_TYPE_LVL_IND);
 	RegisterTagItemType("Actual altitude (m/ft)", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("Cleared flight level (m/FL)", TAG_ITEM_TYPE_CFL_FLX);
@@ -194,7 +194,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
 	RegisterTagItemType("Calculated/Reported GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
 	RegisterTagItemType("Unit indicator", TAG_ITEM_TYPE_UNIT_IND);
-	RegisterTagItemType("Vertical speed (FPM, toggled)", TAG_ITEM_TYPE_VS_TOGGL);
+	RegisterTagItemType("Vertical speed (FPM, duplicate)", TAG_ITEM_TYPE_VS_TOGGL);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -286,32 +286,31 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 2, " ");
 		break;
 	}
-	case TAG_ITEM_TYPE_VS_AHIDE: {
+	case TAG_ITEM_TYPE_VS_AHIDE:
+	case TAG_ITEM_TYPE_VS_TOGGL: {
 		if (!RadarTarget.IsValid()) break;
 		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
-		if (vs >= GetVerticalSpeedThreshold())
-			sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
-		break;
-	}
-	case TAG_ITEM_TYPE_VS_TOGGL: {
-		if (!RadarTarget.IsValid() || !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID()))
-			break;
-		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
-		vs = vs >= GetVerticalSpeedThreshold() ? vs : 0;
+		int thld = GetVerticalSpeedThreshold();
+		if (vs < thld || (thld < 0 && !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID())))
+			break; // show nothing
+		vs = vs >= abs(thld) ? vs : 0;
 		sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 		break;
 	}
 	case TAG_ITEM_TYPE_LVL_IND: {
+		if (!RadarTarget.IsValid()) break;
 		int vs = CalculateVerticalSpeed(RadarTarget);
-		if (vs >= GetVerticalSpeedThreshold())
+		int thld = abs(GetVerticalSpeedThreshold());
+		if (vs >= thld)
 			sprintf_s(sItemString, 2, "^");
-		else if (vs <= -GetVerticalSpeedThreshold())
+		else if (vs <= -thld)
 			sprintf_s(sItemString, 2, "|");
 		else
 			sprintf_s(sItemString, 2, ">");
 		break;
 	}
 	case TAG_ITEM_TYPE_AFL_MTR: {
+		if (!RadarTarget.IsValid()) break;
 		int altref;
 		int rdrAlt = m_TransitionLevel->GetRadarDisplayAltitude(RadarTarget, altref);
 		int dspAlt;
@@ -1317,12 +1316,13 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 
 inline int CMTEPlugIn::GetVerticalSpeedThreshold(void)
 {
-	// use setting from SETTING_VS_THRD, by default 100, will ensure >=1
+	// use setting from SETTING_VS_THRD, by default 100
+	// abs() means threshold. if value is negative means current setting is TOGGLE
 	auto stthrd = GetDataFromSettings(SETTING_VS_THRD);
 	int thrd = 100;
 	if (stthrd != nullptr) {
 		sscanf_s(stthrd, "%d", &thrd);
-		thrd = max(thrd, 1);
+		thrd = thrd != 0 ? thrd : 100;
 	}
 	return thrd;
 }
