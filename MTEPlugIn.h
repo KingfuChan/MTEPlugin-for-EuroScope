@@ -38,10 +38,9 @@ private:
 	std::unique_ptr<TrackedRecorder> m_TrackedRecorder;
 	std::unique_ptr<TransitionLevel> m_TransitionLevel;
 	bool m_CustomCursor = false; // status, doesn't reflect setting
-	int m_AmendCFL = 1; // 0: off; 1: MTEP; 2: all.
 
 	template<typename T>
-	inline void GetPluginSetting(const char* setting, T& value);
+	inline T GetPluginSetting(const char* setting, const T& fallback);
 
 	inline int GetVerticalSpeedThreshold(void);
 	inline int CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded = false);
