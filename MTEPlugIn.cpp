@@ -14,7 +14,7 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 #endif // !COPYRIGHTS
 
 // TAG ITEM TYPE
-const int TAG_ITEM_TYPE_GS_W_IND = 1; // GS (KPH) with trend indicator
+const int TAG_ITEM_TYPE_GS_W_IND = 1; // Ground speed (duplicate)
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_AHIDE = 3; // Vertical speed (FPM)
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb/Descend/Level indicator
@@ -35,7 +35,7 @@ const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_ITEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
-const int TAG_ITEM_TYPE_GS_CALC = 22; // Calculated/Reported GS (KPH/KTS)
+const int TAG_ITEM_TYPE_GS_CALC = 22; // Ground speed
 const int TAG_ITEM_TYPE_UNIT_IND = 23; // Unit indicator
 const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, duplicate)
 
@@ -94,8 +94,8 @@ constexpr auto DEFAULT_ALT_FEET = false;
 constexpr auto SETTING_ALT_TOGG = "ALT/NoToggle"; // bool, *0*
 constexpr auto DEFAULT_ALT_TOGG = false;
 // VERTICAL SPEED
-constexpr auto SETTING_VS_MODE = "VS/Mode"; // *-1*: auto-hide, 0: hide, 1: show, include command
-constexpr auto DEFAULT_VS_MODE = -1;
+constexpr auto SETTING_VS_MODE = "VS/Mode"; // *-1*: auto-hide, 0: hide, 1: show, include command.
+constexpr auto DEFAULT_VS_MODE = -1; // Auto-hide disables VS toggle.
 constexpr auto SETTING_VS_THLD = "VS/Threshold"; // positive int, *100*
 constexpr auto DEFAULT_VS_THLD = 100;
 constexpr auto SETTING_VS_RNDG = "VS/Rounding"; // positive int, *1*
@@ -165,7 +165,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
-	RegisterTagItemType("GS (KPH) with trend indicator", TAG_ITEM_TYPE_GS_W_IND);
+	RegisterTagItemType("Ground speed (duplicate)", TAG_ITEM_TYPE_GS_W_IND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("Vertical speed (FPM)", TAG_ITEM_TYPE_VS_AHIDE);
 	RegisterTagItemType("Climb/Descend/Level indicator", TAG_ITEM_TYPE_LVL_IND);
@@ -186,7 +186,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Departure status", TAG_ITEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
-	RegisterTagItemType("Calculated/Reported GS (KPH/KTS)", TAG_ITEM_TYPE_GS_CALC);
+	RegisterTagItemType("Ground speed", TAG_ITEM_TYPE_GS_CALC);
 	RegisterTagItemType("Unit indicator", TAG_ITEM_TYPE_UNIT_IND);
 	RegisterTagItemType("Vertical speed (FPM, duplicate)", TAG_ITEM_TYPE_VS_TOGGL);
 
@@ -277,18 +277,28 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_VS_AHIDE:
 	case TAG_ITEM_TYPE_VS_TOGGL: {
 		if (!RadarTarget.IsValid()) break;
+		int mode = GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE);
 		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
-		int thld = GetVerticalSpeedThreshold();
-		if (vs < thld || (thld < 0 && !m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID())))
-			break; // show nothing
-		vs = vs >= abs(thld) ? vs : 0;
+		int thld = abs(GetPluginSetting(SETTING_VS_THLD, DEFAULT_VS_THLD));
+		// determines whether to show
+		if (mode == -1) {
+			if (vs < thld) {
+				break;
+			}
+		}
+		else if (!m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID())) {
+			break;
+		}
+		else {
+			vs = vs >= thld ? vs : 0;
+		}
 		sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 		break;
 	}
 	case TAG_ITEM_TYPE_LVL_IND: {
 		if (!RadarTarget.IsValid()) break;
 		int vs = CalculateVerticalSpeed(RadarTarget);
-		int thld = abs(GetVerticalSpeedThreshold());
+		int thld = abs(GetPluginSetting(SETTING_VS_THLD, DEFAULT_VS_THLD));
 		if (vs >= thld)
 			sprintf_s(sItemString, 2, "^");
 		else if (vs <= -thld)
@@ -616,7 +626,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_VS_DISP: {
-		if (!RadarTarget.IsValid()) break;
+		if (!RadarTarget.IsValid() || GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == -1) break;
 		m_TrackedRecorder->ToggleVerticalSpeed(std::string(RadarTarget.GetSystemID()));
 		break;
 	}
@@ -954,12 +964,13 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_UNIT_MENU: {
 		bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan) || m_TrackedRecorder->IsForceFeet(RadarTarget);
 		bool isknot = m_TrackedRecorder->IsForceKnot(RadarTarget);
+		bool suppvs = GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == -1;
 		bool showvs = m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.IsValid() ? RadarTarget.GetSystemID() : "");
 		OpenPopupList(Area, "Units", 2);
 		std::vector<std::string> unitvec = {
 			std::format("{}{}","ALT:", isfeet ? "F" : "M"),
 			std::format("{}{}","SPD:" , isknot ? "S" : "K"),
-			std::format("{}{}","VS :" , showvs ? "O" : "X"),
+			std::format("{}{}","VS :" , suppvs ? "-" : (showvs ? "O" : "X")),
 		}; // fix length=5
 		for (const auto& s : unitvec) {
 			AddPopupListElement(s.c_str(), "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
@@ -983,7 +994,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			}
 		}
 		else if (type.substr(0, 3) == "VS ") {
-			if (RadarTarget.IsValid()) {
+			if (RadarTarget.IsValid() && GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) != -1) {
 				m_TrackedRecorder->ToggleVerticalSpeed(std::string(RadarTarget.GetSystemID()));
 			}
 		}
@@ -1214,7 +1225,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		const char* descr = "display vertical speed";
 		if (res == "AUTO") {
 			m_TrackedRecorder->ToggleVerticalSpeed(false);
-			SaveDataToSettings(SETTING_VS_MODE, descr, "A");
+			SaveDataToSettings(SETTING_VS_MODE, descr, "-1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is AUTO", 1, 0, 0, 0, 0);
 		}
 		else if (res == "ON") {
@@ -1318,19 +1329,6 @@ inline T CMTEPlugIn::GetPluginSetting(const char* setting, const T& fallback)
 	return bufval;
 }
 
-inline int CMTEPlugIn::GetVerticalSpeedThreshold(void)
-{
-	// use setting from SETTING_VS_THLD, by default 100
-	// abs() means threshold. if value is negative means current setting is TOGGLE
-	auto stthrd = GetDataFromSettings(SETTING_VS_THLD);
-	int thrd = 100;
-	if (stthrd != nullptr) {
-		sscanf_s(stthrd, "%d", &thrd);
-		thrd = thrd != 0 ? thrd : 100;
-	}
-	return thrd;
-}
-
 inline int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded)
 {
 	// if rounded = true, will use setting from SETTING_VS_ROUND, default is 1 (no rounding), will ensure >=1
@@ -1341,11 +1339,8 @@ inline int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rou
 	double deltaT = GetLastRadarInterval(curpos, prepos);
 	int vs = (int)round(deltaA / deltaT * 60.0);
 	if (rounded) {
-		auto setrnd = GetDataFromSettings(SETTING_VS_RNDG);
-		if (setrnd != nullptr) {
-			int rnd = 1;
-			sscanf_s(setrnd, "%d", &rnd);
-			rnd = max(1, rnd); // prevent 0 or negative
+		int rnd = abs(GetPluginSetting(SETTING_VS_RNDG, DEFAULT_VS_RNDG));
+		if (rnd > 1) {
 			int rem1 = vs % rnd;
 			int rem2 = rnd - rem1;
 			vs += rem1 <= rem2 ? -rem1 : rem2;

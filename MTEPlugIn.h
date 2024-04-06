@@ -42,7 +42,6 @@ private:
 	template<typename T>
 	inline T GetPluginSetting(const char* setting, const T& fallback);
 
-	inline int GetVerticalSpeedThreshold(void);
 	inline int CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded = false);
 	void CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area); // overload for ES internal function
 	void CallItemFunction(const char* sCallsign, const char* sItemPlugInName, int ItemCode, const char* sItemString, const char* sFunctionPlugInName, int FunctionId, POINT Pt, RECT Area);
