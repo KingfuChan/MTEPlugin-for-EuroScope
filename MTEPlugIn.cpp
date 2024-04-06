@@ -1053,10 +1053,14 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 	if (m_TrackedRecorder->IsActive(RadarTarget)) {
 		m_TrackedRecorder->UpdateFlight(RadarTarget);
 	}
-	else if (m_AutoRetrack) {
-		if (m_TrackedRecorder->SetTrackedData(RadarTarget) && m_AutoRetrack == 2) {
-			std::string msg = std::string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
-			DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
+	else {
+		int retrack = 0;
+		GetPluginSetting(SETTING_AUTO_RETRACK, retrack);
+		if (retrack == 1 || retrack == 2) {
+			if (m_TrackedRecorder->SetTrackedData(RadarTarget) && retrack == 2) {
+				std::string msg = std::string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
+				DisplayUserMessage("MTEP-Recorder", "MTEPlugin", msg.c_str(), 1, 1, 0, 0, 0);
+			}
 		}
 	}
 	m_TransitionLevel->UpdateRadarPosition(RadarTarget);
@@ -1147,17 +1151,14 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		std::string res = match[1].str();
 		const char* descr = "auto retrack mode";
 		if (res == "1") {
-			m_AutoRetrack = 1;
 			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack mode 1 (silent) is set", 1, 0, 0, 0, 0);
 		}
 		else if (res == "2") {
-			m_AutoRetrack = 2;
 			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "2");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack mode 2 (notify) is set", 1, 0, 0, 0, 0);
 		}
 		else if (res == "0") {
-			m_AutoRetrack = 0;
 			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack is off", 1, 0, 0, 0, 0);
 		}
@@ -1423,7 +1424,6 @@ void CMTEPlugIn::ResetDepartureSequence(void)
 void CMTEPlugIn::ResetTrackedRecorder(void)
 {
 	m_TrackedRecorder.reset(new TrackedRecorder(this));
-	GetPluginSetting(SETTING_AUTO_RETRACK, m_AutoRetrack);
 	bool setff = false;
 	GetPluginSetting(SETTING_ALT_FEET, setff);
 	m_TrackedRecorder->ResetAltitudeUnit(setff);
