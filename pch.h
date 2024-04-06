@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <memory>
 #include <functional>
+#include <filesystem>
 // project required
 #include "Resource.h"
 #include <EuroScopePlugIn.h>

@@ -70,11 +70,11 @@ static constexpr int OVRFLW2(const int& t) { return t > 99 || t < 0 ? 99 : t; } 
 static constexpr int OVRFLW3(const int& t) { return t > 999 || t < 0 ? 999 : t; } // overflow pre-process 3 digits
 static constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t; }  // overflow pre-process 4 digits
 inline std::string MakeUpper(const std::string& str);
-inline std::string GetAbsolutePath(const std::string& relativePath);
 inline bool IsCFLAssigned(CFlightPlan FlightPlan);
 inline int GetLastRadarInterval(CRadarTargetPositionData pos1, CRadarTargetPositionData pos2);
 
-// SETTING NAMES
+// SETTING RELATED
+inline std::string GetRealFileName(const std::string& path);
 // NON-REALTIME READ SETTINGS, CHANGE BY COMMAND ONLY
 constexpr auto SETTING_TRANS_LVL_CSV = "TransLevelCSV"; // file name
 constexpr auto SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV"; // file name
@@ -139,25 +139,16 @@ CMTEPlugIn::CMTEPlugIn(void)
 	UINT dpiWnd = GetDpiForWindow(pluginWindow);
 	int curSize = (int)((float)(dpiSys < 96 ? 96 : dpiSys) / (float)(dpiWnd < 96 ? 96 : dpiWnd) * 32.0);
 	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, curSize, curSize, LR_SHARED));
+
 	bool setcs = false;
 	GetPluginSetting(SETTING_CUSTOM_CURSOR, setcs);
 	if (setcs)
 		SetCustomCursor();
 
 	ResetTrackedRecorder();
-
-	auto setrc = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
-	if (setrc != nullptr)
-		LoadRouteChecker(setrc);
-
-	m_TransitionLevel = std::make_unique<TransitionLevel>(this);
-	auto settl = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
-	if (settl != nullptr)
-		LoadTransitionLevel(settl);
-
-	auto setma = GetDataFromSettings(SETTING_TRANS_MALT_TXT);
-	if (setma != nullptr)
-		LoadMetricAltitude(setma);
+	LoadRouteChecker();
+	LoadTransitionLevel();
+	LoadMetricAltitude();
 
 	std::string setnm = m_CustomNumMap;
 	GetPluginSetting(SETTING_CUSTOM_NUMBER_MAP, setnm);
@@ -1116,11 +1107,10 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// load route checker
-	std::regex rxrc("^.MTEP RC (.+\\.CSV)$", std::regex_constants::icase);
+	std::regex rxrc("^.MTEP RC RESET$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxrc)) {
-		LoadRouteChecker(match[1].str());
-		SaveDataToSettings(SETTING_ROUTE_CHECKER_CSV, "route checker csv file", match[1].str().c_str());
-		return (bool)m_RouteChecker;
+		LoadRouteChecker();
+		return true;
 	}
 
 	// route checker get route info
@@ -1230,10 +1220,10 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// load transition level
-	std::regex rxtl("^.MTEP TL (.+\\.CSV)$", std::regex_constants::icase);
+	std::regex rxtl("^.MTEP TL RESET$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxtl)) {
-		SaveDataToSettings(SETTING_TRANS_LVL_CSV, "transition levels csv file", match[1].str().c_str());
-		return LoadTransitionLevel(match[1].str());
+		LoadTransitionLevel();
+		return true;
 	}
 
 	// set transition level for single airport
@@ -1272,10 +1262,10 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// load MetricAlt settings
-	std::regex rxma("^.MTEP MA (.+\\.TXT)$", std::regex_constants::icase);
+	std::regex rxma("^.MTEP MA RESET$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxma)) {
-		SaveDataToSettings(SETTING_TRANS_MALT_TXT, "altitude menu definition txt file", match[1].str().c_str());
-		return LoadMetricAltitude(match[1].str());
+		LoadMetricAltitude();
+		return true;
 	}
 
 	// set amend QFE in CFL
@@ -1398,16 +1388,17 @@ void CMTEPlugIn::CancelCustomCursor(void)
 {
 	if (!m_CustomCursor || pluginWindow == nullptr || pluginCursor == nullptr) return;
 	SetWindowLong(pluginWindow, GWL_WNDPROC, (LONG)prevWndFunc);
-	DisplayUserMessage("MESSAGE", "MTEPlugin", "Cursor is reset!", 1, 0, 0, 0, 0);
 	m_CustomCursor = false;
 }
 
-void CMTEPlugIn::LoadRouteChecker(const std::string& filename)
+void CMTEPlugIn::LoadRouteChecker(void)
 {
-	std::string fn = filename;
-	if (fn[0] == '@') {
-		fn = GetAbsolutePath(fn.substr(1));
+	auto setfn = GetDataFromSettings(SETTING_ROUTE_CHECKER_CSV);
+	if (setfn == nullptr) {
+		m_RouteChecker.reset();
+		return;
 	}
+	std::string fn = GetRealFileName(setfn);
 	try {
 		m_RouteChecker.reset(new RouteChecker(this, fn));
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
@@ -1431,7 +1422,6 @@ void CMTEPlugIn::LoadRouteChecker(const std::string& filename)
 void CMTEPlugIn::ResetDepartureSequence(void)
 {
 	m_DepartureSequence.reset();
-	DisplayUserMessage("MESSAGE", "MTEPlugin", "Departure sequence is deleted!", 1, 0, 0, 0, 0);
 }
 
 void CMTEPlugIn::ResetTrackedRecorder(void)
@@ -1450,12 +1440,14 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is ready!", 1, 0, 0, 0, 0);
 }
 
-bool CMTEPlugIn::LoadTransitionLevel(const std::string& filename)
+void CMTEPlugIn::LoadTransitionLevel(void)
 {
-	std::string fn = filename;
-	if (fn[0] == '@') {
-		fn = GetAbsolutePath(fn.substr(1));
+	m_TransitionLevel.reset(new TransitionLevel(this));
+	auto setfn = GetDataFromSettings(SETTING_TRANS_LVL_CSV);
+	if (setfn == nullptr) {
+		return;
 	}
+	std::string fn = GetRealFileName(setfn);
 	try {
 		m_TransitionLevel->LoadCSV(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
@@ -1467,24 +1459,19 @@ bool CMTEPlugIn::LoadTransitionLevel(const std::string& filename)
 			("Transition levels failed to load (" + e + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_TransitionLevel.reset(new TransitionLevel(this));
-		return false;
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Transition levels failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_TransitionLevel.reset(new TransitionLevel(this));
-		return false;
 	}
-	return true;
 }
 
-bool CMTEPlugIn::LoadMetricAltitude(const std::string& filename)
+void CMTEPlugIn::LoadMetricAltitude(void)
 {
-	std::string fn = filename;
-	if (fn[0] == '@') {
-		fn = GetAbsolutePath(fn.substr(1));
-	}
+	auto setfn = GetDataFromSettings(SETTING_TRANS_MALT_TXT);
+	std::string fn = GetRealFileName(setfn == nullptr ? "" : setfn);
 	try {
 		MetricAlt::LoadAltitudeDefinition(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
@@ -1495,15 +1482,12 @@ bool CMTEPlugIn::LoadMetricAltitude(const std::string& filename)
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Altitude menu definitions failed to load (" + e + "). TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
-		return false;
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
 			("Altitude menu definitions failed to load (" + std::string(e.what()) + "). TXT file name: " + fn).c_str(),
 			1, 0, 0, 0, 0);
-		return false;
 	}
-	return true;
 }
 
 std::string CMTEPlugIn::DisplayRouteMessage(const std::string& departure, const std::string& arrival)
@@ -1520,26 +1504,14 @@ std::string CMTEPlugIn::DisplayRouteMessage(const std::string& departure, const 
 	return res;
 }
 
-std::string MakeUpper(const std::string& str)
+inline std::string MakeUpper(const std::string& str)
 {
 	std::string res;
 	std::transform(str.begin(), str.end(), back_inserter(res), ::toupper);
 	return res;
 }
 
-std::string GetAbsolutePath(const std::string& relativePath)
-{
-	// add DLL directory before relative path
-	if (pluginModule != nullptr) {
-		TCHAR pBuffer[MAX_PATH] = { 0 };
-		GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
-		std::string currentPath = pBuffer;
-		return currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + relativePath;
-	}
-	return std::string();
-}
-
-bool IsCFLAssigned(CFlightPlan FlightPlan)
+inline bool IsCFLAssigned(CFlightPlan FlightPlan)
 {
 	// tell when cleared altitude is 0, is CFL not assigned or assigned to RFL
 	// true means CFL is assigned to RFL, false means no CFL
@@ -1567,6 +1539,25 @@ inline int GetLastRadarInterval(CRadarTargetPositionData pos1, CRadarTargetPosit
 		t = 1;
 	}
 	return t;
+}
+
+inline std::string GetRealFileName(const std::string& path)
+{
+	namespace fs = std::filesystem;
+	if (path.empty()) {
+		return path;
+	}
+	fs::path pFilename = path;
+	if (!fs::is_regular_file(pFilename)) {
+		// add DLL directory before relative path
+		if (pluginModule != nullptr) {
+			TCHAR pBuffer[MAX_PATH] = { 0 };
+			GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
+			std::filesystem::path dllPath = pBuffer;
+			pFilename = dllPath.parent_path() / path;
+		}
+	}
+	return pFilename.string();
 }
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)

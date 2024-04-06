@@ -37,7 +37,7 @@ private:
 	std::unique_ptr<DepartureSequence> m_DepartureSequence;
 	std::unique_ptr<TrackedRecorder> m_TrackedRecorder;
 	std::unique_ptr<TransitionLevel> m_TransitionLevel;
-	bool m_CustomCursor = false;
+	bool m_CustomCursor = false; // status, doesn't reflect setting
 	int m_AutoRetrack = 0; // 0: off (default); 1: silent; 2: notified.
 	std::string m_CustomNumMap = "0123456789"; // 0-9
 	int m_AmendCFL = 1; // 0: off; 1: MTEP (default); 2: all.
@@ -52,10 +52,10 @@ private:
 	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
-	void LoadRouteChecker(const std::string& filename);
+	void LoadRouteChecker(void);
 	void ResetDepartureSequence(void);
 	void ResetTrackedRecorder(void);
-	bool LoadTransitionLevel(const std::string& filename);
-	bool LoadMetricAltitude(const std::string& filename);
+	void LoadTransitionLevel(void);
+	void LoadMetricAltitude(void);
 	std::string DisplayRouteMessage(const std::string& departure, const std::string& arrival);
 };
