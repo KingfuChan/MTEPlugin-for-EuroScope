@@ -38,9 +38,8 @@ private:
 	std::unique_ptr<TrackedRecorder> m_TrackedRecorder;
 	std::unique_ptr<TransitionLevel> m_TransitionLevel;
 	bool m_CustomCursor = false; // status, doesn't reflect setting
-	int m_AutoRetrack = 0; // 0: off (default); 1: silent; 2: notified.
-	std::string m_CustomNumMap = "0123456789"; // 0-9
-	int m_AmendCFL = 1; // 0: off; 1: MTEP (default); 2: all.
+	int m_AutoRetrack = 0; // 0: off; 1: silent; 2: notified.
+	int m_AmendCFL = 1; // 0: off; 1: MTEP; 2: all.
 
 	template<typename T>
 	inline void GetPluginSetting(const char* setting, T& value);

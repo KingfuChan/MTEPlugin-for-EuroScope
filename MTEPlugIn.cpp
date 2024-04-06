@@ -149,14 +149,6 @@ CMTEPlugIn::CMTEPlugIn(void)
 	LoadRouteChecker();
 	LoadTransitionLevel();
 	LoadMetricAltitude();
-
-	std::string setnm = m_CustomNumMap;
-	GetPluginSetting(SETTING_CUSTOM_NUMBER_MAP, setnm);
-	if (setnm.size() == 10) {
-		m_CustomNumMap = setnm;
-		DisplayUserMessage("MESSAGE", "MTEPlugin", "Using customized number map for AFL/CRL.", 1, 0, 0, 0, 0);
-	}
-
 	GetPluginSetting(SETTING_AMEND_CFL, m_AmendCFL);
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
@@ -311,9 +303,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		std::string dspStr = tmpStr;
 		if (altref == AltitudeReference::ALT_REF_QNH) {
 			// use custom number mapping
-			std::transform(dspStr.begin(), dspStr.end(), dspStr.begin(), [&](auto& c) {
-				return m_CustomNumMap[int(c - '0')];
-				});
+			std::string numMap;
+			GetPluginSetting(SETTING_CUSTOM_NUMBER_MAP, numMap);
+			if (numMap.size() == 10) {
+				std::transform(dspStr.begin(), dspStr.end(), dspStr.begin(), [numMap](auto& c) {
+					return numMap[int(c - '0')];
+					});
+			}
 		}
 		else if (altref == AltitudeReference::ALT_REF_QFE) {
 			dspStr = "(" + dspStr + ")";
