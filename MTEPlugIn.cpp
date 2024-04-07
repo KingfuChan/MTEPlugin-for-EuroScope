@@ -91,8 +91,8 @@ const std::string DEFAULT_CUSTOM_NUMBER_MAP = "0123456789"; // specify std::stri
 // ALTITUDE
 constexpr auto SETTING_ALT_FEET = "ALT/Feet"; // bool, *0*, include command
 constexpr auto DEFAULT_ALT_FEET = false;
-constexpr auto SETTING_ALT_TOGG = "ALT/NoToggle"; // bool, *0*
-constexpr auto DEFAULT_ALT_TOGG = false;
+constexpr auto SETTING_ALT_TOGG = "ALT/ToggleDura"; // int, *5*
+constexpr auto DEFAULT_ALT_TOGG = 5; // seconds
 // VERTICAL SPEED
 constexpr auto SETTING_VS_MODE = "VS/Mode"; // *-1*: auto-hide, 0: hide, 1: show, include command.
 constexpr auto DEFAULT_VS_MODE = -1; // Auto-hide disables VS toggle.
@@ -686,7 +686,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget)) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -757,7 +757,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_CFL_EDIT: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget)) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -772,7 +772,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_CFL_TOPSKY: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget)) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
 			// confirm previous CFL first
@@ -817,7 +817,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_RFL_MENU: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget)) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -839,7 +839,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_RFL_EDIT: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget)) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking

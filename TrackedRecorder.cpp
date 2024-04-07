@@ -302,10 +302,10 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return false;
 }
 
-bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration)
+bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int& duration)
 {
-	// set TR->ForceFeet for duration seconds, return true is keyboard alt is pressed
-	if (!RadarTarget.IsValid() || !(GetAsyncKeyState(VK_MENU) & 0x8000)) return false; // keyboard alt is not pressed
+	// set TR->ForceFeet for duration seconds (only accepts positive value), return true if toggle
+	if (duration <= 0 || !RadarTarget.IsValid() || !(GetAsyncKeyState(VK_MENU) & 0x8000)) return false; // invalid duration or keyboard alt is not pressed
 	std::unique_lock uslock(utemp_Mutex);
 	std::unique_lock utlock(uthrd_Mutex);
 	std::string systemid = RadarTarget.GetSystemID();

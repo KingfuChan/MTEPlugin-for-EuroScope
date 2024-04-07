@@ -25,7 +25,7 @@ public:
 	void SetAltitudeUnit(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& feet);
 	void SetAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& feet);
 	void ResetAltitudeUnit(const bool& feet);
-	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration = 5);
+	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int& duration);
 
 	bool IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget);
 	void SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot);
