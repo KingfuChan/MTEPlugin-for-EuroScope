@@ -97,7 +97,7 @@ constexpr auto DEFAULT_ALT_TOGG = false;
 constexpr auto SETTING_VS_MODE = "VS/Mode"; // *-1*: auto-hide, 0: hide, 1: show, include command.
 constexpr auto DEFAULT_VS_MODE = -1; // Auto-hide disables VS toggle.
 constexpr auto SETTING_VS_THLD = "VS/Threshold"; // positive int, *100*
-constexpr auto DEFAULT_VS_THLD = 100;
+constexpr auto DEFAULT_VS_THLD = 100; // FPM
 constexpr auto SETTING_VS_RNDG = "VS/Rounding"; // positive int, *1*
 constexpr auto DEFAULT_VS_RNDG = 1;
 // GOUND SPEED
@@ -106,13 +106,13 @@ constexpr auto DEFAULT_GS_KNOT = false;
 constexpr auto SETTING_GS_MODE = "GS/ModeThreshold"; // int, *0*
 constexpr auto DEFAULT_GS_MODE = 0;
 constexpr auto SETTING_GS_TREND = "GS/TrendThreshold"; // positive int, *5*
-constexpr auto DEFAULT_GS_TREND = 5;
+constexpr auto DEFAULT_GS_TREND = 5; // KPH
 constexpr auto SETTING_GS_INC = "GS/IncreaseMark"; // char, *NULL*
-//constexpr auto DEFAULT_GS_INC = '\0';
+constexpr auto DEFAULT_GS_INC = '\0';
 constexpr auto SETTING_GS_STA = "GS/StableMark"; // char, *NULL*
-//constexpr auto DEFAULT_GS_STA = '\0';
+constexpr auto DEFAULT_GS_STA = '\0';
 constexpr auto SETTING_GS_DEC = "GS/DecreaseMark"; // char, *NULL*
-//constexpr auto DEFAULT_GS_DEC = '\0';
+constexpr auto DEFAULT_GS_DEC = '\0';
 // COLOR DEFINITIONS (R:G:B)
 constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
 constexpr auto SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
@@ -223,25 +223,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		return;
 	switch (ItemCode)
 	{
-	case TAG_ITEM_TYPE_GS_W_IND: {
-		if (!RadarTarget.IsValid()) break;
-		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
-		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
-		int curgs = curpos.GetReportedGS();
-		int pregs = prepos.GetReportedGS();
-		double diff = KN_KPH((double)(curgs - pregs));
-		char gsTrend;
-		if (diff >= 5)
-			gsTrend = 'A';
-		else if (diff <= -5)
-			gsTrend = 'L';
-		else
-			gsTrend = ' ';
-		int dspgs = curgs ? curgs : RadarTarget.GetGS();
-		dspgs = (int)round(KN_KPH((double)dspgs) / 10.0);
-		sprintf_s(sItemString, 5, "%03d%c", OVRFLW3(dspgs), gsTrend);
-		break;
-	}
+	case TAG_ITEM_TYPE_GS_W_IND:
 	case TAG_ITEM_TYPE_GS_CALC: {
 		if (!RadarTarget.IsValid()) break;
 		// determine if using calculated or reported
@@ -260,6 +242,23 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else { //convert to kph
 			double gskph = KN_KPH(gskts);
 			strgs = gskph < 1995 ? std::format("{:03d}", (int)round(gskph / 10.0)) : "+++"; // due to rounding
+		}
+		if (strgs[0] != '+') {
+			char uTrend = GetPluginSetting(SETTING_GS_INC, DEFAULT_GS_INC);
+			char sTrend = GetPluginSetting(SETTING_GS_STA, DEFAULT_GS_STA);
+			char dTrend = GetPluginSetting(SETTING_GS_DEC, DEFAULT_GS_DEC);
+			if (uTrend || sTrend || dTrend) { // determine if a trend mark is appended
+				double diff = KN_KPH(gsrpt - (double)prepos.GetReportedGS());
+				int trendThld = abs(GetPluginSetting(SETTING_GS_TREND, DEFAULT_GS_TREND));
+				if (trendThld > 0) {
+					if (diff >= trendThld)
+						strgs += uTrend;
+					else if (diff <= -trendThld)
+						strgs += dTrend;
+					else
+						strgs += sTrend;
+				}
+			}
 		}
 		strcpy_s(sItemString, strgs.size() + 1, strgs.c_str());
 		break;
