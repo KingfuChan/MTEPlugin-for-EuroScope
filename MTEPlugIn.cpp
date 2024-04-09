@@ -86,8 +86,7 @@ constexpr auto DEFAULT_AUTO_RETRACK = 0;
 constexpr auto SETTING_AMEND_CFL = "AmendQFEinCFL"; // 0: off, *1*: MTEP, 2: all
 constexpr auto DEFAULT_AMEND_CFL = 1;
 // REALTIME READ SETTINGS, CHANGE BY LOAD SETTINGS
-constexpr auto SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9"; // char[10], *0123456789*
-const std::string DEFAULT_CUSTOM_NUMBER_MAP = "0123456789"; // specify std::string for template function
+constexpr auto SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9"; // char[10]
 // ALTITUDE
 constexpr auto SETTING_ALT_FEET = "ALT/Feet"; // bool, *0*, include command
 constexpr auto DEFAULT_ALT_FEET = false;
@@ -137,14 +136,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 CMTEPlugIn::CMTEPlugIn(void)
 	: CPlugIn(COMPATIBILITY_CODE,
 		PLUGIN_NAME,
-#ifdef DEBUG
-		VERSION_FILE_STR " DEBUG",
-#else
 		VERSION_FILE_STR,
-#endif // DEBUG
 		PLUGIN_AUTHOR,
 		PLUGIN_COPYRIGHT)
 {
+	DisplayUserMessage("MESSAGE", "MTEPlugin",
+		std::format("Version {} loaded.", VERSION_DISPLAY).c_str(),
+		1, 0, 0, 0, 0);
+
 	AFX_MANAGE_STATE(AfxGetStaticModuleState());
 	DWORD dwCurPID = GetCurrentProcessId();
 	EnumWindows(EnumWindowsProc, (LPARAM)&dwCurPID); // to set pluginWindow
@@ -206,7 +205,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open unit settings popup menu", TAG_ITEM_FUNCTION_UNIT_MENU);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
-		(std::string("MTEPlugin loaded! For help please refer to ") + GITHUB_LINK).c_str(),
+		std::format("For help please refer to {}.", GITHUB_LINK).c_str(),
 		1, 0, 0, 0, 0);
 }
 
@@ -323,10 +322,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		std::string dspStr = tmpStr;
 		if (altref == AltitudeReference::ALT_REF_QNH) {
 			// use custom number mapping
-			std::string numMap = GetPluginSetting(SETTING_CUSTOM_NUMBER_MAP, DEFAULT_CUSTOM_NUMBER_MAP);
-			if (numMap.size() == 10) {
-				std::transform(dspStr.begin(), dspStr.end(), dspStr.begin(), [numMap](auto& c) {
-					return numMap[int(c - '0')];
+			auto setNumMap = GetDataFromSettings(SETTING_CUSTOM_NUMBER_MAP);
+			if (setNumMap != nullptr && strlen(setNumMap) == 10) {
+				std::transform(dspStr.begin(), dspStr.end(), dspStr.begin(), [setNumMap](auto& c) {
+					return setNumMap[int(c - '0')];
 					});
 			}
 		}
@@ -1405,18 +1404,18 @@ void CMTEPlugIn::LoadRouteChecker(void)
 	try {
 		m_RouteChecker.reset(new RouteChecker(this, fn));
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker is loaded successfully. CSV file name: " + fn).c_str(),
+			("RC loaded. File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker failed to load (" + e + "). CSV file name: " + fn).c_str(),
+			("RC load fail (" + e + "). File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_RouteChecker.reset();
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Route checker failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
+			("RC load fail (" + std::string(e.what()) + "). File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_RouteChecker.reset();
 	}
@@ -1430,12 +1429,9 @@ void CMTEPlugIn::ResetDepartureSequence(void)
 void CMTEPlugIn::ResetTrackedRecorder(void)
 {
 	m_TrackedRecorder.reset(new TrackedRecorder(this));
-	bool setff = GetPluginSetting(SETTING_ALT_FEET, DEFAULT_ALT_FEET);
-	m_TrackedRecorder->ResetAltitudeUnit(setff);
-	bool setfn = GetPluginSetting(SETTING_GS_KNOT, DEFAULT_GS_KNOT);
-	m_TrackedRecorder->SetSpeedUnit(setfn);
-	int setvs = GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE);
-	m_TrackedRecorder->ToggleVerticalSpeed(setvs == 1);
+	m_TrackedRecorder->ResetAltitudeUnit(GetPluginSetting(SETTING_ALT_FEET, DEFAULT_ALT_FEET));
+	m_TrackedRecorder->SetSpeedUnit(GetPluginSetting(SETTING_GS_KNOT, DEFAULT_GS_KNOT));
+	m_TrackedRecorder->ToggleVerticalSpeed(GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == 1);
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is ready!", 1, 0, 0, 0, 0);
 }
 
@@ -1450,18 +1446,18 @@ void CMTEPlugIn::LoadTransitionLevel(void)
 	try {
 		m_TransitionLevel->LoadCSV(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels are loaded successfully. CSV file name: " + fn).c_str(),
+			("TL loaded. File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels failed to load (" + e + "). CSV file name: " + fn).c_str(),
+			("TL load fail (" + e + "). File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_TransitionLevel.reset(new TransitionLevel(this));
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Transition levels failed to load (" + std::string(e.what()) + "). CSV file name: " + fn).c_str(),
+			("TL load fail (" + std::string(e.what()) + "). File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 		m_TransitionLevel.reset(new TransitionLevel(this));
 	}
@@ -1474,17 +1470,17 @@ void CMTEPlugIn::LoadMetricAltitude(void)
 	try {
 		MetricAlt::LoadAltitudeDefinition(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions are loaded successfully. TXT file name: " + fn).c_str(),
+			("MA loaded. File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::string e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions failed to load (" + e + "). TXT file name: " + fn).c_str(),
+			("MA load fail (" + e + "). File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 	catch (std::exception e) {
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
-			("Altitude menu definitions failed to load (" + std::string(e.what()) + "). TXT file name: " + fn).c_str(),
+			("MA load fail (" + std::string(e.what()) + "). File: " + fn).c_str(),
 			1, 0, 0, 0, 0);
 	}
 }
