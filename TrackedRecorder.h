@@ -4,6 +4,7 @@
 
 #include "pch.h"
 #include "SimilarCallsign.h"
+#include "MetricAlt.h"
 
 class TrackedRecorder
 {
@@ -31,7 +32,8 @@ public:
 	void SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot);
 	void SetSpeedUnit(const bool& knot);
 
-	bool IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget);
+	bool IsDifferentUnitPUS(EuroScopePlugIn::CRadarTarget RadarTarget);
+	bool IsDifferentUnitRFL(EuroScopePlugIn::CFlightPlan FlightPlan);
 
 	bool IsSquawkDUPE(const std::string& callsign);
 

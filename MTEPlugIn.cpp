@@ -22,7 +22,7 @@ const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m/ft)
 const int TAG_ITEM_TYPE_CFL_FLX = 6; // Cleared flight level (m/FL)
 const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level (ICAO)
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
-const int TAG_ITEM_TYPE_RFL_IND = 9; // RFL unit indicator
+const int TAG_ITEM_TYPE_UNIT_IND_1 = 9; // Unit indicator 1 (RFL)
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
 const int TAG_ITEM_TYPE_RECAT_BC = 12; // RECAT-CN (H-B/C)
@@ -36,7 +36,7 @@ const int TAG_ITEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
 const int TAG_ITEM_TYPE_GS_CALC = 22; // Ground speed
-const int TAG_ITEM_TYPE_UNIT_IND = 23; // Unit indicator
+const int TAG_ITEM_TYPE_UNIT_IND_2 = 23; // Unit indicator 2 (PUS)
 const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, duplicate)
 
 // TAG ITEM FUNCTION
@@ -112,6 +112,16 @@ constexpr auto SETTING_GS_STA = "GS/StableMark"; // char, *NULL*
 constexpr auto DEFAULT_GS_STA = '\0';
 constexpr auto SETTING_GS_DEC = "GS/DecreaseMark"; // char, *NULL*
 constexpr auto DEFAULT_GS_DEC = '\0';
+// UNIT INDICATOR
+// do not use GetPluginSetting because space is allowed
+constexpr auto SETTING_UNIT_IND_1X = "Unit/Indicator1X"; // char, *NULL*
+constexpr auto DEFAULT_UNIT_IND_1X = '\0';
+constexpr auto SETTING_UNIT_IND_1O = "Unit/Indicator1O"; // char, *#*
+constexpr auto DEFAULT_UNIT_IND_1O = '#';
+constexpr auto SETTING_UNIT_IND_2X = "Unit/Indicator2X"; // char, * *(space)
+constexpr auto DEFAULT_UNIT_IND_2X = ' ';
+constexpr auto SETTING_UNIT_IND_2O = "Unit/Indicator2O"; // char, *NULL*
+constexpr auto DEFAULT_UNIT_IND_2O = '\0';
 // COLOR DEFINITIONS (R:G:B)
 constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
 constexpr auto SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
@@ -172,7 +182,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Cleared flight level (m/FL)", TAG_ITEM_TYPE_CFL_FLX);
 	RegisterTagItemType("Final flight level (ICAO)", TAG_ITEM_TYPE_RFL_ICAO);
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
-	RegisterTagItemType("RFL unit indicator", TAG_ITEM_TYPE_RFL_IND);
+	RegisterTagItemType("Unit indicator 1 (RFL)", TAG_ITEM_TYPE_UNIT_IND_1);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
 	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
 	RegisterTagItemType("RECAT-CN (H-B/C)", TAG_ITEM_TYPE_RECAT_BC);
@@ -186,7 +196,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
 	RegisterTagItemType("Ground speed", TAG_ITEM_TYPE_GS_CALC);
-	RegisterTagItemType("Unit indicator", TAG_ITEM_TYPE_UNIT_IND);
+	RegisterTagItemType("Unit indicator 2 (PUS)", TAG_ITEM_TYPE_UNIT_IND_2);
 	RegisterTagItemType("Vertical speed (FPM, duplicate)", TAG_ITEM_TYPE_VS_TOGGL);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
@@ -415,14 +425,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break;
 	}
-	case TAG_ITEM_TYPE_RFL_IND: {
+	case TAG_ITEM_TYPE_UNIT_IND_1: {
 		if (!FlightPlan.IsValid()) break;
-		bool plnfeet = m_TrackedRecorder->IsForceFeet(FlightPlan);
-		int rflAlt = FlightPlan.GetFinalAltitude();
-		int _meter;
-		bool rflfeet = !MetricAlt::RflFeettoM(rflAlt, _meter);
-		if (plnfeet != rflfeet)  // discrepancy
-			strcpy_s(sItemString, 2, "#");
+		auto co = GetDataFromSettings(SETTING_UNIT_IND_1O);
+		auto cx = GetDataFromSettings(SETTING_UNIT_IND_1X);
+		if (m_TrackedRecorder->IsDifferentUnitRFL(FlightPlan)) {
+			char c = co == nullptr ? DEFAULT_UNIT_IND_1O : co[0];
+			sprintf_s(sItemString, 2, "%c", c);
+		}
+		else {
+			char c = cx == nullptr ? DEFAULT_UNIT_IND_1X : cx[0];
+			sprintf_s(sItemString, 2, "%c", c);
+		}
 		break;
 	}
 	case TAG_ITEM_TYPE_RVSM_IND: {
@@ -593,10 +607,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break;
 	}
-	case TAG_ITEM_TYPE_UNIT_IND: {
+	case TAG_ITEM_TYPE_UNIT_IND_2: {
 		if (!RadarTarget.IsValid()) break;
-		if (!m_TrackedRecorder->IsDifferentUnit(RadarTarget)) {
-			strcpy_s(sItemString, 2, " ");
+		auto co = GetDataFromSettings(SETTING_UNIT_IND_2O);
+		auto cx = GetDataFromSettings(SETTING_UNIT_IND_2X);
+		if (m_TrackedRecorder->IsDifferentUnitPUS(RadarTarget)) {
+			char c = co == nullptr ? DEFAULT_UNIT_IND_2O : co[0];
+			sprintf_s(sItemString, 2, "%c", c);
+		}
+		else {
+			char c = cx == nullptr ? DEFAULT_UNIT_IND_2X : cx[0];
+			sprintf_s(sItemString, 2, "%c", c);
 		}
 		break;
 	}
@@ -965,14 +986,10 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		bool suppvs = GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == -1;
 		bool showvs = m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.IsValid() ? RadarTarget.GetSystemID() : "");
 		OpenPopupList(Area, "Units", 2);
-		std::vector<std::string> unitvec = {
-			std::format("{}{}","ALT:", isfeet ? "F" : "M"),
-			std::format("{}{}","SPD:" , isknot ? "S" : "K"),
-			std::format("{}{}","VS :" , suppvs ? "-" : (showvs ? "O" : "X")),
-		}; // fix length=5
-		for (const auto& s : unitvec) {
-			AddPopupListElement(s.c_str(), "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
-		}
+		// fix length = 5
+		AddPopupListElement(isfeet ? "ALT:F" : "ALT:M", "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
+		AddPopupListElement(isknot ? "SPD:S" : "SPD:K", "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
+		AddPopupListElement(suppvs ? "VS: A" : (showvs ? "VS :O" : "VS :X"), "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, suppvs, false);
 		break;
 	}
 	case TAG_ITEM_FUNCTION_UNIT_SET: {

@@ -370,8 +370,9 @@ void TrackedRecorder::SetSpeedUnit(const bool& knot)
 	m_DefaultKnot = knot;
 }
 
-bool TrackedRecorder::IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackedRecorder::IsDifferentUnitPUS(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
+	// PUS = Position Unit Setting
 	if (!RadarTarget.IsValid()) return false;
 	std::shared_lock aclock(ucals_Mutex), ailock(usysi_Mutex), slock(speed_Mutex);
 	std::string callsign = RadarTarget.GetCorrelatedFlightPlan().IsValid() ? RadarTarget.GetCorrelatedFlightPlan().GetCallsign() : "";
@@ -380,6 +381,14 @@ bool TrackedRecorder::IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget)
 	bool revi = m_AltUnitSysID.contains(systemID);
 	bool revs = m_SpeedUnitSysID.contains(systemID);
 	return revc || revi || revs;
+}
+
+bool TrackedRecorder::IsDifferentUnitRFL(EuroScopePlugIn::CFlightPlan FlightPlan)
+{
+	if (!FlightPlan.IsValid()) return false;
+	int _meter;
+	bool feetRequested = !MetricAlt::RflFeettoM(FlightPlan.GetFinalAltitude(), _meter);
+	return m_DefaultFeet != feetRequested;
 }
 
 bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
