@@ -14,7 +14,7 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 #endif // !COPYRIGHTS
 
 // TAG ITEM TYPE
-const int TAG_ITEM_TYPE_GND_SPD_DUPE = 1; // GS (duplicate)
+const int TAG_ITEM_TYPE_GS_W_TRND = 1; // GS (value & trend)
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_AHIDE = 3; // VS (auto)
 const int TAG_ITEM_TYPE_LVL_IND = 4; // Altitude trend indicator
@@ -35,10 +35,11 @@ const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_ITEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
 const int TAG_ITEM_TYPE_ASPD_BND = 21; // ASP bound (Topsky, +/-)
-const int TAG_ITEM_TYPE_GND_SPD = 22; // GS
+const int TAG_ITEM_TYPE_GS_VALUE = 22; // GS (value)
 const int TAG_ITEM_TYPE_UNIT_IND_2 = 23; // Unit indicator 2 (PUS)
 const int TAG_ITEM_TYPE_VS_TOGGL = 24; // VS (toggle)
 const int TAG_ITEM_TYPE_VS_ALWYS = 25; // VS (always)
+const int TAG_ITEM_TYPE_GS_TRND = 26; // GS (trend)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
@@ -176,7 +177,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
-	RegisterTagItemType("GS (duplicate)", TAG_ITEM_TYPE_GND_SPD_DUPE);
+	RegisterTagItemType("GS (with trend)", TAG_ITEM_TYPE_GS_W_TRND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("VS (auto)", TAG_ITEM_TYPE_VS_AHIDE);
 	RegisterTagItemType("Altitude trend indicator", TAG_ITEM_TYPE_LVL_IND);
@@ -197,10 +198,11 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Departure status", TAG_ITEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
 	RegisterTagItemType("ASP bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
-	RegisterTagItemType("GS", TAG_ITEM_TYPE_GND_SPD);
+	RegisterTagItemType("GS (value)", TAG_ITEM_TYPE_GS_VALUE);
 	RegisterTagItemType("Unit indicator 2 (PUS)", TAG_ITEM_TYPE_UNIT_IND_2);
 	RegisterTagItemType("VS (toggle)", TAG_ITEM_TYPE_VS_TOGGL);
 	RegisterTagItemType("VS (always)", TAG_ITEM_TYPE_VS_ALWYS);
+	RegisterTagItemType("GS (trend)", TAG_ITEM_TYPE_GS_TRND);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -235,8 +237,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		return;
 	switch (ItemCode)
 	{
-	case TAG_ITEM_TYPE_GND_SPD_DUPE:
-	case TAG_ITEM_TYPE_GND_SPD: {
+	case TAG_ITEM_TYPE_GS_TRND:
+	case TAG_ITEM_TYPE_GS_VALUE:
+	case TAG_ITEM_TYPE_GS_W_TRND: {
 		if (!RadarTarget.IsValid()) break;
 		// determine if using calculated or reported
 		int threshold = GetPluginSetting(SETTING_GS_MODE, DEFAULT_GS_MODE); // knots, when the gap is smaller than this value, use reported, otherwise use calculated.
@@ -248,27 +251,30 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		double gscal = abs(distance / elapsed * 3600.0); // knots
 		double gskts = abs(gsrpt - gscal) < (double)threshold ? gsrpt : gscal;
 		std::string strgs = "";
-		if (m_TrackedRecorder->IsForceKnot(RadarTarget)) { // force knot
-			strgs = gskts < 995 ? std::format("{:02d} ", (int)round(gskts / 10.0)) : "++ "; // due to rounding
+		if (ItemCode != TAG_ITEM_TYPE_GS_TRND) {
+			if (m_TrackedRecorder->IsForceKnot(RadarTarget)) { // force knot
+				strgs = gskts < 995 ? std::format("{:02d}", (int)round(gskts / 10.0)) : "++"; // due to rounding
+			}
+			else { //convert to kph
+				double gskph = KN_KPH(gskts);
+				strgs = gskph < 1995 ? std::format("{:03d}", (int)round(gskph / 10.0)) : "+++"; // due to rounding
+			}
 		}
-		else { //convert to kph
-			double gskph = KN_KPH(gskts);
-			strgs = gskph < 1995 ? std::format("{:03d}", (int)round(gskph / 10.0)) : "+++"; // due to rounding
-		}
-		if (strgs[0] != '+') {
+		if (ItemCode != TAG_ITEM_TYPE_GS_VALUE && strgs.size() && strgs.find('+') == std::string::npos) {
 			char uTrend = GetPluginSetting(SETTING_GS_INC, DEFAULT_GS_INC);
 			char sTrend = GetPluginSetting(SETTING_GS_STA, DEFAULT_GS_STA);
 			char dTrend = GetPluginSetting(SETTING_GS_DEC, DEFAULT_GS_DEC);
-			if (uTrend || sTrend || dTrend) { // determine if a trend mark is appended
-				double diff = KN_KPH(gsrpt - (double)prepos.GetReportedGS());
+			if (uTrend || sTrend || dTrend) { // at least one trend mark
+				double gsrpt1 = prepos.GetReportedGS();
+				CRadarTargetPositionData prepos1 = RadarTarget.GetPreviousPosition(prepos);
+				double distance1 = prepos1.GetPosition().DistanceTo(prepos.GetPosition()); // n miles
+				double elapsed1 = GetLastRadarInterval(prepos, prepos1);
+				double gscal1 = abs(distance1 / elapsed1 * 3600.0); // knots
+				double gskts1 = abs(gsrpt1 - gscal1) < (double)threshold ? gsrpt1 : gscal1;
+				double diff = KN_KPH(gskts - gskts1);
 				int trendThld = abs(GetPluginSetting(SETTING_GS_TREND, DEFAULT_GS_TREND));
 				if (trendThld > 0) {
-					if (diff >= trendThld)
-						strgs += uTrend;
-					else if (diff <= -trendThld)
-						strgs += dTrend;
-					else
-						strgs += sTrend;
+					strgs += diff >= trendThld ? uTrend : (diff <= -trendThld ? dTrend : sTrend);
 				}
 			}
 		}

@@ -144,7 +144,8 @@
       </Command>
     </PreLinkEvent>
     <PreBuildEvent>
-      <Command>python BuildNumber.py</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
