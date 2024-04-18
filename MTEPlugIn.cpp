@@ -14,13 +14,13 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 #endif // !COPYRIGHTS
 
 // TAG ITEM TYPE
-const int TAG_ITEM_TYPE_GS_W_IND = 1; // Ground speed (duplicate)
+const int TAG_ITEM_TYPE_GND_SPD_DUPE = 1; // GS (duplicate)
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
-const int TAG_ITEM_TYPE_VS_AHIDE = 3; // Vertical speed (FPM)
-const int TAG_ITEM_TYPE_LVL_IND = 4; // Climb/Descend/Level indicator
-const int TAG_ITEM_TYPE_AFL_MTR = 5; // Actual altitude (m/ft)
-const int TAG_ITEM_TYPE_CFL_FLX = 6; // Cleared flight level (m/FL)
-const int TAG_ITEM_TYPE_RFL_ICAO = 7; // Final flight level (ICAO)
+const int TAG_ITEM_TYPE_VS_AHIDE = 3; // VS (auto)
+const int TAG_ITEM_TYPE_LVL_IND = 4; // Altitude trend indicator
+const int TAG_ITEM_TYPE_AFL_MTR = 5; // MCL/AFL
+const int TAG_ITEM_TYPE_CFL_FLX = 6; // CFL
+const int TAG_ITEM_TYPE_RFL_ICAO = 7; // RFL
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 const int TAG_ITEM_TYPE_UNIT_IND_1 = 9; // Unit indicator 1 (RFL)
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
@@ -30,19 +30,20 @@ const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
 const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
 const int TAG_ITEM_TYPE_DEP_SEQ = 15; // Departure sequence
 const int TAG_ITEM_TYPE_RVEC_IND = 16; // Radar vector indicator
-const int TAG_ITEM_TYPE_CFL_MTR = 17; // Cleared flight level (m)
+const int TAG_ITEM_TYPE_CFL_MTR = 17; // CFL (m)
 const int TAG_ITEM_TYPE_RCNT_IND = 18; // Reconnected indicator
 const int TAG_ITEM_TYPE_DEP_STS = 19; // Departure status
 const int TAG_TIEM_TYPE_RECAT_WTC = 20; // RECAT-CN (LMCBJ)
-const int TAG_ITEM_TYPE_ASPD_BND = 21; // Assigned speed bound (Topsky, +/-)
-const int TAG_ITEM_TYPE_GS_CALC = 22; // Ground speed
+const int TAG_ITEM_TYPE_ASPD_BND = 21; // ASP bound (Topsky, +/-)
+const int TAG_ITEM_TYPE_GND_SPD = 22; // GS
 const int TAG_ITEM_TYPE_UNIT_IND_2 = 23; // Unit indicator 2 (PUS)
-const int TAG_ITEM_TYPE_VS_TOGGL = 24; // Vertical speed (FPM, duplicate)
+const int TAG_ITEM_TYPE_VS_TOGGL = 24; // VS (toggle)
+const int TAG_ITEM_TYPE_VS_ALWYS = 25; // VS (always)
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
 const int TAG_ITEM_FUNCTION_RCNT_RST = 2; // Restore assigned data
-const int TAG_ITEM_FUNCTION_VS_DISP = 3; // Toggle vertical speed display
+const int TAG_ITEM_FUNCTION_VS_DISP = 3; // Toggle VS display
 const int TAG_ITEM_FUNCTION_CFL_SET_EDIT = 10; // Set CFL from edit (not registered)
 const int TAG_ITEM_FUNCTION_CFL_MENU = 11; // Open CFL popup menu
 const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit
@@ -58,8 +59,8 @@ const int TAG_ITEM_FUNCTION_RTE_INFO = 40; // Show route checker info
 const int TAG_ITEM_FUNCTION_DSQ_MENU = 50; // Set departure sequence
 const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit (not registered)
 const int TAG_ITEM_FUNCTION_DSQ_STS = 52; // Set departure status
-const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set assigned speed (not registered)
-const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open assigned speed popup list
+const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set ASP (not registered)
+const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open ASP popup list
 const int TAG_ITEM_FUNCTION_UNIT_MENU = 70; // Open unit settings popup menu
 const int TAG_ITEM_FUNCTION_UNIT_SET = 71; // Set unit from menu (not registered)
 
@@ -93,8 +94,8 @@ constexpr auto DEFAULT_ALT_FEET = false;
 constexpr auto SETTING_ALT_TOGG = "ALT/ToggleDura"; // int, *5*
 constexpr auto DEFAULT_ALT_TOGG = 5; // seconds
 // VERTICAL SPEED
-constexpr auto SETTING_VS_MODE = "VS/Mode"; // *-1*: auto-hide, 0: hide, 1: show, include command.
-constexpr auto DEFAULT_VS_MODE = -1; // Auto-hide disables VS toggle.
+constexpr auto SETTING_VS_MODE = "VS/Mode"; // bool, *0*: hide, 1: show, only valid for toggle, included in command.
+constexpr auto DEFAULT_VS_MODE = false; // Auto-hide disables VS toggle.
 constexpr auto SETTING_VS_THLD = "VS/Threshold"; // positive int, *100*
 constexpr auto DEFAULT_VS_THLD = 100; // FPM
 constexpr auto SETTING_VS_RNDG = "VS/Rounding"; // positive int, *1*
@@ -114,6 +115,7 @@ constexpr auto SETTING_GS_DEC = "GS/DecreaseMark"; // char, *NULL*
 constexpr auto DEFAULT_GS_DEC = '\0';
 // UNIT INDICATOR
 // do not use GetPluginSetting because space is allowed
+// use "\0" in settings file to explicit string terminator, to prevent being discarded by ES when saving settings
 constexpr auto SETTING_UNIT_IND_1X = "Unit/Indicator1X"; // char, *NULL*
 constexpr auto DEFAULT_UNIT_IND_1X = '\0';
 constexpr auto SETTING_UNIT_IND_1O = "Unit/Indicator1O"; // char, *#*
@@ -174,13 +176,13 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
-	RegisterTagItemType("Ground speed (duplicate)", TAG_ITEM_TYPE_GS_W_IND);
+	RegisterTagItemType("GS (duplicate)", TAG_ITEM_TYPE_GND_SPD_DUPE);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
-	RegisterTagItemType("Vertical speed (FPM)", TAG_ITEM_TYPE_VS_AHIDE);
-	RegisterTagItemType("Climb/Descend/Level indicator", TAG_ITEM_TYPE_LVL_IND);
-	RegisterTagItemType("Actual altitude (m/ft)", TAG_ITEM_TYPE_AFL_MTR);
-	RegisterTagItemType("Cleared flight level (m/FL)", TAG_ITEM_TYPE_CFL_FLX);
-	RegisterTagItemType("Final flight level (ICAO)", TAG_ITEM_TYPE_RFL_ICAO);
+	RegisterTagItemType("VS (auto)", TAG_ITEM_TYPE_VS_AHIDE);
+	RegisterTagItemType("Altitude trend indicator", TAG_ITEM_TYPE_LVL_IND);
+	RegisterTagItemType("MCL/AFL", TAG_ITEM_TYPE_AFL_MTR);
+	RegisterTagItemType("CFL", TAG_ITEM_TYPE_CFL_FLX);
+	RegisterTagItemType("RFL", TAG_ITEM_TYPE_RFL_ICAO);
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
 	RegisterTagItemType("Unit indicator 1 (RFL)", TAG_ITEM_TYPE_UNIT_IND_1);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
@@ -190,18 +192,19 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
 	RegisterTagItemType("Departure sequence", TAG_ITEM_TYPE_DEP_SEQ);
 	RegisterTagItemType("Radar vector indicator", TAG_ITEM_TYPE_RVEC_IND);
-	RegisterTagItemType("Cleared flight level (m)", TAG_ITEM_TYPE_CFL_MTR);
+	RegisterTagItemType("CFL (m)", TAG_ITEM_TYPE_CFL_MTR);
 	RegisterTagItemType("Reconnected indicator", TAG_ITEM_TYPE_RCNT_IND);
 	RegisterTagItemType("Departure status", TAG_ITEM_TYPE_DEP_STS);
 	RegisterTagItemType("RECAT-CN (LMCBJ)", TAG_TIEM_TYPE_RECAT_WTC);
-	RegisterTagItemType("Assigned speed bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
-	RegisterTagItemType("Ground speed", TAG_ITEM_TYPE_GS_CALC);
+	RegisterTagItemType("ASP bound (Topsky, +/-)", TAG_ITEM_TYPE_ASPD_BND);
+	RegisterTagItemType("GS", TAG_ITEM_TYPE_GND_SPD);
 	RegisterTagItemType("Unit indicator 2 (PUS)", TAG_ITEM_TYPE_UNIT_IND_2);
-	RegisterTagItemType("Vertical speed (FPM, duplicate)", TAG_ITEM_TYPE_VS_TOGGL);
+	RegisterTagItemType("VS (toggle)", TAG_ITEM_TYPE_VS_TOGGL);
+	RegisterTagItemType("VS (always)", TAG_ITEM_TYPE_VS_ALWYS);
 
 	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
-	RegisterTagItemFunction("Toggle vertical speed display", TAG_ITEM_FUNCTION_VS_DISP);
+	RegisterTagItemFunction("Toggle VS display", TAG_ITEM_FUNCTION_VS_DISP);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
 	RegisterTagItemFunction("Open CFL popup edit", TAG_ITEM_FUNCTION_CFL_EDIT);
 	RegisterTagItemFunction("Confirm CFL / Open Topsky CFL menu", TAG_ITEM_FUNCTION_CFL_TOPSKY);
@@ -211,7 +214,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
 	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
 	RegisterTagItemFunction("Set departure status", TAG_ITEM_FUNCTION_DSQ_STS);
-	RegisterTagItemFunction("Open assigned speed popup list", TAG_ITEM_FUNCTION_SPD_LIST);
+	RegisterTagItemFunction("Open ASP popup list", TAG_ITEM_FUNCTION_SPD_LIST);
 	RegisterTagItemFunction("Open unit settings popup menu", TAG_ITEM_FUNCTION_UNIT_MENU);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
@@ -232,8 +235,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		return;
 	switch (ItemCode)
 	{
-	case TAG_ITEM_TYPE_GS_W_IND:
-	case TAG_ITEM_TYPE_GS_CALC: {
+	case TAG_ITEM_TYPE_GND_SPD_DUPE:
+	case TAG_ITEM_TYPE_GND_SPD: {
 		if (!RadarTarget.IsValid()) break;
 		// determine if using calculated or reported
 		int threshold = GetPluginSetting(SETTING_GS_MODE, DEFAULT_GS_MODE); // knots, when the gap is smaller than this value, use reported, otherwise use calculated.
@@ -279,27 +282,26 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (remarks.find("RMK/") != std::string::npos || remarks.find("STS/") != std::string::npos)
 			sprintf_s(sItemString, 2, "*");
 		else
-			sprintf_s(sItemString, 2, " ");
+			sprintf_s(sItemString, 16, "");
 		break;
 	}
 	case TAG_ITEM_TYPE_VS_AHIDE:
-	case TAG_ITEM_TYPE_VS_TOGGL: {
+	case TAG_ITEM_TYPE_VS_TOGGL:
+	case TAG_ITEM_TYPE_VS_ALWYS: {
 		if (!RadarTarget.IsValid()) break;
-		int mode = GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE);
 		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
 		int thld = abs(GetPluginSetting(SETTING_VS_THLD, DEFAULT_VS_THLD));
 		// determines whether to show
-		if (mode == -1) {
+		if (ItemCode == TAG_ITEM_TYPE_VS_AHIDE) {
 			if (vs < thld) {
 				break;
 			}
 		}
-		else if (!m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID())) {
+		else if (ItemCode == TAG_ITEM_TYPE_VS_TOGGL &&
+			!m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.GetSystemID())) {
 			break;
 		}
-		else {
-			vs = vs >= thld ? vs : 0;
-		}
+		vs = vs >= thld ? vs : 0;
 		sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
 		break;
 	}
@@ -427,16 +429,50 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_UNIT_IND_1: {
 		if (!FlightPlan.IsValid()) break;
-		auto co = GetDataFromSettings(SETTING_UNIT_IND_1O);
-		auto cx = GetDataFromSettings(SETTING_UNIT_IND_1X);
+		char c = '\0';
 		if (m_TrackedRecorder->IsDifferentUnitRFL(FlightPlan)) {
-			char c = co == nullptr ? DEFAULT_UNIT_IND_1O : co[0];
-			sprintf_s(sItemString, 2, "%c", c);
+			auto co = GetDataFromSettings(SETTING_UNIT_IND_1O);
+			if (co == nullptr) {
+				c = DEFAULT_UNIT_IND_1O;
+			}
+			else if (strcmp(co, R"(\0)")) {
+				c = co[0];
+			}
 		}
 		else {
-			char c = cx == nullptr ? DEFAULT_UNIT_IND_1X : cx[0];
-			sprintf_s(sItemString, 2, "%c", c);
+			auto cx = GetDataFromSettings(SETTING_UNIT_IND_1X);
+			if (cx == nullptr) {
+				c = DEFAULT_UNIT_IND_1X;
+			}
+			else if (strcmp(cx, R"(\0)")) {
+				c = cx[0];
+			}
 		}
+		sprintf_s(sItemString, 2, "%c", c);
+		break;
+	}
+	case TAG_ITEM_TYPE_UNIT_IND_2: {
+		if (!RadarTarget.IsValid()) break;
+		char c = '\0';
+		if (m_TrackedRecorder->IsDifferentUnitPUS(RadarTarget)) {
+			auto co = GetDataFromSettings(SETTING_UNIT_IND_2O);
+			if (co == nullptr) {
+				c = DEFAULT_UNIT_IND_2O;
+			}
+			else if (strcmp(co, R"(\0)")) {
+				c = co[0];
+			}
+		}
+		else {
+			auto cx = GetDataFromSettings(SETTING_UNIT_IND_2X);
+			if (cx == nullptr) {
+				c = DEFAULT_UNIT_IND_2X;
+			}
+			else if (strcmp(cx, R"(\0)")) {
+				c = cx[0];
+			}
+		}
+		sprintf_s(sItemString, 2, "%c", c);
 		break;
 	}
 	case TAG_ITEM_TYPE_RVSM_IND: {
@@ -607,20 +643,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		break;
 	}
-	case TAG_ITEM_TYPE_UNIT_IND_2: {
-		if (!RadarTarget.IsValid()) break;
-		auto co = GetDataFromSettings(SETTING_UNIT_IND_2O);
-		auto cx = GetDataFromSettings(SETTING_UNIT_IND_2X);
-		if (m_TrackedRecorder->IsDifferentUnitPUS(RadarTarget)) {
-			char c = co == nullptr ? DEFAULT_UNIT_IND_2O : co[0];
-			sprintf_s(sItemString, 2, "%c", c);
-		}
-		else {
-			char c = cx == nullptr ? DEFAULT_UNIT_IND_2X : cx[0];
-			sprintf_s(sItemString, 2, "%c", c);
-		}
-		break;
-	}
 	default:
 		break;
 	}
@@ -645,7 +667,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_VS_DISP: {
-		if (!RadarTarget.IsValid() || GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == -1) break;
+		if (!RadarTarget.IsValid()) break;
 		m_TrackedRecorder->ToggleVerticalSpeed(std::string(RadarTarget.GetSystemID()));
 		break;
 	}
@@ -983,13 +1005,12 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_UNIT_MENU: {
 		bool isfeet = m_TrackedRecorder->IsForceFeet(FlightPlan) || m_TrackedRecorder->IsForceFeet(RadarTarget);
 		bool isknot = m_TrackedRecorder->IsForceKnot(RadarTarget);
-		bool suppvs = GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == -1;
 		bool showvs = m_TrackedRecorder->IsDisplayVerticalSpeed(RadarTarget.IsValid() ? RadarTarget.GetSystemID() : "");
 		OpenPopupList(Area, "Units", 2);
 		// fix length = 5
 		AddPopupListElement(isfeet ? "ALT:F" : "ALT:M", "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
 		AddPopupListElement(isknot ? "SPD:S" : "SPD:K", "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
-		AddPopupListElement(suppvs ? "VS: A" : (showvs ? "VS :O" : "VS :X"), "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, suppvs, false);
+		AddPopupListElement(showvs ? "VS :O" : "VS :X", "", TAG_ITEM_FUNCTION_UNIT_SET, false, POPUP_ELEMENT_NO_CHECKBOX, false, false);
 		break;
 	}
 	case TAG_ITEM_FUNCTION_UNIT_SET: {
@@ -1009,7 +1030,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			}
 		}
 		else if (type.substr(0, 3) == "VS ") {
-			if (RadarTarget.IsValid() && GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) != -1) {
+			if (RadarTarget.IsValid()) {
 				m_TrackedRecorder->ToggleVerticalSpeed(std::string(RadarTarget.GetSystemID()));
 			}
 		}
@@ -1234,16 +1255,11 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 	}
 
 	// set vertical speed display
-	std::regex rxvs("^.MTEP VS (AUTO|ON|OFF)$", std::regex_constants::icase);
+	std::regex rxvs("^.MTEP VS (ON|OFF)$", std::regex_constants::icase);
 	if (regex_match(cmd, match, rxvs)) {
 		std::string res = MakeUpper(match[1].str());
 		const char* descr = "display vertical speed";
-		if (res == "AUTO") {
-			m_TrackedRecorder->ToggleVerticalSpeed(false);
-			SaveDataToSettings(SETTING_VS_MODE, descr, "-1");
-			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is AUTO", 1, 0, 0, 0, 0);
-		}
-		else if (res == "ON") {
+		if (res == "ON") {
 			m_TrackedRecorder->ToggleVerticalSpeed(true);
 			SaveDataToSettings(SETTING_VS_MODE, descr, "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is ON", 1, 0, 0, 0, 0);
@@ -1448,7 +1464,7 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	m_TrackedRecorder.reset(new TrackedRecorder(this));
 	m_TrackedRecorder->ResetAltitudeUnit(GetPluginSetting(SETTING_ALT_FEET, DEFAULT_ALT_FEET));
 	m_TrackedRecorder->SetSpeedUnit(GetPluginSetting(SETTING_GS_KNOT, DEFAULT_GS_KNOT));
-	m_TrackedRecorder->ToggleVerticalSpeed(GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE) == 1);
+	m_TrackedRecorder->ToggleVerticalSpeed(GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE));
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is ready!", 1, 0, 0, 0, 0);
 }
 
