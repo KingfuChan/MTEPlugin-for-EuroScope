@@ -14,6 +14,10 @@
 
 using namespace EuroScopePlugIn;
 
+typedef struct _common_setting {
+	const char* name;
+	const char* fallback;
+} CommonSetting;
 typedef struct _color_setting {
 	const char* name;
 	const int code;
@@ -46,6 +50,9 @@ private:
 
 	template<typename T>
 	inline T GetPluginSetting(const char* setting, const T& fallback);
+
+	template<typename T>
+	inline T GetPluginSetting(const CommonSetting& setting);
 
 	inline int CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded = false);
 	void CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area); // overload for ES internal function

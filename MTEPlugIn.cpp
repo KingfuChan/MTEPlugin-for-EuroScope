@@ -81,39 +81,25 @@ inline std::string GetRealFileName(const std::string& path);
 constexpr auto SETTING_TRANS_LVL_CSV = "TransLevelCSV"; // file name
 constexpr auto SETTING_ROUTE_CHECKER_CSV = "RteCheckerCSV"; // file name
 constexpr auto SETTING_TRANS_MALT_TXT = "MetricAltitudeTXT"; // file name
-constexpr auto SETTING_CUSTOM_CURSOR = "CustomCursor"; // bool, *0*
-constexpr auto DEFAULT_CUSTOM_CURSOR = false;
-constexpr auto SETTING_AUTO_RETRACK = "AutoRetrack"; // *0*: off, 1: silent, 2: notify
-constexpr auto DEFAULT_AUTO_RETRACK = 0;
-constexpr auto SETTING_AMEND_CFL = "AmendQFEinCFL"; // 0: off, *1*: MTEP, 2: all
-constexpr auto DEFAULT_AMEND_CFL = 1;
+const CommonSetting SETTING_CUSTOM_CURSOR = { "CustomCursor", "0" }; // bool, *0*
+const CommonSetting SETTING_AUTO_RETRACK = { "AutoRetrack", "0" }; // *0*: off, 1: silent, 2: notify
+const CommonSetting SETTING_AMEND_CFL = { "AmendQFEinCFL", "1" }; // 0: off, *1*: MTEP, 2: all
 // REALTIME READ SETTINGS, CHANGE BY LOAD SETTINGS
 constexpr auto SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9"; // char[10]
 // ALTITUDE
-constexpr auto SETTING_ALT_FEET = "ALT/Feet"; // bool, *0*, include command
-constexpr auto DEFAULT_ALT_FEET = false;
-constexpr auto SETTING_ALT_TOGG = "ALT/ToggleDura"; // int, *5*
-constexpr auto DEFAULT_ALT_TOGG = 5; // seconds
+const CommonSetting SETTING_ALT_FEET = { "ALT/Feet", "0" }; // bool, *0*, include command
+const CommonSetting SETTING_ALT_TOGG = { "ALT/ToggleDura", "5" }; // int, *5* seconds
 // VERTICAL SPEED
-constexpr auto SETTING_VS_MODE = "VS/Mode"; // bool, *0*: hide, 1: show, only valid for toggle, included in command.
-constexpr auto DEFAULT_VS_MODE = false; // Auto-hide disables VS toggle.
-constexpr auto SETTING_VS_THLD = "VS/Threshold"; // positive int, *100*
-constexpr auto DEFAULT_VS_THLD = 100; // FPM
-constexpr auto SETTING_VS_RNDG = "VS/Rounding"; // positive int, *1*
-constexpr auto DEFAULT_VS_RNDG = 1;
+const CommonSetting SETTING_VS_MODE = { "VS/Mode", "0" }; // bool, *0*: hide, 1: show, only valid for toggle, included in command.
+const CommonSetting SETTING_VS_THLD = { "VS/Threshold", "100" }; // positive int, *100* FPM
+const CommonSetting SETTING_VS_RNDG = { "VS/Rounding", "1" }; // positive int, *1* FPM
 // GOUND SPEED
-constexpr auto SETTING_GS_KNOT = "GS/Knot"; // bool, *0*, include command
-constexpr auto DEFAULT_GS_KNOT = false;
-constexpr auto SETTING_GS_MODE = "GS/ModeThreshold"; // int, *0*
-constexpr auto DEFAULT_GS_MODE = 0;
-constexpr auto SETTING_GS_TREND = "GS/TrendThreshold"; // positive int, *5*
-constexpr auto DEFAULT_GS_TREND = 5; // KPH
-constexpr auto SETTING_GS_INC = "GS/IncreaseMark"; // char, *NULL*
-constexpr auto DEFAULT_GS_INC = '\0';
-constexpr auto SETTING_GS_STA = "GS/StableMark"; // char, *NULL*
-constexpr auto DEFAULT_GS_STA = '\0';
-constexpr auto SETTING_GS_DEC = "GS/DecreaseMark"; // char, *NULL*
-constexpr auto DEFAULT_GS_DEC = '\0';
+const CommonSetting SETTING_GS_KNOT = { "GS/Knot", "0" }; // bool, *0*, include command
+const CommonSetting SETTING_GS_MODE = { "GS/ModeThreshold", "0" }; // int, *0* KTS
+const CommonSetting SETTING_GS_TREND = { "GS/TrendThreshold", "5" }; // positive int, *5* KPH
+const CommonSetting SETTING_GS_INC = { "GS/IncreaseMark", "" }; // char, *NULL*
+const CommonSetting SETTING_GS_STA = { "GS/StableMark", "" }; // char, *NULL*
+const CommonSetting SETTING_GS_DEC = { "GS/DecreaseMark", "" }; // char, *NULL*
 // UNIT INDICATOR
 // do not use GetPluginSetting because space is allowed
 // use "\0" in settings file to explicit string terminator, to prevent being discarded by ES when saving settings
@@ -167,7 +153,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	int curSize = (int)((float)(dpiSys < 96 ? 96 : dpiSys) / (float)(dpiWnd < 96 ? 96 : dpiWnd) * 32.0);
 	pluginCursor = CopyCursor(LoadImage(pluginModule, MAKEINTRESOURCE(IDC_CURSORCROSS), IMAGE_CURSOR, curSize, curSize, LR_SHARED));
 
-	if (GetPluginSetting(SETTING_CUSTOM_CURSOR, DEFAULT_CUSTOM_CURSOR))
+	if (GetPluginSetting<bool>(SETTING_CUSTOM_CURSOR))
 		SetCustomCursor();
 
 	ResetTrackedRecorder();
@@ -242,7 +228,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_GS_W_TRND: {
 		if (!RadarTarget.IsValid()) break;
 		// determine if using calculated or reported
-		int threshold = GetPluginSetting(SETTING_GS_MODE, DEFAULT_GS_MODE); // knots, when the gap is smaller than this value, use reported, otherwise use calculated.
+		int threshold = GetPluginSetting<int>(SETTING_GS_MODE); // knots, when the gap is smaller than this value, use reported, otherwise use calculated.
 		CRadarTargetPositionData curpos = RadarTarget.GetPosition();
 		double gsrpt = curpos.GetReportedGS(); // can be 0 but should not affect consequent selection
 		CRadarTargetPositionData prepos = RadarTarget.GetPreviousPosition(curpos);
@@ -260,10 +246,11 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				strgs = gskph < 1995 ? std::format("{:03d}", (int)round(gskph / 10.0)) : "+++"; // due to rounding
 			}
 		}
-		if (ItemCode != TAG_ITEM_TYPE_GS_VALUE && strgs.size() && strgs.find('+') == std::string::npos) {
-			char uTrend = GetPluginSetting(SETTING_GS_INC, DEFAULT_GS_INC);
-			char sTrend = GetPluginSetting(SETTING_GS_STA, DEFAULT_GS_STA);
-			char dTrend = GetPluginSetting(SETTING_GS_DEC, DEFAULT_GS_DEC);
+		if (ItemCode == TAG_ITEM_TYPE_GS_TRND ||
+			(ItemCode == TAG_ITEM_TYPE_GS_W_TRND && strgs.find('+') == std::string::npos)) {
+			char uTrend = GetPluginSetting<char>(SETTING_GS_INC);
+			char sTrend = GetPluginSetting<char>(SETTING_GS_STA);
+			char dTrend = GetPluginSetting<char>(SETTING_GS_DEC);
 			if (uTrend || sTrend || dTrend) { // at least one trend mark
 				double gsrpt1 = prepos.GetReportedGS();
 				CRadarTargetPositionData prepos1 = RadarTarget.GetPreviousPosition(prepos);
@@ -272,7 +259,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				double gscal1 = abs(distance1 / elapsed1 * 3600.0); // knots
 				double gskts1 = abs(gsrpt1 - gscal1) < (double)threshold ? gsrpt1 : gscal1;
 				double diff = KN_KPH(gskts - gskts1);
-				int trendThld = abs(GetPluginSetting(SETTING_GS_TREND, DEFAULT_GS_TREND));
+				int trendThld = abs(GetPluginSetting<int>(SETTING_GS_TREND));
 				if (trendThld > 0) {
 					strgs += diff >= trendThld ? uTrend : (diff <= -trendThld ? dTrend : sTrend);
 				}
@@ -296,7 +283,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_VS_ALWYS: {
 		if (!RadarTarget.IsValid()) break;
 		int vs = abs(CalculateVerticalSpeed(RadarTarget, true));
-		int thld = abs(GetPluginSetting(SETTING_VS_THLD, DEFAULT_VS_THLD));
+		int thld = abs(GetPluginSetting<int>(SETTING_VS_THLD));
 		// determines whether to show
 		if (ItemCode == TAG_ITEM_TYPE_VS_AHIDE) {
 			if (vs < thld) {
@@ -314,13 +301,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_LVL_IND: {
 		if (!RadarTarget.IsValid()) break;
 		int vs = CalculateVerticalSpeed(RadarTarget);
-		int thld = abs(GetPluginSetting(SETTING_VS_THLD, DEFAULT_VS_THLD));
-		if (vs >= thld)
-			sprintf_s(sItemString, 2, "^");
-		else if (vs <= -thld)
-			sprintf_s(sItemString, 2, "|");
-		else
-			sprintf_s(sItemString, 2, ">");
+		int thld = abs(GetPluginSetting<int>(SETTING_VS_THLD));
+		strcpy_s(sItemString, 2, vs >= thld ? "^" : (vs <= -thld ? "|" : ">"));
 		break;
 	}
 	case TAG_ITEM_TYPE_AFL_MTR: {
@@ -504,6 +486,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
 				ind = 'X';
 		}
+		sprintf_s(sItemString, 2, "%c", ind);
 		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
 		break;
 	}
@@ -671,7 +654,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 				FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
 			}
 			else if (tgtAlt > 2) {
-				if (GetPluginSetting(SETTING_AMEND_CFL, DEFAULT_AMEND_CFL) == 1) {
+				if (GetPluginSetting<int>(SETTING_AMEND_CFL) == 1) {
 					int trslvl, elev;
 					std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 					tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
@@ -711,7 +694,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		else if (regex_match(input, match, rxn)) {
 			tgtAlt = MetricAlt::LvlMtoFeet(stoi(match[1]) * 100);
 		}
-		if (tgtAlt > 2 && GetPluginSetting(SETTING_AMEND_CFL, DEFAULT_AMEND_CFL) == 1) {
+		if (tgtAlt > 2 && GetPluginSetting<int>(SETTING_AMEND_CFL) == 1) {
 			int trslvl, elev;
 			std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 			tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
@@ -720,7 +703,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -791,7 +774,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_CFL_EDIT: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -806,7 +789,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_CFL_TOPSKY: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
 			// confirm previous CFL first
@@ -851,7 +834,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_RFL_MENU: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -873,7 +856,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		break;
 	}
 	case TAG_ITEM_FUNCTION_RFL_EDIT: {
-		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting(SETTING_ALT_TOGG, DEFAULT_ALT_TOGG))) break;
+		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
 			// don't show list if other controller is tracking
@@ -1038,7 +1021,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 	if (!FlightPlan.IsValid())
 		return;
 	if (DataType == CTR_DATA_TYPE_TEMPORARY_ALTITUDE) {
-		if (GetPluginSetting(SETTING_AMEND_CFL, DEFAULT_AMEND_CFL) == 2) { // amend only when mode 2 (all) is set
+		if (GetPluginSetting<int>(SETTING_AMEND_CFL) == 2) { // amend only when mode 2 (all) is set
 			int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 			if (cflAlt > 2) { // exclude ILS, VA, NONE
 				int trslvl, elev;
@@ -1108,7 +1091,7 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 		m_TrackedRecorder->UpdateFlight(RadarTarget);
 	}
 	else {
-		int retrack = GetPluginSetting(SETTING_AUTO_RETRACK, DEFAULT_AUTO_RETRACK);
+		int retrack = GetPluginSetting<int>(SETTING_AUTO_RETRACK);
 		if (retrack == 1 || retrack == 2) {
 			if (m_TrackedRecorder->SetTrackedData(RadarTarget) && retrack == 2) {
 				std::string msg = std::string(RadarTarget.GetCallsign()) + " reconnected and is re-tracked.";
@@ -1138,7 +1121,7 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		bool cc = MakeUpper(match[1].str()) == "ON";
 		if (cc)
 			SetCustomCursor();
-		SaveDataToSettings(SETTING_CUSTOM_CURSOR, "set custom mouse cursor", cc ? "1" : "0");
+		SaveDataToSettings(SETTING_CUSTOM_CURSOR.name, "set custom mouse cursor", cc ? "1" : "0");
 		return true;
 	}
 
@@ -1204,15 +1187,15 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		std::string res = match[1].str();
 		const char* descr = "auto retrack mode";
 		if (res == "1") {
-			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "1");
+			SaveDataToSettings(SETTING_AUTO_RETRACK.name, descr, "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack mode 1 (silent) is set", 1, 0, 0, 0, 0);
 		}
 		else if (res == "2") {
-			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "2");
+			SaveDataToSettings(SETTING_AUTO_RETRACK.name, descr, "2");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack mode 2 (notify) is set", 1, 0, 0, 0, 0);
 		}
 		else if (res == "0") {
-			SaveDataToSettings(SETTING_AUTO_RETRACK, descr, "0");
+			SaveDataToSettings(SETTING_AUTO_RETRACK.name, descr, "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Auto retrack is off", 1, 0, 0, 0, 0);
 		}
 		return true;
@@ -1225,22 +1208,22 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		const char* descr = "force feet";
 		if (res == "F") {
 			m_TrackedRecorder->ResetAltitudeUnit(true);
-			SaveDataToSettings(SETTING_ALT_FEET, "force feet", "1");
+			SaveDataToSettings(SETTING_ALT_FEET.name, "force feet", "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Altitude unit is set to feet", 1, 0, 0, 0, 0);
 		}
 		else if (res == "M") {
 			m_TrackedRecorder->ResetAltitudeUnit(false);
-			SaveDataToSettings(SETTING_ALT_FEET, "force feet", "0");
+			SaveDataToSettings(SETTING_ALT_FEET.name, "force feet", "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Altitude unit is set to meter", 1, 0, 0, 0, 0);
 		}
 		else if (res == "S") {
 			m_TrackedRecorder->SetSpeedUnit(true);
-			SaveDataToSettings(SETTING_GS_KNOT, "force knot", "1");
+			SaveDataToSettings(SETTING_GS_KNOT.name, "force knot", "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Speed unit is set to KTS", 1, 0, 0, 0, 0);
 		}
 		else if (res == "K") {
 			m_TrackedRecorder->SetSpeedUnit(false);
-			SaveDataToSettings(SETTING_GS_KNOT, "force knot", "0");
+			SaveDataToSettings(SETTING_GS_KNOT.name, "force knot", "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Speed unit is set to KPH", 1, 0, 0, 0, 0);
 		}
 		return true;
@@ -1253,12 +1236,12 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		const char* descr = "display vertical speed";
 		if (res == "ON") {
 			m_TrackedRecorder->ToggleVerticalSpeed(true);
-			SaveDataToSettings(SETTING_VS_MODE, descr, "1");
+			SaveDataToSettings(SETTING_VS_MODE.name, descr, "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is ON", 1, 0, 0, 0, 0);
 		}
 		else if (res == "OFF") {
 			m_TrackedRecorder->ToggleVerticalSpeed(false);
-			SaveDataToSettings(SETTING_VS_MODE, descr, "0");
+			SaveDataToSettings(SETTING_VS_MODE.name, descr, "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Global vertical speed display is OFF", 1, 0, 0, 0, 0);
 		}
 		return true;
@@ -1319,15 +1302,15 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 		std::string res = match[1].str();
 		const char* descr = "amend QFE in CFL";
 		if (res == "1") {
-			SaveDataToSettings(SETTING_AMEND_CFL, descr, "1");
+			SaveDataToSettings(SETTING_AMEND_CFL.name, descr, "1");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Amend QFE in CFL mode 1 (MTEP) is set", 1, 0, 0, 0, 0);
 		}
 		else if (res == "2") {
-			SaveDataToSettings(SETTING_AMEND_CFL, descr, "2");
+			SaveDataToSettings(SETTING_AMEND_CFL.name, descr, "2");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Amend QFE in CFL mode 2 (all) is set", 1, 0, 0, 0, 0);
 		}
 		else if (res == "0") {
-			SaveDataToSettings(SETTING_AMEND_CFL, descr, "0");
+			SaveDataToSettings(SETTING_AMEND_CFL.name, descr, "0");
 			DisplayUserMessage("MESSAGE", "MTEPlugin", "Amend QFE in CFL is off", 1, 0, 0, 0, 0);
 		}
 		return true;
@@ -1352,6 +1335,24 @@ inline T CMTEPlugIn::GetPluginSetting(const char* setting, const T& fallback)
 	return bufval;
 }
 
+template<typename T>
+inline T CMTEPlugIn::GetPluginSetting(const CommonSetting& setting)
+{
+	// only accept 0/1 for bool
+	T bufval{};
+	auto data = GetDataFromSettings(setting.name);
+	if (data != nullptr) {
+		std::stringstream ss(data);
+		ss >> bufval;
+		if (!ss.fail()) {
+			return bufval;
+		}
+	}
+	std::stringstream ssf(setting.fallback);
+	ssf >> bufval;
+	return bufval;
+}
+
 inline int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded)
 {
 	// if rounded = true, will use setting from SETTING_VS_ROUND, default is 1 (no rounding), will ensure >=1
@@ -1362,7 +1363,7 @@ inline int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rou
 	double deltaT = GetLastRadarInterval(curpos, prepos);
 	int vs = (int)round(deltaA / deltaT * 60.0);
 	if (rounded) {
-		int rnd = abs(GetPluginSetting(SETTING_VS_RNDG, DEFAULT_VS_RNDG));
+		int rnd = abs(GetPluginSetting<int>(SETTING_VS_RNDG));
 		if (rnd > 1) {
 			int rem1 = vs % rnd;
 			int rem2 = rnd - rem1;
@@ -1457,9 +1458,9 @@ void CMTEPlugIn::ResetDepartureSequence(void)
 void CMTEPlugIn::ResetTrackedRecorder(void)
 {
 	m_TrackedRecorder.reset(new TrackedRecorder(this));
-	m_TrackedRecorder->ResetAltitudeUnit(GetPluginSetting(SETTING_ALT_FEET, DEFAULT_ALT_FEET));
-	m_TrackedRecorder->SetSpeedUnit(GetPluginSetting(SETTING_GS_KNOT, DEFAULT_GS_KNOT));
-	m_TrackedRecorder->ToggleVerticalSpeed(GetPluginSetting(SETTING_VS_MODE, DEFAULT_VS_MODE));
+	m_TrackedRecorder->ResetAltitudeUnit(GetPluginSetting<bool>(SETTING_ALT_FEET));
+	m_TrackedRecorder->SetSpeedUnit(GetPluginSetting<bool>(SETTING_GS_KNOT));
+	m_TrackedRecorder->ToggleVerticalSpeed(GetPluginSetting<bool>(SETTING_VS_MODE));
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is ready!", 1, 0, 0, 0, 0);
 }
 
