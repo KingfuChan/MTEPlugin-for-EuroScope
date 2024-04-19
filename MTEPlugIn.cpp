@@ -17,7 +17,7 @@ constexpr auto GITHUB_LINK = "https://github.com/KingfuChan/MTEPlugin-for-EuroSc
 const int TAG_ITEM_TYPE_GS_W_TRND = 1; // GS (value & trend)
 const int TAG_ITEM_TYPE_RMK_IND = 2; // RMK/STS indicator
 const int TAG_ITEM_TYPE_VS_AHIDE = 3; // VS (auto)
-const int TAG_ITEM_TYPE_LVL_IND = 4; // Altitude trend indicator
+const int TAG_ITEM_TYPE_LVL_IND = 4; // VS indicator
 const int TAG_ITEM_TYPE_AFL_MTR = 5; // MCL/AFL
 const int TAG_ITEM_TYPE_CFL_FLX = 6; // CFL
 const int TAG_ITEM_TYPE_RFL_ICAO = 7; // RFL
@@ -61,7 +61,7 @@ const int TAG_ITEM_FUNCTION_DSQ_MENU = 50; // Set departure sequence
 const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit (not registered)
 const int TAG_ITEM_FUNCTION_DSQ_STS = 52; // Set departure status
 const int TAG_ITEM_FUNCTION_SPD_SET = 60; // Set ASP (not registered)
-const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open ASP popup list
+const int TAG_ITEM_FUNCTION_SPD_LIST = 61; // Open ASP popup menu
 const int TAG_ITEM_FUNCTION_UNIT_MENU = 70; // Open unit settings popup menu
 const int TAG_ITEM_FUNCTION_UNIT_SET = 71; // Set unit from menu (not registered)
 
@@ -126,17 +126,17 @@ constexpr auto DEFAULT_UNIT_IND_2X = ' ';
 constexpr auto SETTING_UNIT_IND_2O = "Unit/Indicator2O"; // char, *NULL*
 constexpr auto DEFAULT_UNIT_IND_2O = '\0';
 // COLOR DEFINITIONS (R:G:B)
-constexpr auto SETTING_COLOR_CFL_CONFRM = "Color/CFLNeedConfirm";
-constexpr auto SETTING_COLOR_CS_SIMILR = "Color/SimilarCallsign";
-constexpr auto SETTING_COLOR_COMM_ESTAB = "Color/CommNoEstablish";
-constexpr auto SETTING_COLOR_RC_INVALID = "Color/RouteInvalid";
-constexpr auto SETTING_COLOR_RC_UNCERTN = "Color/RouteUncertain";
-constexpr auto SETTING_COLOR_SQ_DUPE = "Color/SquawkDupe";
-constexpr auto SETTING_COLOR_DS_NUMBR = "Color/DSRestore";
-constexpr auto SETTING_COLOR_DS_STATE = "Color/DSNotCleared";
-constexpr auto SETTING_COLOR_RDRV_IND = "Color/RadarVector";
-constexpr auto SETTING_COLOR_RECONT_IND = "Color/Reconnected";
-constexpr auto SETTING_COLOR_RVSM_IND = "Color/RVSMIndicator";
+const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNeedConfirm", TAG_COLOR_REDUNDANT };
+const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_COMM_ESTAB = { "Color/CommNoEstablish", TAG_COLOR_REDUNDANT };
+const ColorSetting SETTING_COLOR_RC_INVALID = { "Color/RouteInvalid", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_RC_UNCERTN = { "Color/RouteUncertain", TAG_COLOR_REDUNDANT };
+const ColorSetting SETTING_COLOR_SQ_DUPE = { "Color/SquawkDupe", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_DS_NUMBR = { "Color/DSRestore", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_DS_STATE = { "Color/DSNotCleared", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_RDRV_IND = { "Color/RadarVector", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_RECONT_IND = { "Color/Reconnected", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_RVSM_IND = { "Color/RVSMIndicator", TAG_COLOR_DEFAULT };
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -177,10 +177,10 @@ CMTEPlugIn::CMTEPlugIn(void)
 
 	AddAlias(".mteplugin", GITHUB_LINK); // for testing and for fun
 
-	RegisterTagItemType("GS (with trend)", TAG_ITEM_TYPE_GS_W_TRND);
+	RegisterTagItemType("GS (value & trend)", TAG_ITEM_TYPE_GS_W_TRND);
 	RegisterTagItemType("RMK/STS indicator", TAG_ITEM_TYPE_RMK_IND);
 	RegisterTagItemType("VS (auto)", TAG_ITEM_TYPE_VS_AHIDE);
-	RegisterTagItemType("Altitude trend indicator", TAG_ITEM_TYPE_LVL_IND);
+	RegisterTagItemType("VS indicator", TAG_ITEM_TYPE_LVL_IND);
 	RegisterTagItemType("MCL/AFL", TAG_ITEM_TYPE_AFL_MTR);
 	RegisterTagItemType("CFL", TAG_ITEM_TYPE_CFL_FLX);
 	RegisterTagItemType("RFL", TAG_ITEM_TYPE_RFL_ICAO);
@@ -216,7 +216,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
 	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
 	RegisterTagItemFunction("Set departure status", TAG_ITEM_FUNCTION_DSQ_STS);
-	RegisterTagItemFunction("Open ASP popup list", TAG_ITEM_FUNCTION_SPD_LIST);
+	RegisterTagItemFunction("Open ASP popup menu", TAG_ITEM_FUNCTION_SPD_LIST);
 	RegisterTagItemFunction("Open unit settings popup menu", TAG_ITEM_FUNCTION_UNIT_MENU);
 
 	DisplayUserMessage("MESSAGE", "MTEPlugin",
@@ -356,7 +356,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_CFL_FLX: {
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
-			*pColorCode = TAG_COLOR_REDUNDANT;
 			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
@@ -428,7 +427,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		if (m_TrackedRecorder->IsSimilarCallsign(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 3, "SC");
-			*pColorCode = TAG_COLOR_INFORMATION;
 			GetColorDefinition(SETTING_COLOR_CS_SIMILR, pColorCode, pRGB);
 		}
 		break;
@@ -506,7 +504,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
 				ind = 'X';
 		}
-		sprintf_s(sItemString, 2, "%c", ind);
 		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
 		break;
 	}
@@ -514,7 +511,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackedRecorder->IsCommEstablished(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 2, "C");
-			*pColorCode = TAG_COLOR_REDUNDANT;
 			GetColorDefinition(SETTING_COLOR_COMM_ESTAB, pColorCode, pRGB);
 		}
 		break;
@@ -547,17 +543,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			break;
 		case RouteCheckerConstants::INVALID:
 			sprintf_s(sItemString, 3, "X ");
-			*pColorCode = TAG_COLOR_INFORMATION;
 			GetColorDefinition(SETTING_COLOR_RC_INVALID, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::PARTIAL_NO_LEVEL:
 			sprintf_s(sItemString, 3, "PL");
-			*pColorCode = TAG_COLOR_REDUNDANT;
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_NO_LEVEL:
 			sprintf_s(sItemString, 3, "YL");
-			*pColorCode = TAG_COLOR_REDUNDANT;
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_NO_LEVEL:
@@ -565,12 +558,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			break;
 		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
 			sprintf_s(sItemString, 3, "P ");
-			*pColorCode = TAG_COLOR_REDUNDANT;
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_OK_LEVEL:
 			sprintf_s(sItemString, 3, "Y ");
-			*pColorCode = TAG_COLOR_REDUNDANT;
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_OK_LEVEL:
@@ -585,7 +576,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		if (m_TrackedRecorder->IsSquawkDUPE(FlightPlan.GetCallsign())) {
 			sprintf_s(sItemString, 5, "DUPE");
-			*pColorCode = TAG_COLOR_INFORMATION;
 			GetColorDefinition(SETTING_COLOR_SQ_DUPE, pColorCode, pRGB);
 		}
 		break;
@@ -598,7 +588,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			sprintf_s(sItemString, 3, "%02d", OVRFLW2(seq));
 		else if (seq < 0) { // reconnected
 			sprintf_s(sItemString, 3, "--");
-			*pColorCode = TAG_COLOR_INFORMATION;
 			GetColorDefinition(SETTING_COLOR_DS_NUMBR, pColorCode, pRGB);
 		}
 		break;
@@ -609,7 +598,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (gsts.size()) {
 			sprintf_s(sItemString, gsts.size() + 1, gsts.c_str());
 			if (!FlightPlan.GetClearenceFlag()) {
-				*pColorCode = TAG_COLOR_INFORMATION;
 				GetColorDefinition(SETTING_COLOR_DS_STATE, pColorCode, pRGB);
 			}
 		}
@@ -621,7 +609,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_RVEC_IND: {
 		if (FlightPlan.IsValid() && FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
 			sprintf_s(sItemString, 3, "RV");
-			*pColorCode = TAG_COLOR_INFORMATION;
 			GetColorDefinition(SETTING_COLOR_RDRV_IND, pColorCode, pRGB);
 		}
 		break;
@@ -630,7 +617,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackedRecorder->IsActive(FlightPlan)) {
 			sprintf_s(sItemString, 2, "r");
-			*pColorCode = TAG_COLOR_INFORMATION;
 			GetColorDefinition(SETTING_COLOR_RECONT_IND, pColorCode, pRGB);
 		}
 		break;
@@ -1404,17 +1390,20 @@ void CMTEPlugIn::CallItemFunction(const char* sCallsign, const char* sItemPlugIn
 	}
 }
 
-void CMTEPlugIn::GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB)
+bool CMTEPlugIn::GetColorDefinition(const ColorSetting setting, int* pColorCode, COLORREF* pRGB)
 {
 	// If setting is not present or invalid, it will not touch anything
 	unsigned int r(256), g(256), b(256);
-	auto settingValue = GetDataFromSettings(setting);
-	if (settingValue != nullptr && sscanf_s(settingValue, "%u:%u:%u", &r, &g, &b) != 3)
-		return;
-	if (r <= 255 && g <= 255 && b <= 255) {
+	auto settingValue = GetDataFromSettings(setting.name);
+	if (settingValue != nullptr &&
+		sscanf_s(settingValue, "%u:%u:%u", &r, &g, &b) == 3 &&
+		r <= 255 && g <= 255 && b <= 255) {
 		*pColorCode = TAG_COLOR_RGB_DEFINED;
 		*pRGB = RGB(r, g, b);
+		return true;
 	}
+	*pColorCode = setting.code;
+	return false;
 }
 
 void CMTEPlugIn::SetCustomCursor(void)

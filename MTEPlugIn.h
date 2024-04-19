@@ -14,6 +14,11 @@
 
 using namespace EuroScopePlugIn;
 
+typedef struct _color_setting {
+	const char* name;
+	const int code;
+} ColorSetting;
+
 class CMTEPlugIn :
 	public CPlugIn
 {
@@ -45,7 +50,7 @@ private:
 	inline int CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded = false);
 	void CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area); // overload for ES internal function
 	void CallItemFunction(const char* sCallsign, const char* sItemPlugInName, int ItemCode, const char* sItemString, const char* sFunctionPlugInName, int FunctionId, POINT Pt, RECT Area);
-	void GetColorDefinition(const char* setting, int* pColorCode, COLORREF* pRGB);
+	bool GetColorDefinition(const ColorSetting setting, int* pColorCode, COLORREF* pRGB);
 	void SetCustomCursor(void);
 	void CancelCustomCursor(void);
 	void LoadRouteChecker(void);
