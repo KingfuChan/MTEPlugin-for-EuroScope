@@ -15,8 +15,9 @@ public:
 	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
 
-	bool IsCommEstablished(const std::string& callsign);
-	void SetCommEstablished(const std::string& callsign);
+	bool GetCoordinationFlag(const std::string& callsign);
+	void SetCoordinationFlag(const std::string& callsign);
+	void SetCoordinationFlag(const bool& assumed);
 
 	bool IsCFLConfirmed(const std::string& callsign);
 	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
@@ -52,6 +53,7 @@ public:
 
 private:
 	bool m_SuppressUpdate = false;
+	bool m_CoordFlagAssumed = true;
 
 	typedef struct _AsD {
 		// in the order of SDK
@@ -88,15 +90,18 @@ private:
 	typedef struct _TkD {
 		std::string m_SystemID;
 		bool m_Offline;
-		bool m_CommEstbed;
+		bool m_CoordFlag;
 		bool m_CFLConfirmed;
 		AssignedData m_AssignedData;
 
-		_TkD(std::string _sID, AssignedData _asd, bool _fft) :
-			m_SystemID(_sID),
-			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true),
+		_TkD(std::string _sID, AssignedData _asd, bool _cFlag) :
 			m_AssignedData(_asd)
-		{};
+		{
+			m_SystemID = _sID;
+			m_Offline = false;
+			m_CFLConfirmed = true;
+			m_CoordFlag = _cFlag;
+		};
 	}TrackedData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
@@ -126,7 +131,7 @@ private:
 	std::shared_mutex speed_Mutex;
 
 	// toggle vertical speed display
-	bool m_GlobalVS = true; // global vs display, true=display
+	bool m_GlobalVS = false; // global vs display, true=display
 	std::set<std::string> m_DisplayVS; // systemID, only stores those different from default
 	std::shared_mutex vsdsp_Mutex;
 

@@ -49,10 +49,8 @@ private:
 	bool m_CustomCursor = false; // status, doesn't reflect setting
 
 	template<typename T>
-	inline T GetPluginSetting(const char* setting, const T& fallback);
-
-	template<typename T>
 	inline T GetPluginSetting(const CommonSetting& setting);
+	inline char GetPluginCharSetting(const char* setting, const char& fallback);
 
 	inline int CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded = false);
 	void CallItemFunction(const char* sCallsign, const int& FunctionId, const POINT& Pt, const RECT& Area); // overload for ES internal function

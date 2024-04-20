@@ -24,7 +24,7 @@ const int TAG_ITEM_TYPE_RFL_ICAO = 7; // RFL
 const int TAG_ITEM_TYPE_SC_IND = 8; // Similar callsign indicator
 const int TAG_ITEM_TYPE_UNIT_IND_1 = 9; // Unit indicator 1 (RFL)
 const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
-const int TAG_ITEM_TYPE_COMM_IND = 11; // COMM ESTB indicator
+const int TAG_ITEM_TYPE_COORD_FLAG = 11; // Coordination flag
 const int TAG_ITEM_TYPE_RECAT_BC = 12; // RECAT-CN (H-B/C)
 const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
 const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
@@ -42,7 +42,7 @@ const int TAG_ITEM_TYPE_VS_ALWYS = 25; // VS (always)
 const int TAG_ITEM_TYPE_GS_TRND = 26; // GS (trend)
 
 // TAG ITEM FUNCTION
-const int TAG_ITEM_FUNCTION_COMM_ESTAB = 1; // Set COMM ESTB
+const int TAG_ITEM_FUNCTION_SET_CFLAG = 1; // Set coordination flag
 const int TAG_ITEM_FUNCTION_RCNT_RST = 2; // Restore assigned data
 const int TAG_ITEM_FUNCTION_VS_DISP = 3; // Toggle VS display
 const int TAG_ITEM_FUNCTION_CFL_SET_EDIT = 10; // Set CFL from edit (not registered)
@@ -100,8 +100,9 @@ const CommonSetting SETTING_GS_TREND = { "GS/TrendThreshold", "5" }; // positive
 const CommonSetting SETTING_GS_INC = { "GS/IncreaseMark", "" }; // char, *NULL*
 const CommonSetting SETTING_GS_STA = { "GS/StableMark", "" }; // char, *NULL*
 const CommonSetting SETTING_GS_DEC = { "GS/DecreaseMark", "" }; // char, *NULL*
-// UNIT INDICATOR
-// do not use GetPluginSetting because space is allowed
+// INDICATOR & FLAG
+// X means extinguished, O means illuminated
+// use GetPluginCharSetting for char because space is allowed
 // use "\0" in settings file to explicit string terminator, to prevent being discarded by ES when saving settings
 constexpr auto SETTING_UNIT_IND_1X = "Unit/Indicator1X"; // char, *NULL*
 constexpr auto DEFAULT_UNIT_IND_1X = '\0';
@@ -111,10 +112,15 @@ constexpr auto SETTING_UNIT_IND_2X = "Unit/Indicator2X"; // char, * *(space)
 constexpr auto DEFAULT_UNIT_IND_2X = ' ';
 constexpr auto SETTING_UNIT_IND_2O = "Unit/Indicator2O"; // char, *NULL*
 constexpr auto DEFAULT_UNIT_IND_2O = '\0';
+const CommonSetting SETTING_FLAG_COORD_MODE = { "Flag/CoordinationAuto", "1" }; // bool, 0: manual *1*: auto on assume
+constexpr auto SETTING_FLAG_COORD_X = "Flag/CoordinationX"; // char, *NULL*
+constexpr auto DEFAULT_FLAG_COORD_X = '\0';
+constexpr auto SETTING_FLAG_COORD_O = "Flag/CoordinationO"; // char, *C*
+constexpr auto DEFAULT_FLAG_COORD_O = 'C';
 // COLOR DEFINITIONS (R:G:B)
 const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNeedConfirm", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
-const ColorSetting SETTING_COLOR_COMM_ESTAB = { "Color/CommNoEstablish", TAG_COLOR_REDUNDANT };
+const ColorSetting SETTING_COLOR_COORD_FLAG = { "Color/CoordFlag", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_RC_INVALID = { "Color/RouteInvalid", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RC_UNCERTN = { "Color/RouteUncertain", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_SQ_DUPE = { "Color/SquawkDupe", TAG_COLOR_INFORMATION };
@@ -173,7 +179,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Similar callsign indicator", TAG_ITEM_TYPE_SC_IND);
 	RegisterTagItemType("Unit indicator 1 (RFL)", TAG_ITEM_TYPE_UNIT_IND_1);
 	RegisterTagItemType("RVSM indicator", TAG_ITEM_TYPE_RVSM_IND);
-	RegisterTagItemType("COMM ESTB indicator", TAG_ITEM_TYPE_COMM_IND);
+	RegisterTagItemType("Coordination flag", TAG_ITEM_TYPE_COORD_FLAG);
 	RegisterTagItemType("RECAT-CN (H-B/C)", TAG_ITEM_TYPE_RECAT_BC);
 	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
 	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
@@ -190,7 +196,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("VS (always)", TAG_ITEM_TYPE_VS_ALWYS);
 	RegisterTagItemType("GS (trend)", TAG_ITEM_TYPE_GS_TRND);
 
-	RegisterTagItemFunction("Set COMM ESTB", TAG_ITEM_FUNCTION_COMM_ESTAB);
+	RegisterTagItemFunction("Set coordination flag", TAG_ITEM_FUNCTION_SET_CFLAG);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
 	RegisterTagItemFunction("Toggle VS display", TAG_ITEM_FUNCTION_VS_DISP);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
@@ -337,7 +343,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_CFL_FLX: {
 		if (!FlightPlan.IsValid()) break;
-		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
+		if (FlightPlan.GetTrackingControllerIsMe() &&
+			!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
 			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
@@ -415,49 +422,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_UNIT_IND_1: {
 		if (!FlightPlan.IsValid()) break;
-		char c = '\0';
-		if (m_TrackedRecorder->IsDifferentUnitRFL(FlightPlan)) {
-			auto co = GetDataFromSettings(SETTING_UNIT_IND_1O);
-			if (co == nullptr) {
-				c = DEFAULT_UNIT_IND_1O;
-			}
-			else if (strcmp(co, R"(\0)")) {
-				c = co[0];
-			}
-		}
-		else {
-			auto cx = GetDataFromSettings(SETTING_UNIT_IND_1X);
-			if (cx == nullptr) {
-				c = DEFAULT_UNIT_IND_1X;
-			}
-			else if (strcmp(cx, R"(\0)")) {
-				c = cx[0];
-			}
-		}
+		char c = m_TrackedRecorder->IsDifferentUnitRFL(FlightPlan) ? \
+			GetPluginCharSetting(SETTING_UNIT_IND_1O, DEFAULT_UNIT_IND_1O) : \
+			GetPluginCharSetting(SETTING_UNIT_IND_1X, DEFAULT_UNIT_IND_1X);
 		sprintf_s(sItemString, 2, "%c", c);
 		break;
 	}
 	case TAG_ITEM_TYPE_UNIT_IND_2: {
 		if (!RadarTarget.IsValid()) break;
-		char c = '\0';
-		if (m_TrackedRecorder->IsDifferentUnitPUS(RadarTarget)) {
-			auto co = GetDataFromSettings(SETTING_UNIT_IND_2O);
-			if (co == nullptr) {
-				c = DEFAULT_UNIT_IND_2O;
-			}
-			else if (strcmp(co, R"(\0)")) {
-				c = co[0];
-			}
-		}
-		else {
-			auto cx = GetDataFromSettings(SETTING_UNIT_IND_2X);
-			if (cx == nullptr) {
-				c = DEFAULT_UNIT_IND_2X;
-			}
-			else if (strcmp(cx, R"(\0)")) {
-				c = cx[0];
-			}
-		}
+		char c = m_TrackedRecorder->IsDifferentUnitPUS(RadarTarget) ? \
+			GetPluginCharSetting(SETTING_UNIT_IND_2O, DEFAULT_UNIT_IND_2O) : \
+			GetPluginCharSetting(SETTING_UNIT_IND_2X, DEFAULT_UNIT_IND_2X);
 		sprintf_s(sItemString, 2, "%c", c);
 		break;
 	}
@@ -490,12 +465,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
 		break;
 	}
-	case TAG_ITEM_TYPE_COMM_IND: {
+	case TAG_ITEM_TYPE_COORD_FLAG: {
 		if (!FlightPlan.IsValid()) break;
-		if (!m_TrackedRecorder->IsCommEstablished(FlightPlan.GetCallsign())) {
-			sprintf_s(sItemString, 2, "C");
-			GetColorDefinition(SETTING_COLOR_COMM_ESTAB, pColorCode, pRGB);
-		}
+		char c = m_TrackedRecorder->GetCoordinationFlag(FlightPlan.GetCallsign()) ? \
+			GetPluginCharSetting(SETTING_FLAG_COORD_O, DEFAULT_FLAG_COORD_O) : \
+			GetPluginCharSetting(SETTING_FLAG_COORD_X, DEFAULT_FLAG_COORD_X);
+		sprintf_s(sItemString, 2, "%c", c);
+		GetColorDefinition(SETTING_COLOR_COORD_FLAG, pColorCode, pRGB);
 		break;
 	}
 	case TAG_ITEM_TYPE_RECAT_BC: {
@@ -631,9 +607,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 
 	switch (FunctionId)
 	{
-	case TAG_ITEM_FUNCTION_COMM_ESTAB: {
+	case TAG_ITEM_FUNCTION_SET_CFLAG: {
 		if (!FlightPlan.IsValid()) break;
-		m_TrackedRecorder->SetCommEstablished(FlightPlan.GetCallsign());
+		m_TrackedRecorder->SetCoordinationFlag(std::string(FlightPlan.GetCallsign()));
 		break;
 	}
 	case TAG_ITEM_FUNCTION_RCNT_RST: {
@@ -1320,22 +1296,6 @@ bool CMTEPlugIn::OnCompileCommand(const char* sCommandLine)
 }
 
 template<typename T>
-inline T CMTEPlugIn::GetPluginSetting(const char* setting, const T& fallback)
-{
-	// only accept 0/1 for bool
-	T bufval = fallback;
-	auto data = GetDataFromSettings(setting);
-	if (data != nullptr) {
-		std::stringstream ss(data);
-		ss >> bufval;
-		if (ss.fail()) {
-			bufval = fallback;
-		}
-	}
-	return bufval;
-}
-
-template<typename T>
 inline T CMTEPlugIn::GetPluginSetting(const CommonSetting& setting)
 {
 	// only accept 0/1 for bool
@@ -1351,6 +1311,19 @@ inline T CMTEPlugIn::GetPluginSetting(const CommonSetting& setting)
 	std::stringstream ssf(setting.fallback);
 	ssf >> bufval;
 	return bufval;
+}
+
+inline char CMTEPlugIn::GetPluginCharSetting(const char* setting, const char& fallback)
+{
+	char c = '\0';
+	auto cs = GetDataFromSettings(setting);
+	if (cs == nullptr) {
+		c = fallback;
+	}
+	else if (strcmp(cs, R"(\0)")) { // "\0" is recognized as '\0'
+		c = cs[0];
+	}
+	return c;
 }
 
 inline int CMTEPlugIn::CalculateVerticalSpeed(CRadarTarget RadarTarget, bool rounded)
@@ -1461,6 +1434,7 @@ void CMTEPlugIn::ResetTrackedRecorder(void)
 	m_TrackedRecorder->ResetAltitudeUnit(GetPluginSetting<bool>(SETTING_ALT_FEET));
 	m_TrackedRecorder->SetSpeedUnit(GetPluginSetting<bool>(SETTING_GS_KNOT));
 	m_TrackedRecorder->ToggleVerticalSpeed(GetPluginSetting<bool>(SETTING_VS_MODE));
+	m_TrackedRecorder->SetCoordinationFlag(GetPluginSetting<bool>(SETTING_FLAG_COORD_MODE));
 	DisplayUserMessage("MESSAGE", "MTEPlugin", "Tracked recorder is ready!", 1, 0, 0, 0, 0);
 }
 

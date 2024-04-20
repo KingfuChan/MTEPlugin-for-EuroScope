@@ -46,7 +46,7 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, cons
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded but tracking. add
-		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan), m_DefaultFeet };
+		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan), m_CoordFlagAssumed };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		mlock.unlock();
 		RefreshSimilarCallsign();
@@ -76,29 +76,34 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded, tracking. add
-		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan), m_DefaultFeet };
+		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan), m_CoordFlagAssumed };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		mlock.unlock();
 		RefreshSimilarCallsign();
 	}
 }
 
-bool TrackedRecorder::IsCommEstablished(const std::string& callsign)
+bool TrackedRecorder::GetCoordinationFlag(const std::string& callsign)
 {
 	std::shared_lock mlock(tr_Mutex);
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
-		return r->second.m_CommEstbed;
+		return r->second.m_CoordFlag;
 	else
-		return true;
+		return false;
 }
 
-void TrackedRecorder::SetCommEstablished(const std::string& callsign)
+void TrackedRecorder::SetCoordinationFlag(const std::string& callsign)
 {
 	std::unique_lock mlock(tr_Mutex);
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
-		r->second.m_CommEstbed = true;
+		r->second.m_CoordFlag = !r->second.m_CoordFlag;
+}
+
+void TrackedRecorder::SetCoordinationFlag(const bool& assumed)
+{
+	m_CoordFlagAssumed = assumed;
 }
 
 bool TrackedRecorder::IsCFLConfirmed(const std::string& callsign)
