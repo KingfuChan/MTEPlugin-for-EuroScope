@@ -40,6 +40,7 @@ const int TAG_ITEM_TYPE_UNIT_IND_2 = 23; // Unit indicator 2 (PUS)
 const int TAG_ITEM_TYPE_VS_TOGGL = 24; // VS (toggle)
 const int TAG_ITEM_TYPE_VS_ALWYS = 25; // VS (always)
 const int TAG_ITEM_TYPE_GS_TRND = 26; // GS (trend)
+const int TAG_ITEM_TYPE_SQ_EMRG = 27; // Emergency flag
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_SET_CFLAG = 1; // Set coordination flag
@@ -117,6 +118,7 @@ constexpr auto SETTING_FLAG_COORD_X = "Flag/CoordinationX"; // char, *NULL*
 constexpr auto DEFAULT_FLAG_COORD_X = '\0';
 constexpr auto SETTING_FLAG_COORD_O = "Flag/CoordinationO"; // char, *C*
 constexpr auto DEFAULT_FLAG_COORD_O = 'C';
+const CommonSetting SETTING_FLAG_EMG_MODE = { "Flag/EmergencyLength", "2" }; // int, *2*: EM/RF/HJ, *3*: EMG/RDO/HIJ
 // COLOR DEFINITIONS (R:G:B)
 const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNeedConfirm", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
@@ -129,6 +131,7 @@ const ColorSetting SETTING_COLOR_DS_STATE = { "Color/DSNotCleared", TAG_COLOR_IN
 const ColorSetting SETTING_COLOR_RDRV_IND = { "Color/RadarVector", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RECONT_IND = { "Color/Reconnected", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RVSM_IND = { "Color/RVSMIndicator", TAG_COLOR_DEFAULT };
+const ColorSetting SETTING_COLOR_SQ_EMRG = { "Color/SquawkEmergency", TAG_COLOR_EMERGENCY };
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -195,6 +198,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("VS (toggle)", TAG_ITEM_TYPE_VS_TOGGL);
 	RegisterTagItemType("VS (always)", TAG_ITEM_TYPE_VS_ALWYS);
 	RegisterTagItemType("GS (trend)", TAG_ITEM_TYPE_GS_TRND);
+	RegisterTagItemType("Emergency flag", TAG_ITEM_TYPE_SQ_EMRG);
 
 	RegisterTagItemFunction("Set coordination flag", TAG_ITEM_FUNCTION_SET_CFLAG);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -592,6 +596,26 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else if (strip.find("/s-/") != std::string::npos) {
 			sprintf_s(sItemString, 2, "-");
 		}
+		break;
+	}
+	case TAG_ITEM_TYPE_SQ_EMRG: {
+		if (!RadarTarget.IsValid()) break;
+		std::string squawk = RadarTarget.GetPosition().GetSquawk();
+		if (squawk != "7700" && squawk != "7600" && squawk != "7500") break;
+		int length = GetPluginSetting<int>(SETTING_FLAG_EMG_MODE);
+		if (length != 2 && length != 3) break;
+		std::string flag = length == 2 ? "EM RF HJ " : "EMGRDOHIJ";
+		if (squawk == "7700") {
+			flag = flag.substr(0, length);
+		}
+		else if (squawk == "7600") {
+			flag = flag.substr(3, length);
+		}
+		else if (squawk == "7500") {
+			flag = flag.substr(6, length);
+		}
+		strcpy_s(sItemString, flag.size() + 1, flag.c_str());
+		GetColorDefinition(SETTING_COLOR_SQ_EMRG, pColorCode, pRGB);
 		break;
 	}
 	default:
