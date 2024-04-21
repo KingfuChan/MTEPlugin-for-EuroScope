@@ -120,7 +120,7 @@ constexpr auto SETTING_FLAG_COORD_X = "Flag/CoordinationX"; // char, *NULL*
 constexpr auto DEFAULT_FLAG_COORD_X = '\0';
 constexpr auto SETTING_FLAG_COORD_O = "Flag/CoordinationO"; // char, *C*
 constexpr auto DEFAULT_FLAG_COORD_O = 'C';
-const CommonSetting SETTING_FLAG_EMG_MODE = { "Flag/EmergencyLength", "2" }; // int, *2*: EM/RF/HJ, *3*: EMG/RDO/HIJ
+const CommonSetting SETTING_FLAG_EMG = { "Flag/Emergency", "EM:RF:HJ" }; // string, 2: EM:RF:HJ, 3: EMG:RDO:HIJ
 // COLOR DEFINITIONS (R:G:B)
 const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNeedConfirm", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
@@ -133,7 +133,9 @@ const ColorSetting SETTING_COLOR_DS_STATE = { "Color/DSNotCleared", TAG_COLOR_IN
 const ColorSetting SETTING_COLOR_RDRV_IND = { "Color/RadarVector", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RECONT_IND = { "Color/Reconnected", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RVSM_IND = { "Color/RVSMIndicator", TAG_COLOR_DEFAULT };
-const ColorSetting SETTING_COLOR_SQ_EMRG = { "Color/SquawkEmergency", TAG_COLOR_EMERGENCY };
+const ColorSetting SETTING_COLOR_SQ_7700 = { "Color/Squawk7700", TAG_COLOR_EMERGENCY };
+const ColorSetting SETTING_COLOR_SQ_7600 = { "Color/Squawk7600", TAG_COLOR_EMERGENCY };
+const ColorSetting SETTING_COLOR_SQ_7500 = { "Color/Squawk7500", TAG_COLOR_EMERGENCY };
 const ColorSetting SETTING_COLOR_CLAM_FLAG = { "Color/CLAM", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RAM_FLAG = { "Color/RAM", TAG_COLOR_INFORMATION };
 
@@ -608,20 +610,25 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!RadarTarget.IsValid()) break;
 		std::string squawk = RadarTarget.GetPosition().GetSquawk();
 		if (squawk != "7700" && squawk != "7600" && squawk != "7500") break;
-		int length = GetPluginSetting<int>(SETTING_FLAG_EMG_MODE);
-		if (length != 2 && length != 3) break;
-		std::string flag = length == 2 ? "EM RF HJ " : "EMGRDOHIJ";
+		std::stringstream ssFlag(GetPluginSetting<std::string>(SETTING_FLAG_EMG));
+		std::string flag, flag77, flag76, flag75;
+		std::getline(ssFlag, flag77, ':');
+		std::getline(ssFlag, flag76, ':');
+		std::getline(ssFlag, flag75, ':');
 		if (squawk == "7700") {
-			flag = flag.substr(0, length);
+			flag = flag77;
+			GetColorDefinition(SETTING_COLOR_SQ_7700, pColorCode, pRGB);
 		}
 		else if (squawk == "7600") {
-			flag = flag.substr(3, length);
+			flag = flag76;
+			GetColorDefinition(SETTING_COLOR_SQ_7600, pColorCode, pRGB);
 		}
 		else if (squawk == "7500") {
-			flag = flag.substr(6, length);
+			flag = flag75;
+			GetColorDefinition(SETTING_COLOR_SQ_7500, pColorCode, pRGB);
 		}
+		flag = flag.substr(0, 15);// prevent overflow pool
 		strcpy_s(sItemString, flag.size() + 1, flag.c_str());
-		GetColorDefinition(SETTING_COLOR_SQ_EMRG, pColorCode, pRGB);
 		break;
 	}
 	case TAG_ITEM_TYPE_CLAM_FLAG: {
