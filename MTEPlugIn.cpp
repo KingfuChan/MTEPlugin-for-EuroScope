@@ -632,15 +632,24 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break;
 	}
 	case TAG_ITEM_TYPE_CLAM_FLAG: {
-		if (!FlightPlan.IsValid() || RadarTarget.IsValid()) break;
+		if (!FlightPlan.IsValid() || !RadarTarget.IsValid()) break;
 		if (!FlightPlan.GetCLAMFlag()) break;
 		strcpy_s(sItemString, 3, "CL");
 		GetColorDefinition(SETTING_COLOR_CLAM_FLAG, pColorCode, pRGB);
 		break;
 	}
 	case TAG_ITEM_TYPE_RAM_FLAG: {
-		if (!FlightPlan.IsValid() || RadarTarget.IsValid()) break;
+		if (!FlightPlan.IsValid() || !RadarTarget.IsValid()) break;
 		if (!FlightPlan.GetRAMFlag()) break;
+		auto route = FlightPlan.GetExtractedRoute();
+		int n = route.GetPointsNumber();
+		auto posOrig = route.GetPointPosition(0);
+		auto posDest = route.GetPointPosition(n - 1);
+		auto posCurr = FlightPlan.GetFPTrackPosition().GetPosition();
+		double d1 = posCurr.DistanceTo(posDest);
+		double d2 = posCurr.DistanceTo(posOrig);
+		if (d1 <= 30 || d2 <= 30)
+			break; // inhibit RAM when near origin/destination
 		strcpy_s(sItemString, 3, "RA");
 		GetColorDefinition(SETTING_COLOR_RAM_FLAG, pColorCode, pRGB);
 		break;
