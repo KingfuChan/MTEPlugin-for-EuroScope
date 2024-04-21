@@ -41,6 +41,8 @@ const int TAG_ITEM_TYPE_VS_TOGGL = 24; // VS (toggle)
 const int TAG_ITEM_TYPE_VS_ALWYS = 25; // VS (always)
 const int TAG_ITEM_TYPE_GS_TRND = 26; // GS (trend)
 const int TAG_ITEM_TYPE_SQ_EMRG = 27; // Emergency flag
+const int TAG_ITEM_TYPE_CLAM_FLAG = 28; // CLAM flag
+const int TAG_ITEM_TYPE_RAM_FLAG = 29; // RAM flag
 
 // TAG ITEM FUNCTION
 const int TAG_ITEM_FUNCTION_SET_CFLAG = 1; // Set coordination flag
@@ -132,6 +134,8 @@ const ColorSetting SETTING_COLOR_RDRV_IND = { "Color/RadarVector", TAG_COLOR_INF
 const ColorSetting SETTING_COLOR_RECONT_IND = { "Color/Reconnected", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_RVSM_IND = { "Color/RVSMIndicator", TAG_COLOR_DEFAULT };
 const ColorSetting SETTING_COLOR_SQ_EMRG = { "Color/SquawkEmergency", TAG_COLOR_EMERGENCY };
+const ColorSetting SETTING_COLOR_CLAM_FLAG = { "Color/CLAM", TAG_COLOR_INFORMATION };
+const ColorSetting SETTING_COLOR_RAM_FLAG = { "Color/RAM", TAG_COLOR_INFORMATION };
 
 // WINAPI RELATED
 WNDPROC prevWndFunc = nullptr;
@@ -199,6 +203,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("VS (always)", TAG_ITEM_TYPE_VS_ALWYS);
 	RegisterTagItemType("GS (trend)", TAG_ITEM_TYPE_GS_TRND);
 	RegisterTagItemType("Emergency flag", TAG_ITEM_TYPE_SQ_EMRG);
+	RegisterTagItemType("CLAM flag", TAG_ITEM_TYPE_CLAM_FLAG);
+	RegisterTagItemType("RAM flag", TAG_ITEM_TYPE_RAM_FLAG);
 
 	RegisterTagItemFunction("Set coordination flag", TAG_ITEM_FUNCTION_SET_CFLAG);
 	RegisterTagItemFunction("Restore assigned data", TAG_ITEM_FUNCTION_RCNT_RST);
@@ -616,6 +622,20 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		strcpy_s(sItemString, flag.size() + 1, flag.c_str());
 		GetColorDefinition(SETTING_COLOR_SQ_EMRG, pColorCode, pRGB);
+		break;
+	}
+	case TAG_ITEM_TYPE_CLAM_FLAG: {
+		if (!FlightPlan.IsValid() || RadarTarget.IsValid()) break;
+		if (!FlightPlan.GetCLAMFlag()) break;
+		strcpy_s(sItemString, 3, "CL");
+		GetColorDefinition(SETTING_COLOR_CLAM_FLAG, pColorCode, pRGB);
+		break;
+	}
+	case TAG_ITEM_TYPE_RAM_FLAG: {
+		if (!FlightPlan.IsValid() || RadarTarget.IsValid()) break;
+		if (!FlightPlan.GetRAMFlag()) break;
+		strcpy_s(sItemString, 3, "RA");
+		GetColorDefinition(SETTING_COLOR_RAM_FLAG, pColorCode, pRGB);
 		break;
 	}
 	default:
