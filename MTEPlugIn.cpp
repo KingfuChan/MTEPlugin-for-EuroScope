@@ -52,7 +52,7 @@ const int TAG_ITEM_FUNCTION_CFL_SET_EDIT = 10; // Set CFL from edit (not registe
 const int TAG_ITEM_FUNCTION_CFL_MENU = 11; // Open CFL popup menu
 const int TAG_ITEM_FUNCTION_CFL_EDIT = 12; // Open CFL popup edit
 const int TAG_ITEM_FUNCTION_CFL_SET_MENU = 13; // Set CFL from menu (not registered)
-const int TAG_ITEM_FUNCTION_CFL_TOPSKY = 14; // Confirm CFL / Open Topsky CFL menu
+const int TAG_ITEM_FUNCTION_CFL_TOPSKY = 14; // Acknowledge CFL, open Topsky CFL menu
 const int TAG_ITEM_FUNCTION_RFL_SET_EDIT = 20; // Set RFL from edit (not registered)
 const int TAG_ITEM_FUNCTION_RFL_MENU = 21; // Open RFL popup menu
 const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit
@@ -122,7 +122,7 @@ constexpr auto SETTING_FLAG_COORD_O = "Flag/CoordinationO"; // char, *C*
 constexpr auto DEFAULT_FLAG_COORD_O = 'C';
 const CommonSetting SETTING_FLAG_EMG = { "Flag/Emergency", "EM:RF:HJ" }; // string, 2: EM:RF:HJ, 3: EMG:RDO:HIJ
 // COLOR DEFINITIONS (R:G:B)
-const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNeedConfirm", TAG_COLOR_REDUNDANT };
+const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNotAckd", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_COORD_FLAG = { "Color/CoordFlag", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_RC_INVALID = { "Color/RouteInvalid", TAG_COLOR_INFORMATION };
@@ -213,7 +213,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Toggle VS display", TAG_ITEM_FUNCTION_VS_DISP);
 	RegisterTagItemFunction("Open CFL popup menu", TAG_ITEM_FUNCTION_CFL_MENU);
 	RegisterTagItemFunction("Open CFL popup edit", TAG_ITEM_FUNCTION_CFL_EDIT);
-	RegisterTagItemFunction("Confirm CFL / Open Topsky CFL menu", TAG_ITEM_FUNCTION_CFL_TOPSKY);
+	RegisterTagItemFunction("Acknowledge CFL, open Topsky CFL menu", TAG_ITEM_FUNCTION_CFL_TOPSKY);
 	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
 	RegisterTagItemFunction("Open RFL popup edit", TAG_ITEM_FUNCTION_RFL_EDIT);
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
@@ -355,8 +355,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_CFL_FLX: {
 		if (!FlightPlan.IsValid()) break;
-		if (FlightPlan.GetTrackingControllerIsMe() &&
-			!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
+		if (!m_TrackedRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
 			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
@@ -646,15 +645,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		// get VS trend
 		int vs = CalculateVerticalSpeed(RadarTarget);
 		int thld = abs(GetPluginSetting<int>(SETTING_VS_THLD));
-		// TODO: basic logic
+		// basic logic
 		if (abs(vs) < thld) { // maintaining altitude
-			if (false) {
-				// TODO: exceeds last CFL assign time + 60s
+			if (m_TrackedRecorder->GetCflElapsedTime(FlightPlan.GetCallsign()) < 60) {
+				// inhibit within last CFL assign time + 60s
 				break;
 			}
 		}
 		else { // changing altitude
-			if (vs * (mclAlt - cflAlt) > 0) { // going towards cfl
+			if (vs * (cflAlt - mclAlt) > 0) { // going towards cfl
 				break;
 			}
 		}
@@ -769,9 +768,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			// don't show list if other controller is tracking
 			break;
 		}
-		else if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
-			// confirm previous CFL first
-			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign());
+		else if (!m_TrackedRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
+			// acknowledge previous CFL first
+			m_TrackedRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
 			break;
 		}
 		OpenPopupList(Area, "CFL Menu", 1);
@@ -840,9 +839,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			// don't show list if other controller is tracking
 			break;
 		}
-		else if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
-			// confirm previous CFL first
-			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign());
+		else if (!m_TrackedRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
+			// acknowledge previous CFL first
+			m_TrackedRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
 			break;
 		}
 		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_CFL_SET_EDIT, "");
@@ -851,9 +850,9 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_CFL_TOPSKY: {
 		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
-		if (!m_TrackedRecorder->IsCFLConfirmed(FlightPlan.GetCallsign())) {
-			// confirm previous CFL first
-			m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign());
+		if (!m_TrackedRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
+			// acknowledge previous CFL first
+			m_TrackedRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
 			break;
 		}
 		CallItemFunction(FlightPlan.GetCallsign(), nullptr, 0, sItemString, "TopSky plugin", 12, Pt, Area);
@@ -1098,13 +1097,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 				}
 			}
 		}
-		if (FlightPlan.GetTrackingControllerIsMe()) {
-			if (FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
-				IsCFLAssigned(FlightPlan)) {
-				// initiate CFL to be confirmed
-				m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
-			}
-		}
+		m_TrackedRecorder->HandleNewCfl(FlightPlan, !FlightPlan.GetTrackingControllerIsMe()); // initiate CFL not ack
 	}
 	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {

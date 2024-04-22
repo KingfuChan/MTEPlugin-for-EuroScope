@@ -106,22 +106,50 @@ void TrackedRecorder::SetCoordinationFlag(const bool& assumed)
 	m_CoordFlagAssumed = assumed;
 }
 
-bool TrackedRecorder::IsCFLConfirmed(const std::string& callsign)
+void TrackedRecorder::HandleNewCfl(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& acknowledge)
 {
-	std::shared_lock mlock(tr_Mutex);
-	auto r = m_TrackedMap.find(callsign);
-	if (r != m_TrackedMap.end())
-		return r->second.m_CFLConfirmed;
+	if (!FlightPlan.IsValid()) return;
+	int t = strlen(FlightPlan.GetTrackingControllerId()) ? (FlightPlan.GetTrackingControllerIsMe() ? 1 : -1) : 0;
+	CflData cd(t, acknowledge);
+	std::unique_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(FlightPlan.GetCallsign());
+	if (r == m_CflMap.end()) {
+		m_CflMap.insert({ FlightPlan.GetCallsign(), cd });
+	}
+	else {
+		r->second = cd;
+	}
+}
+
+bool TrackedRecorder::IsCflAcknowledged(const std::string& callsign)
+{
+	// returns true if not found
+	std::shared_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(callsign);
+	if (r != m_CflMap.end())
+		return r->second.m_Acknowledged;
 	else
 		return true;
 }
 
-void TrackedRecorder::SetCFLConfirmed(const std::string& callsign, const bool confirmed)
+void TrackedRecorder::AcknowledgeCfl(const std::string& callsign, const bool confirmed)
 {
-	std::unique_lock mlock(tr_Mutex);
-	auto r = m_TrackedMap.find(callsign);
-	if (r != m_TrackedMap.end())
-		r->second.m_CFLConfirmed = confirmed;
+	std::unique_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(callsign);
+	if (r != m_CflMap.end())
+		r->second.m_Acknowledged = confirmed;
+}
+
+int TrackedRecorder::GetCflElapsedTime(const std::string& callsign)
+{
+	std::shared_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(callsign);
+	if (r != m_CflMap.end()) {
+		auto dura = std::chrono::steady_clock::now() - r->second.m_TimeStamp;
+		auto secs = std::chrono::duration_cast<std::chrono::seconds>(dura);
+		return (int)secs.count();
+	}
+	return -1;
 }
 
 bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan)

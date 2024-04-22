@@ -19,8 +19,10 @@ public:
 	void SetCoordinationFlag(const std::string& callsign);
 	void SetCoordinationFlag(const bool& assumed);
 
-	bool IsCFLConfirmed(const std::string& callsign);
-	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
+	void HandleNewCfl(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& acknowledge);
+	bool IsCflAcknowledged(const std::string& callsign);
+	void AcknowledgeCfl(const std::string& callsign, const bool confirmed = true);
+	int GetCflElapsedTime(const std::string& callsign);
 
 	bool IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget);
@@ -91,7 +93,6 @@ private:
 		std::string m_SystemID;
 		bool m_Offline;
 		bool m_CoordFlag;
-		bool m_CFLConfirmed;
 		AssignedData m_AssignedData;
 
 		_TkD(std::string _sID, AssignedData _asd, bool _cFlag) :
@@ -99,7 +100,6 @@ private:
 		{
 			m_SystemID = _sID;
 			m_Offline = false;
-			m_CFLConfirmed = true;
 			m_CoordFlag = _cFlag;
 		};
 	}TrackedData;
@@ -108,6 +108,21 @@ private:
 	// track map
 	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign -> TrackedData
 	std::shared_mutex tr_Mutex;
+
+	// CFL recorder
+	typedef struct _CflD {
+		int m_Tracked; // 0: no one tracking, 1: tracked by myself, -1: tracked by others
+		bool m_Acknowledged;
+		std::chrono::time_point<std::chrono::steady_clock> m_TimeStamp;
+
+		_CflD(int _t, bool _ack) {
+			m_Tracked = _t;
+			m_Acknowledged = _ack;
+			m_TimeStamp = std::chrono::steady_clock::now();
+		}
+	}CflData;
+	std::unordered_map<std::string, CflData> m_CflMap; // callsign -> CflData
+	std::shared_mutex cfl_Mutex;
 
 	// for similar callsign
 	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign -> set<callsign>
