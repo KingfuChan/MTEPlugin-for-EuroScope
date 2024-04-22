@@ -366,8 +366,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else if (cflAlt == 1) { // cleared for ILS approach
 			sprintf_s(sItemString, 4, "ILS");
 		}
-		else if (cflAlt <= 0 && !IsCFLAssigned(FlightPlan)) { // no cleared level or CFL==RFL
-			// TODO: sometimes FlightPlan.GetControllerAssignedData().GetClearedAltitude() returns -1.
+		else if (!IsCFLAssigned(FlightPlan)) { // no cleared level or CFL==RFL
 			sprintf_s(sItemString, 5, "    ");
 		}
 		else { // have a cleared level
@@ -633,7 +632,32 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	}
 	case TAG_ITEM_TYPE_CLAM_FLAG: {
 		if (!FlightPlan.IsValid() || !RadarTarget.IsValid()) break;
-		if (!FlightPlan.GetCLAMFlag()) break;
+		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+		if (cflAlt == 1 || cflAlt == 2) break; // final approach
+		else if (cflAlt <= 200 && !IsCFLAssigned(FlightPlan)) break; // inhibits when no CFL
+		cflAlt = FlightPlan.GetClearedAltitude();
+		// get MCL
+		int trsl, _elev;
+		m_TransitionLevel->GetTargetAirport(FlightPlan, trsl, _elev);
+		int stdAlt = RadarTarget.GetPosition().GetFlightLevel();
+		int qnhAlt = RadarTarget.GetPosition().GetPressureAltitude();
+		int mclAlt = stdAlt >= trsl ? stdAlt : qnhAlt;
+		if (abs(mclAlt - cflAlt) <= 200) break; // within normal zone
+		// get VS trend
+		int vs = CalculateVerticalSpeed(RadarTarget);
+		int thld = abs(GetPluginSetting<int>(SETTING_VS_THLD));
+		// TODO: basic logic
+		if (abs(vs) < thld) { // maintaining altitude
+			if (false) {
+				// TODO: exceeds last CFL assign time + 60s
+				break;
+			}
+		}
+		else { // changing altitude
+			if (vs * (mclAlt - cflAlt) > 0) { // going towards cfl
+				break;
+			}
+		}
 		strcpy_s(sItemString, 3, "CL");
 		GetColorDefinition(SETTING_COLOR_CLAM_FLAG, pColorCode, pRGB);
 		break;
@@ -1076,7 +1100,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		}
 		if (FlightPlan.GetTrackingControllerIsMe()) {
 			if (FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC() &&
-				(IsCFLAssigned(FlightPlan) || FlightPlan.GetControllerAssignedData().GetClearedAltitude())) {
+				IsCFLAssigned(FlightPlan)) {
 				// initiate CFL to be confirmed
 				m_TrackedRecorder->SetCFLConfirmed(FlightPlan.GetCallsign(), false);
 			}
@@ -1571,9 +1595,11 @@ inline std::string MakeUpper(const std::string& str)
 
 inline bool IsCFLAssigned(CFlightPlan FlightPlan)
 {
-	// tell when cleared altitude is 0, is CFL not assigned or assigned to RFL
-	// true means CFL is assigned to RFL, false means no CFL
-	if (FlightPlan.IsValid() && strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
+	// issue: sometimes FlightPlan.GetControllerAssignedData().GetClearedAltitude() returns negative value
+	if (!FlightPlan.IsValid()) return false;
+	int cfl = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+	if (cfl > 0) return true;
+	else if (strlen(FlightPlan.GetTrackingControllerCallsign())) { // tracked by someone
 		CRadarTarget RadarTarget = FlightPlan.GetCorrelatedRadarTarget();
 		if (RadarTarget.IsValid()) {
 			std::string squawk = RadarTarget.GetPosition().GetSquawk();
