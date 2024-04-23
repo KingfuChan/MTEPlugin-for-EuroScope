@@ -38,7 +38,7 @@ public:
 	bool IsDifferentUnitPUS(EuroScopePlugIn::CRadarTarget RadarTarget);
 	bool IsDifferentUnitRFL(EuroScopePlugIn::CFlightPlan FlightPlan);
 
-	bool IsSquawkDUPE(const std::string& callsign);
+	bool IsSquawkDUPE(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);

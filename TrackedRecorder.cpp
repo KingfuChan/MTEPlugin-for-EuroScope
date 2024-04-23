@@ -220,17 +220,21 @@ void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
 	m_AltUnitCallsign.clear();
 }
 
-bool TrackedRecorder::IsSquawkDUPE(const std::string& callsign)
+bool TrackedRecorder::IsSquawkDUPE(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	std::shared_lock mlock(tr_Mutex);
-	const auto r1 = m_TrackedMap.find(callsign);
-	if (r1 == m_TrackedMap.end())
-		return false;
-	return std::any_of(m_TrackedMap.begin(), m_TrackedMap.end(), [&](const auto& r2) {
-		return !r2.second.m_Offline &&
-			r1->first != r2.first &&
-			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk;
-		});
+	if (!RadarTarget.IsValid()) return false;
+	if (!RadarTarget.GetPosition().GetTransponderC()) return false;
+	bool correlated = RadarTarget.GetCorrelatedFlightPlan().IsValid();
+	std::string sq = RadarTarget.GetPosition().GetSquawk();
+	for (auto rt1 = m_PluginPtr->RadarTargetSelectFirst(); rt1.IsValid(); rt1 = m_PluginPtr->RadarTargetSelectNext(rt1)) {
+		if (!strcmp(rt1.GetSystemID(), RadarTarget.GetSystemID())) continue; // skip itself
+		if (rt1.GetPosition().GetTransponderC() && sq == rt1.GetPosition().GetSquawk()) {
+			if (correlated || rt1.GetCorrelatedFlightPlan().IsValid()) { // at least one is correlated
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool TrackedRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)

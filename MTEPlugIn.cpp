@@ -27,7 +27,7 @@ const int TAG_ITEM_TYPE_RVSM_IND = 10; // RVSM indicator
 const int TAG_ITEM_TYPE_COORD_FLAG = 11; // Coordination flag
 const int TAG_ITEM_TYPE_RECAT_BC = 12; // RECAT-CN (H-B/C)
 const int TAG_ITEM_TYPE_RTE_CHECK = 13; // Route validity
-const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Tracked DUPE warning
+const int TAG_ITEM_TYPE_SQ_DUPE = 14; // Squawk DUPE flag
 const int TAG_ITEM_TYPE_DEP_SEQ = 15; // Departure sequence
 const int TAG_ITEM_TYPE_RVEC_IND = 16; // Radar vector indicator
 const int TAG_ITEM_TYPE_CFL_MTR = 17; // CFL (m)
@@ -121,6 +121,9 @@ constexpr auto DEFAULT_FLAG_COORD_X = '\0';
 constexpr auto SETTING_FLAG_COORD_O = "Flag/CoordinationO"; // char, *C*
 constexpr auto DEFAULT_FLAG_COORD_O = 'C';
 const CommonSetting SETTING_FLAG_EMG = { "Flag/Emergency", "EM:RF:HJ" }; // string, 2: EM:RF:HJ, 3: EMG:RDO:HIJ
+const CommonSetting SETTING_FLAG_CLAM = { "Flag/CLAM", "CL" }; // string
+const CommonSetting SETTING_FLAG_RAM = { "Flag/RAM", "RA" }; // string
+const CommonSetting SETTING_FLAG_DUPE = { "Flag/DUPE", "DU" }; // string
 // COLOR DEFINITIONS (R:G:B)
 const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNotAckd", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
@@ -191,7 +194,7 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemType("Coordination flag", TAG_ITEM_TYPE_COORD_FLAG);
 	RegisterTagItemType("RECAT-CN (H-B/C)", TAG_ITEM_TYPE_RECAT_BC);
 	RegisterTagItemType("Route validity", TAG_ITEM_TYPE_RTE_CHECK);
-	RegisterTagItemType("Tracked DUPE warning", TAG_ITEM_TYPE_SQ_DUPE);
+	RegisterTagItemType("Squawk DUPE flag", TAG_ITEM_TYPE_SQ_DUPE);
 	RegisterTagItemType("Departure sequence", TAG_ITEM_TYPE_DEP_SEQ);
 	RegisterTagItemType("Radar vector indicator", TAG_ITEM_TYPE_RVEC_IND);
 	RegisterTagItemType("CFL (m)", TAG_ITEM_TYPE_CFL_MTR);
@@ -542,9 +545,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break;
 	}
 	case TAG_ITEM_TYPE_SQ_DUPE: {
-		if (!FlightPlan.IsValid()) break;
-		if (m_TrackedRecorder->IsSquawkDUPE(FlightPlan.GetCallsign())) {
-			sprintf_s(sItemString, 5, "DUPE");
+		if (!RadarTarget.IsValid()) break;
+		if (m_TrackedRecorder->IsSquawkDUPE(RadarTarget)) {
+			std::string flag = GetPluginSetting<std::string>(SETTING_FLAG_DUPE);
+			strcpy_s(sItemString, 16, flag.c_str());
 			GetColorDefinition(SETTING_COLOR_SQ_DUPE, pColorCode, pRGB);
 		}
 		break;
@@ -657,7 +661,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				break;
 			}
 		}
-		strcpy_s(sItemString, 3, "CL");
+		strcpy_s(sItemString, 16, GetPluginSetting<std::string>(SETTING_FLAG_CLAM).c_str());
 		GetColorDefinition(SETTING_COLOR_CLAM_FLAG, pColorCode, pRGB);
 		break;
 	}
@@ -673,7 +677,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		double d2 = posCurr.DistanceTo(posOrig);
 		if (d1 <= 30 || d2 <= 30)
 			break; // inhibit RAM when near origin/destination
-		strcpy_s(sItemString, 3, "RA");
+		strcpy_s(sItemString, 16, GetPluginSetting<std::string>(SETTING_FLAG_RAM).c_str());
 		GetColorDefinition(SETTING_COLOR_RAM_FLAG, pColorCode, pRGB);
 		break;
 	}
