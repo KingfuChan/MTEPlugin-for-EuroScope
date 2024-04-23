@@ -242,6 +242,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 {
 	if (!FlightPlan.IsValid() && !RadarTarget.IsValid())
 		return;
+	auto PrintStr = [sItemString](const std::string& s) {
+		strcpy_s(sItemString, 16, s.substr(0, 15).c_str());
+		};
+
 	switch (ItemCode)
 	{
 	case TAG_ITEM_TYPE_GS_TRND:
@@ -286,7 +290,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				}
 			}
 		}
-		strcpy_s(sItemString, strgs.size() + 1, strgs.c_str());
+		PrintStr(strgs);
 		break;
 	}
 	case TAG_ITEM_TYPE_RMK_IND: {
@@ -294,9 +298,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		std::string remarks;
 		remarks = FlightPlan.GetFlightPlanData().GetRemarks();
 		if (remarks.find("RMK/") != std::string::npos || remarks.find("STS/") != std::string::npos)
-			sprintf_s(sItemString, 2, "*");
+			PrintStr("*");
 		else
-			sprintf_s(sItemString, 16, "");
+			PrintStr("");
 		break;
 	}
 	case TAG_ITEM_TYPE_VS_AHIDE:
@@ -316,14 +320,14 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			break;
 		}
 		vs = vs >= thld ? vs : 0;
-		sprintf_s(sItemString, 5, "%04d", OVRFLW4(vs));
+		PrintStr(std::format("{:04d}", OVRFLW4(vs)));
 		break;
 	}
 	case TAG_ITEM_TYPE_LVL_IND: {
 		if (!RadarTarget.IsValid()) break;
 		int vs = CalculateVerticalSpeed(RadarTarget);
 		int thld = abs(GetPluginSetting<int>(SETTING_VS_THLD));
-		strcpy_s(sItemString, 2, vs >= thld ? "^" : (vs <= -thld ? "|" : ">"));
+		PrintStr(vs >= thld ? "^" : (vs <= -thld ? "|" : ">"));
 		break;
 	}
 	case TAG_ITEM_TYPE_AFL_MTR: {
@@ -353,7 +357,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		else if (altref == AltitudeReference::ALT_REF_QFE) {
 			dspStr = "(" + dspStr + ")";
 		}
-		strcpy_s(sItemString, dspStr.size() + 1, dspStr.c_str());
+		PrintStr(dspStr);
 		break;
 	}
 	case TAG_ITEM_TYPE_CFL_FLX: {
@@ -363,13 +367,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		}
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		if (cflAlt == 2) { // cleared for visual approach
-			sprintf_s(sItemString, 3, "VA");
+			PrintStr("VA");
 		}
 		else if (cflAlt == 1) { // cleared for ILS approach
-			sprintf_s(sItemString, 4, "ILS");
+			PrintStr("ILS");
 		}
 		else if (!IsCFLAssigned(FlightPlan)) { // no cleared level or CFL==RFL
-			sprintf_s(sItemString, 5, "    ");
+			PrintStr("    ");
 		}
 		else { // have a cleared level
 			cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
@@ -389,17 +393,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 					isfeet = true;
 				}
 			}
+			std::string dspAltStr;
 			if (isfeet) {
 				dspAlt = cflAlt / 100; // FL xx0, show FL in feet
-				sprintf_s(sItemString, 4, "%03d", OVRFLW3(dspAlt));
+				dspAltStr = std::format("{:03d}", OVRFLW3(dspAlt));
 			}
 			else {
-				sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt));
+				dspAltStr = std::format("{:04d}", OVRFLW4(dspAlt));
 			}
 			if (isQFE) {
-				std::string qfeAltStr = "(" + std::string(sItemString) + ")";
-				strcpy_s(sItemString, qfeAltStr.size() + 1, qfeAltStr.c_str());
+				dspAltStr = std::format("({})", dspAltStr);
 			}
+			PrintStr(dspAltStr);
 		}
 		break;
 	}
@@ -407,7 +412,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
 		int dspAlt = MetricAlt::LvlFeettoM(cflAlt);
-		sprintf_s(sItemString, 5, "%04d", OVRFLW4(dspAlt / 10));
+		PrintStr(std::format("{:04d}", OVRFLW4(dspAlt / 10)));
 		break;
 	}
 	case TAG_ITEM_TYPE_RFL_ICAO: {
@@ -417,18 +422,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (MetricAlt::RflFeettoM(rflAlt, dspMtr) && !m_TrackedRecorder->IsForceFeet(FlightPlan)) {
 			// is metric RVSM and not forced feet
 			char trsMrk = rflAlt >= GetTransitionAltitude() ? 'S' : 'M';
-			sprintf_s(sItemString, 6, "%c%04d", trsMrk, OVRFLW4(dspMtr / 10));
+			PrintStr(std::format("{}{:04d}", trsMrk, OVRFLW4(dspMtr / 10)));
 		}
 		else {
 			rflAlt = (int)round(rflAlt / 100.0);
-			sprintf_s(sItemString, 5, "F%03d", OVRFLW3(rflAlt));
+			PrintStr(std::format("F{:03d}", OVRFLW3(rflAlt)));
 		}
 		break;
 	}
 	case TAG_ITEM_TYPE_SC_IND: {
 		if (!FlightPlan.IsValid()) break;
 		if (m_TrackedRecorder->IsSimilarCallsign(FlightPlan.GetCallsign())) {
-			sprintf_s(sItemString, 3, "SC");
+			PrintStr("SC");
 			GetColorDefinition(SETTING_COLOR_CS_SIMILR, pColorCode, pRGB);
 		}
 		break;
@@ -438,7 +443,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		char c = m_TrackedRecorder->IsDifferentUnitRFL(FlightPlan) ? \
 			GetPluginCharSetting(SETTING_UNIT_IND_1O, DEFAULT_UNIT_IND_1O) : \
 			GetPluginCharSetting(SETTING_UNIT_IND_1X, DEFAULT_UNIT_IND_1X);
-		sprintf_s(sItemString, 2, "%c", c);
+		PrintStr(std::string(1, c));
 		break;
 	}
 	case TAG_ITEM_TYPE_UNIT_IND_2: {
@@ -446,7 +451,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		char c = m_TrackedRecorder->IsDifferentUnitPUS(RadarTarget) ? \
 			GetPluginCharSetting(SETTING_UNIT_IND_2O, DEFAULT_UNIT_IND_2O) : \
 			GetPluginCharSetting(SETTING_UNIT_IND_2X, DEFAULT_UNIT_IND_2X);
-		sprintf_s(sItemString, 2, "%c", c);
+		PrintStr(std::string(1, c));
 		break;
 	}
 	case TAG_ITEM_TYPE_RVSM_IND: {
@@ -474,7 +479,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
 				ind = 'X';
 		}
-		sprintf_s(sItemString, 2, "%c", ind);
+		PrintStr(std::string(1, ind));
 		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
 		break;
 	}
@@ -483,7 +488,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		char c = m_TrackedRecorder->GetCoordinationFlag(FlightPlan.GetCallsign()) ? \
 			GetPluginCharSetting(SETTING_FLAG_COORD_O, DEFAULT_FLAG_COORD_O) : \
 			GetPluginCharSetting(SETTING_FLAG_COORD_X, DEFAULT_FLAG_COORD_X);
-		sprintf_s(sItemString, 2, "%c", c);
+		PrintStr(std::string(1, c));
 		GetColorDefinition(SETTING_COLOR_COORD_FLAG, pColorCode, pRGB);
 		break;
 	}
@@ -492,15 +497,15 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (FlightPlan.GetFlightPlanData().GetAircraftWtc() == 'H') {
 			auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
 			if (rc != m_ReCatMap.end() && rc->second != 'J')
-				sprintf_s(sItemString, 3, "-%c", rc->second);
+				PrintStr("-" + std::string(1, rc->second));
 		}
 		break;
 	}
 	case TAG_TIEM_TYPE_RECAT_WTC: {
 		if (!FlightPlan.IsValid()) break;
 		auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
-		sprintf_s(sItemString, 2, "%c",
-			rc != m_ReCatMap.end() ? rc->second : FlightPlan.GetFlightPlanData().GetAircraftWtc());
+		PrintStr(std::string(1,
+			rc != m_ReCatMap.end() ? rc->second : FlightPlan.GetFlightPlanData().GetAircraftWtc()));
 		break;
 	}
 	case TAG_ITEM_TYPE_RTE_CHECK: {
@@ -511,33 +516,33 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		switch (m_RouteChecker->CheckFlightPlan(FlightPlan, false, false))
 		{
 		case RouteCheckerConstants::NOT_FOUND:
-			sprintf_s(sItemString, 3, "? ");
+			PrintStr("? ");
 			break;
 		case RouteCheckerConstants::INVALID:
-			sprintf_s(sItemString, 3, "X ");
+			PrintStr("X ");
 			GetColorDefinition(SETTING_COLOR_RC_INVALID, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::PARTIAL_NO_LEVEL:
-			sprintf_s(sItemString, 3, "PL");
+			PrintStr("PL");
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_NO_LEVEL:
-			sprintf_s(sItemString, 3, "YL");
+			PrintStr("YL");
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_NO_LEVEL:
-			sprintf_s(sItemString, 3, "YL");
+			PrintStr("YL");
 			break;
 		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
-			sprintf_s(sItemString, 3, "P ");
+			PrintStr("P ");
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::STRUCT_OK_LEVEL:
-			sprintf_s(sItemString, 3, "Y ");
+			PrintStr("Y ");
 			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::TEXT_OK_LEVEL:
-			sprintf_s(sItemString, 3, "Y ");
+			PrintStr("Y ");
 			break;
 		default:
 			break;
@@ -548,7 +553,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!RadarTarget.IsValid()) break;
 		if (m_TrackedRecorder->IsSquawkDUPE(RadarTarget)) {
 			std::string flag = GetPluginSetting<std::string>(SETTING_FLAG_DUPE);
-			strcpy_s(sItemString, 16, flag.c_str());
+			PrintStr(flag);
 			GetColorDefinition(SETTING_COLOR_SQ_DUPE, pColorCode, pRGB);
 		}
 		break;
@@ -558,9 +563,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!m_DepartureSequence) m_DepartureSequence = std::make_unique<DepartureSequence>();
 		int seq = m_DepartureSequence->GetSequence(FlightPlan);
 		if (seq > 0)
-			sprintf_s(sItemString, 3, "%02d", OVRFLW2(seq));
+			PrintStr(std::format("{:02d}", OVRFLW2(seq)));
 		else if (seq < 0) { // reconnected
-			sprintf_s(sItemString, 3, "--");
+			PrintStr("--");
 			GetColorDefinition(SETTING_COLOR_DS_NUMBR, pColorCode, pRGB);
 		}
 		break;
@@ -569,19 +574,19 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		std::string gsts = FlightPlan.GetGroundState();
 		if (gsts.size()) {
-			sprintf_s(sItemString, gsts.size() + 1, gsts.c_str());
+			PrintStr(gsts);
 			if (!FlightPlan.GetClearenceFlag()) {
 				GetColorDefinition(SETTING_COLOR_DS_STATE, pColorCode, pRGB);
 			}
 		}
 		else if (FlightPlan.GetClearenceFlag()) {
-			sprintf_s(sItemString, 5, "CLRD");
+			PrintStr("CLRD");
 		}
 		break;
 	}
 	case TAG_ITEM_TYPE_RVEC_IND: {
 		if (FlightPlan.IsValid() && FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
-			sprintf_s(sItemString, 3, "RV");
+			PrintStr("RV");
 			GetColorDefinition(SETTING_COLOR_RDRV_IND, pColorCode, pRGB);
 		}
 		break;
@@ -589,7 +594,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 	case TAG_ITEM_TYPE_RCNT_IND: {
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackedRecorder->IsActive(FlightPlan)) {
-			sprintf_s(sItemString, 2, "r");
+			PrintStr("r");
 			GetColorDefinition(SETTING_COLOR_RECONT_IND, pColorCode, pRGB);
 		}
 		break;
@@ -601,10 +606,10 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			break; // not assigned
 		std::string strip = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(7); // on (2, 3) of annotation
 		if (strip.find("/s+/") != std::string::npos) {
-			sprintf_s(sItemString, 2, "+");
+			PrintStr("+");
 		}
 		else if (strip.find("/s-/") != std::string::npos) {
-			sprintf_s(sItemString, 2, "-");
+			PrintStr("-");
 		}
 		break;
 	}
@@ -630,7 +635,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			GetColorDefinition(SETTING_COLOR_SQ_7500, pColorCode, pRGB);
 		}
 		flag = flag.substr(0, 15);// prevent overflow pool
-		strcpy_s(sItemString, flag.size() + 1, flag.c_str());
+		PrintStr(flag);
 		break;
 	}
 	case TAG_ITEM_TYPE_CLAM_FLAG: {
@@ -661,7 +666,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				break;
 			}
 		}
-		strcpy_s(sItemString, 16, GetPluginSetting<std::string>(SETTING_FLAG_CLAM).c_str());
+		PrintStr(GetPluginSetting<std::string>(SETTING_FLAG_CLAM));
 		GetColorDefinition(SETTING_COLOR_CLAM_FLAG, pColorCode, pRGB);
 		break;
 	}
@@ -677,7 +682,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		double d2 = posCurr.DistanceTo(posOrig);
 		if (d1 <= 30 || d2 <= 30)
 			break; // inhibit RAM when near origin/destination
-		strcpy_s(sItemString, 16, GetPluginSetting<std::string>(SETTING_FLAG_RAM).c_str());
+		PrintStr(GetPluginSetting<std::string>(SETTING_FLAG_RAM));
 		GetColorDefinition(SETTING_COLOR_RAM_FLAG, pColorCode, pRGB);
 		break;
 	}
