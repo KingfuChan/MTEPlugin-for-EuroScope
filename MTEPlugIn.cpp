@@ -77,6 +77,10 @@ static constexpr int OVRFLW4(const int& t) { return t > 9999 || t < 0 ? 9999 : t
 inline std::string MakeUpper(const std::string& str);
 inline bool IsCFLAssigned(CFlightPlan FlightPlan);
 inline int GetLastRadarInterval(CRadarTargetPositionData pos1, CRadarTargetPositionData pos2);
+inline int GetTrackingStatus(CFlightPlan FlightPlan);
+constexpr auto TRACK_STATUS_NONE = 0;
+constexpr auto TRACK_STATUS_MYSF = 1;
+constexpr auto TRACK_STATUS_OTHR = -1;
 
 // SETTING RELATED
 inline std::string GetRealFileName(const std::string& path);
@@ -128,8 +132,7 @@ const CommonSetting SETTING_FLAG_DUPE = { "Flag/DUPE", "DU" }; // string
 const ColorSetting SETTING_COLOR_CFL_CONFRM = { "Color/CFLNotAckd", TAG_COLOR_REDUNDANT };
 const ColorSetting SETTING_COLOR_CS_SIMILR = { "Color/SimilarCallsign", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_COORD_FLAG = { "Color/CoordFlag", TAG_COLOR_REDUNDANT };
-const ColorSetting SETTING_COLOR_RC_INVALID = { "Color/RouteInvalid", TAG_COLOR_INFORMATION };
-const ColorSetting SETTING_COLOR_RC_UNCERTN = { "Color/RouteUncertain", TAG_COLOR_REDUNDANT };
+const ColorSetting SETTING_COLOR_RC_ALT = { "Color/RCLevelInvalid", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_SQ_DUPE = { "Color/SquawkDupe", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_DS_NUMBR = { "Color/DSRestore", TAG_COLOR_INFORMATION };
 const ColorSetting SETTING_COLOR_DS_STATE = { "Color/DSNotCleared", TAG_COLOR_INFORMATION };
@@ -513,40 +516,38 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
-		switch (m_RouteChecker->CheckFlightPlan(FlightPlan, false, false))
+		std::string ind = "?";
+		int res = m_RouteChecker->CheckFlightPlan(FlightPlan, false, false);
+		switch (res)
 		{
 		case RouteCheckerConstants::NOT_FOUND:
-			PrintStr("? ");
 			break;
 		case RouteCheckerConstants::INVALID:
-			PrintStr("X ");
-			GetColorDefinition(SETTING_COLOR_RC_INVALID, pColorCode, pRGB);
+			ind = "X";
+			GetColorDefinition(SETTING_COLOR_RC_ALT, pColorCode, pRGB);
 			break;
 		case RouteCheckerConstants::PARTIAL_NO_LEVEL:
-			PrintStr("PL");
-			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
+			GetColorDefinition(SETTING_COLOR_RC_ALT, pColorCode, pRGB);
+			[[fallthrough]];
+		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
+			ind = "P";
 			break;
 		case RouteCheckerConstants::STRUCT_NO_LEVEL:
-			PrintStr("YL");
-			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
+			GetColorDefinition(SETTING_COLOR_RC_ALT, pColorCode, pRGB);
+			[[fallthrough]];
+		case RouteCheckerConstants::STRUCT_OK_LEVEL:
+			ind = "S";
 			break;
 		case RouteCheckerConstants::TEXT_NO_LEVEL:
-			PrintStr("YL");
-			break;
-		case RouteCheckerConstants::PARTIAL_OK_LEVEL:
-			PrintStr("P ");
-			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
-			break;
-		case RouteCheckerConstants::STRUCT_OK_LEVEL:
-			PrintStr("Y ");
-			GetColorDefinition(SETTING_COLOR_RC_UNCERTN, pColorCode, pRGB);
-			break;
+			GetColorDefinition(SETTING_COLOR_RC_ALT, pColorCode, pRGB);
+			[[fallthrough]];
 		case RouteCheckerConstants::TEXT_OK_LEVEL:
-			PrintStr("Y ");
+			ind = "Y";
 			break;
 		default:
 			break;
 		}
+		PrintStr(ind);
 		break;
 	}
 	case TAG_ITEM_TYPE_SQ_DUPE: {
@@ -585,7 +586,8 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		break;
 	}
 	case TAG_ITEM_TYPE_RVEC_IND: {
-		if (FlightPlan.IsValid() && FlightPlan.GetTrackingControllerIsMe() && FlightPlan.GetControllerAssignedData().GetAssignedHeading()) {
+		if (FlightPlan.IsValid() && FlightPlan.GetControllerAssignedData().GetAssignedHeading() &&
+			GetTrackingStatus(FlightPlan) == TRACK_STATUS_MYSF) {
 			PrintStr("RV");
 			GetColorDefinition(SETTING_COLOR_RDRV_IND, pColorCode, pRGB);
 		}
@@ -773,7 +775,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_CFL_MENU: {
 		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
-		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
 			// don't show list if other controller is tracking
 			break;
 		}
@@ -844,7 +846,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_CFL_EDIT: {
 		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
-		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
 			// don't show list if other controller is tracking
 			break;
 		}
@@ -904,7 +906,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_RFL_MENU: {
 		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
-		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
 			// don't show list if other controller is tracking
 			break;
 		}
@@ -926,7 +928,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	case TAG_ITEM_FUNCTION_RFL_EDIT: {
 		if (m_TrackedRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
-		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
 			// don't show list if other controller is tracking
 			break;
 		}
@@ -962,6 +964,14 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			break;
 		int rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true, false); // force a refresh here to avoid error
 		if (rc == RouteCheckerConstants::NOT_FOUND) break;
+		// assign to flight strip, format: /RC{rc}:{my controller callsign}/
+		if (rc > RouteCheckerConstants::INVALID && GetTrackingStatus(FlightPlan) != TRACK_STATUS_OTHR) {
+			std::string strip = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(3);
+			std::string strpn = std::format("/RC{}/{}/", rc, ControllerMyself().GetCallsign());
+			if (strip != strpn) {
+				FlightPlan.GetControllerAssignedData().SetFlightStripAnnotation(3, strpn.c_str());
+			}
+		}
 		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 		break;
 	}
@@ -1014,7 +1024,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 	}
 	case TAG_ITEM_FUNCTION_SPD_LIST: {
 		if (!FlightPlan.IsValid()) break;
-		if (!FlightPlan.GetTrackingControllerIsMe() && strlen(FlightPlan.GetTrackingControllerId())) {
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
 			// don't show list if other controller is tracking
 			break;
 		}
@@ -1106,7 +1116,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 				}
 			}
 		}
-		m_TrackedRecorder->HandleNewCfl(FlightPlan, !FlightPlan.GetTrackingControllerIsMe()); // initiate CFL not ack
+		m_TrackedRecorder->HandleNewCfl(FlightPlan, !GetTrackingStatus(FlightPlan)); // initiate CFL not ack
 	}
 	if (m_RouteChecker &&
 		(DataType == CTR_DATA_TYPE_FINAL_ALTITUDE && !FlightPlan.GetCorrelatedRadarTarget().GetPosition().GetTransponderC())) {
@@ -1132,7 +1142,7 @@ void CMTEPlugIn::OnFlightPlanDisconnect(CFlightPlan FlightPlan)
 		m_RouteChecker->RemoveCache(FlightPlan);
 	if (m_DepartureSequence)
 		m_DepartureSequence->EditSequence(FlightPlan, -1);
-	if (FlightPlan.GetTrackingControllerIsMe())
+	if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_MYSF)
 		m_TrackedRecorder->UpdateFlight(FlightPlan, false);
 }
 
@@ -1625,6 +1635,13 @@ inline int GetLastRadarInterval(CRadarTargetPositionData pos1, CRadarTargetPosit
 		t = 1;
 	}
 	return t;
+}
+
+inline int GetTrackingStatus(CFlightPlan FlightPlan)
+{
+	// 0: none, 1: myself, -1: others
+	return FlightPlan.GetTrackingControllerIsMe() ? TRACK_STATUS_MYSF : \
+		(strlen(FlightPlan.GetTrackingControllerId()) ? TRACK_STATUS_OTHR : TRACK_STATUS_NONE);
 }
 
 inline std::string GetRealFileName(const std::string& path)
