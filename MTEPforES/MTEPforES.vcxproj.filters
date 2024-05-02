@@ -50,7 +50,6 @@
     <None Include="cross.cur">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="README.md" />
     <None Include="BuildNumber.py" />
   </ItemGroup>
   <ItemGroup>

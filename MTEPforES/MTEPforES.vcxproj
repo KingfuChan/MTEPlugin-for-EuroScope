@@ -94,7 +94,7 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PreBuildEvent>
-      <Command>python BuildNumber.py</Command>
+      <Command>python $(ProjectDir)BuildNumber.py</Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>
@@ -167,7 +167,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </None>
     <None Include="cross.cur" />
-    <None Include="README.md" />
     <None Include="res\MTEPforES.rc2" />
   </ItemGroup>
   <ItemGroup>
