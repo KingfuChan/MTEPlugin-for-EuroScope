@@ -59,7 +59,8 @@ const int TAG_ITEM_FUNCTION_RFL_EDIT = 22; // Open RFL popup edit
 const int TAG_ITEM_FUNCTION_RFL_SET_MENU = 23; // Set RFL from menu (not registered)
 const int TAG_ITEM_FUNCTION_SC_LIST = 30; // Open similar callsign list
 const int TAG_ITEM_FUNCTION_SC_SELECT = 31; // Select in similar callsign list (not registered)
-const int TAG_ITEM_FUNCTION_RTE_INFO = 40; // Show route checker info
+const int TAG_ITEM_FUNCTION_RC_INFO = 40; // Show route checker info
+const int TAG_ITEM_FUNCTION_RC_STRIP = 41; // Amend route checker to strip
 const int TAG_ITEM_FUNCTION_DSQ_MENU = 50; // Set departure sequence
 const int TAG_ITEM_FUNCTION_DSQ_EDIT = 51; // Open departure sequence popup edit (not registered)
 const int TAG_ITEM_FUNCTION_DSQ_STS = 52; // Set departure status
@@ -223,7 +224,8 @@ CMTEPlugIn::CMTEPlugIn(void)
 	RegisterTagItemFunction("Open RFL popup menu", TAG_ITEM_FUNCTION_RFL_MENU);
 	RegisterTagItemFunction("Open RFL popup edit", TAG_ITEM_FUNCTION_RFL_EDIT);
 	RegisterTagItemFunction("Open similar callsign list", TAG_ITEM_FUNCTION_SC_LIST);
-	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RTE_INFO);
+	RegisterTagItemFunction("Show route checker info", TAG_ITEM_FUNCTION_RC_INFO);
+	RegisterTagItemFunction("Amend route checker to strip", TAG_ITEM_FUNCTION_RC_STRIP);
 	RegisterTagItemFunction("Set departure sequence", TAG_ITEM_FUNCTION_DSQ_MENU);
 	RegisterTagItemFunction("Set departure status", TAG_ITEM_FUNCTION_DSQ_STS);
 	RegisterTagItemFunction("Open ASP popup menu", TAG_ITEM_FUNCTION_SPD_LIST);
@@ -517,11 +519,20 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			FlightPlan.GetClearenceFlag())
 			break;
 		std::string ind = "?";
-		int res = m_RouteChecker->CheckFlightPlan(FlightPlan, false, false);
+		std::string mrk = ""; // for * (other controller set strip annotation)
+		int res = RouteCheckerConstants::NOT_FOUND;
+		std::regex rxAnno(R"(/RC/(\d+)/(\S+)/)");
+		std::smatch match;
+		std::string anno = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(3);
+		if (anno.size() && std::regex_match(anno, match, rxAnno)) {
+			res = std::stoi(match[1].str());
+			if (match[2].str() != ControllerMyself().GetCallsign()) { // someone else has set annotation
+				mrk = "*";
+			}
+		}
+		res = res != RouteCheckerConstants::NOT_FOUND ? res : m_RouteChecker->CheckFlightPlan(FlightPlan, false, false);
 		switch (res)
 		{
-		case RouteCheckerConstants::NOT_FOUND:
-			break;
 		case RouteCheckerConstants::INVALID:
 			ind = "X";
 			GetColorDefinition(SETTING_COLOR_RC_ALT, pColorCode, pRGB);
@@ -547,7 +558,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		default:
 			break;
 		}
-		PrintStr(ind);
+		PrintStr(ind + mrk);
 		break;
 	}
 	case TAG_ITEM_TYPE_SQ_DUPE: {
@@ -957,22 +968,22 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		SetASELAircraft(FlightPlanSelect(sItemString));
 		break;
 	}
-	case TAG_ITEM_FUNCTION_RTE_INFO: {
+	case TAG_ITEM_FUNCTION_RC_INFO:
+	case TAG_ITEM_FUNCTION_RC_STRIP: {
 		if (!m_RouteChecker ||
 			!FlightPlan.IsValid() ||
 			FlightPlan.GetClearenceFlag())
 			break;
 		int rc = m_RouteChecker->CheckFlightPlan(FlightPlan, true, false); // force a refresh here to avoid error
 		if (rc == RouteCheckerConstants::NOT_FOUND) break;
-		// assign to flight strip, format: /RC{rc}:{my controller callsign}/
-		if (rc > RouteCheckerConstants::INVALID && GetTrackingStatus(FlightPlan) != TRACK_STATUS_OTHR) {
-			std::string strip = FlightPlan.GetControllerAssignedData().GetFlightStripAnnotation(3);
-			std::string strpn = std::format("/RC{}/{}/", rc, ControllerMyself().GetCallsign());
-			if (strip != strpn) {
-				FlightPlan.GetControllerAssignedData().SetFlightStripAnnotation(3, strpn.c_str());
-			}
+		if (FunctionId == TAG_ITEM_FUNCTION_RC_INFO) {
+			DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
 		}
-		DisplayRouteMessage(FlightPlan.GetFlightPlanData().GetOrigin(), FlightPlan.GetFlightPlanData().GetDestination());
+		else if (ControllerMyself().IsController()) {
+			// assign to flight strip, format: /RC/{rc}/{my controller callsign}/
+			std::string strpn = std::format("/RC/{}/{}/", rc, ControllerMyself().GetCallsign());
+			FlightPlan.GetControllerAssignedData().SetFlightStripAnnotation(3, strpn.c_str());
+		}
 		break;
 	}
 	case TAG_ITEM_FUNCTION_DSQ_MENU: {
@@ -1106,7 +1117,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 				std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
 				if (aptgt.size() && cflAlt < trslvl && elev > 0) {
 					static bool suppress = false;
-					if (!suppress) {
+					if (GetConnectionType() != CONNECTION_TYPE_VIA_PROXY && !suppress) {
 						suppress = true;
 						cflAlt += elev; // convert QNH to QFE
 						FlightPlan.GetControllerAssignedData().SetClearedAltitude(cflAlt);
@@ -1127,6 +1138,7 @@ void CMTEPlugIn::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan FlightPlan
 		m_DepartureSequence->EditSequence(FlightPlan, 0);
 	}
 	if (DataType == CTR_DATA_TYPE_GROUND_STATE &&
+		GetConnectionType() != CONNECTION_TYPE_VIA_PROXY &&
 		FlightPlan.GetClearenceFlag() &&
 		!strlen(FlightPlan.GetGroundState())) {
 		CallItemFunction(FlightPlan.GetCallsign(), TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, POINT(), RECT());
@@ -1162,7 +1174,7 @@ void CMTEPlugIn::OnRadarTargetPositionUpdate(CRadarTarget RadarTarget)
 	if (m_TrackedRecorder->IsActive(RadarTarget)) {
 		m_TrackedRecorder->UpdateFlight(RadarTarget);
 	}
-	else {
+	else if (GetConnectionType() != CONNECTION_TYPE_VIA_PROXY) {
 		int retrack = GetPluginSetting<int>(SETTING_AUTO_RETRACK);
 		if (retrack == 1 || retrack == 2) {
 			if (m_TrackedRecorder->SetTrackedData(RadarTarget) && retrack == 2) {
