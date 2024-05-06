@@ -1,4 +1,4 @@
-//TrackedRecorder.h
+//TrackRecorder.h
 
 #pragma once
 
@@ -6,11 +6,11 @@
 #include "SimilarCallsign.h"
 #include "MetricAlt.h"
 
-class TrackedRecorder
+class TrackRecorder
 {
 public:
-	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
-	~TrackedRecorder(void);
+	TrackRecorder(EuroScopePlugIn::CPlugIn* plugin);
+	~TrackRecorder(void);
 
 	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
