@@ -60,7 +60,12 @@ std::string MetricAlt::LvlFeetEvenOdd(const int& feet)
 
 bool MetricAlt::LoadAltitudeDefinition(const std::string& filename)
 {
+	// pass empty filename to set default
 	m_AltStrMap.clear(); // clear previous record
+	if (filename.empty()) {
+		m_AltStrMap = v_atos1;
+		return true;
+	}
 	std::ifstream inFile;
 	inFile.open(filename, std::ios::in);
 	if (!inFile.is_open()) // unable to open file

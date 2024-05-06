@@ -1,39 +1,44 @@
-//TrackedRecorder.h
+//TrackRecorder.h
 
 #pragma once
 
 #include "pch.h"
 #include "SimilarCallsign.h"
+#include "MetricAlt.h"
 
-class TrackedRecorder
+class TrackRecorder
 {
 public:
-	TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin);
-	~TrackedRecorder(void);
+	TrackRecorder(EuroScopePlugIn::CPlugIn* plugin);
+	~TrackRecorder(void);
 
 	void UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online = true);
 	void UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget);
 
-	bool IsCommEstablished(const std::string& callsign);
-	void SetCommEstablished(const std::string& callsign);
+	bool GetCoordinationFlag(const std::string& callsign);
+	void SetCoordinationFlag(const std::string& callsign);
+	void SetCoordinationFlag(const bool& assumed);
 
-	bool IsCFLConfirmed(const std::string& callsign);
-	void SetCFLConfirmed(const std::string& callsign, const bool confirmed = true);
+	void HandleNewCfl(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& acknowledge);
+	bool IsCflAcknowledged(const std::string& callsign);
+	void AcknowledgeCfl(const std::string& callsign, const bool confirmed = true);
+	int GetCflElapsedTime(const std::string& callsign);
 
 	bool IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget);
 	void SetAltitudeUnit(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& feet);
 	void SetAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& feet);
 	void ResetAltitudeUnit(const bool& feet);
-	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration = 5);
+	bool ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int& duration);
 
 	bool IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget);
 	void SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot);
 	void SetSpeedUnit(const bool& knot);
 
-	bool IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget);
+	bool IsDifferentUnitPUS(EuroScopePlugIn::CRadarTarget RadarTarget);
+	bool IsDifferentUnitRFL(EuroScopePlugIn::CFlightPlan FlightPlan);
 
-	bool IsSquawkDUPE(const std::string& callsign);
+	bool IsSquawkDUPE(EuroScopePlugIn::CRadarTarget RadarTarget);
 
 	bool IsActive(EuroScopePlugIn::CFlightPlan FlightPlan);
 	bool IsActive(EuroScopePlugIn::CRadarTarget RadarTarget);
@@ -50,6 +55,7 @@ public:
 
 private:
 	bool m_SuppressUpdate = false;
+	bool m_CoordFlagAssumed = true;
 
 	typedef struct _AsD {
 		// in the order of SDK
@@ -86,21 +92,37 @@ private:
 	typedef struct _TkD {
 		std::string m_SystemID;
 		bool m_Offline;
-		bool m_CommEstbed;
-		bool m_CFLConfirmed;
+		bool m_CoordFlag;
 		AssignedData m_AssignedData;
 
-		_TkD(std::string _sID, AssignedData _asd, bool _fft) :
-			m_SystemID(_sID),
-			m_Offline(false), m_CommEstbed(false), m_CFLConfirmed(true),
+		_TkD(std::string _sID, AssignedData _asd, bool _cFlag) :
 			m_AssignedData(_asd)
-		{};
+		{
+			m_SystemID = _sID;
+			m_Offline = false;
+			m_CoordFlag = _cFlag;
+		};
 	}TrackedData;
 
 	EuroScopePlugIn::CPlugIn* m_PluginPtr;
 	// track map
 	std::unordered_map<std::string, TrackedData> m_TrackedMap; // callsign -> TrackedData
 	std::shared_mutex tr_Mutex;
+
+	// CFL recorder
+	typedef struct _CflD {
+		int m_Tracked; // 0: no one tracking, 1: tracked by myself, -1: tracked by others
+		bool m_Acknowledged;
+		std::chrono::time_point<std::chrono::steady_clock> m_TimeStamp;
+
+		_CflD(int _t, bool _ack) {
+			m_Tracked = _t;
+			m_Acknowledged = _ack;
+			m_TimeStamp = std::chrono::steady_clock::now();
+		}
+	}CflData;
+	std::unordered_map<std::string, CflData> m_CflMap; // callsign -> CflData
+	std::shared_mutex cfl_Mutex;
 
 	// for similar callsign
 	std::unordered_map<std::string, std::unordered_set<std::string>> m_SCSetMap; // callsign -> set<callsign>
@@ -124,7 +146,7 @@ private:
 	std::shared_mutex speed_Mutex;
 
 	// toggle vertical speed display
-	bool m_GlobalVS = true; // global vs display, true=display
+	bool m_GlobalVS = false; // global vs display, true=display
 	std::set<std::string> m_DisplayVS; // systemID, only stores those different from default
 	std::shared_mutex vsdsp_Mutex;
 

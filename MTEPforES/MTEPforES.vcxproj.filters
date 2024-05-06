@@ -36,7 +36,7 @@
     <ClCompile Include="DepartureSequence.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="TrackedRecorder.cpp">
+    <ClCompile Include="TrackRecorder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="TransitionLevel.cpp">
@@ -50,7 +50,7 @@
     <None Include="cross.cur">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="README.md" />
+    <None Include="BuildNumber.py" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -83,7 +83,7 @@
     <ClInclude Include="DepartureSequence.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="TrackedRecorder.h">
+    <ClInclude Include="TrackRecorder.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Version.h">

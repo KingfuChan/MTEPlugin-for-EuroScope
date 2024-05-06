@@ -340,7 +340,6 @@ ASALocalRun/
 healthchecksdb
 
 # Other
-/BuildNumber.py
 ._.DS_Store
 .DS_Store
 ._README.md

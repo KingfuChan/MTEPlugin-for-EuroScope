@@ -1,21 +1,21 @@
-//TrackedRecorder.cpp
+//TrackRecorder.cpp
 
 #include "pch.h"
-#include "TrackedRecorder.h"
+#include "TrackRecorder.h"
 
-TrackedRecorder::TrackedRecorder(EuroScopePlugIn::CPlugIn* plugin)
+TrackRecorder::TrackRecorder(EuroScopePlugIn::CPlugIn* plugin)
 {
 	m_PluginPtr = plugin;
-	sc_Thread = std::jthread(std::bind_front(&TrackedRecorder::SimilarCallsignThread, this));
+	sc_Thread = std::jthread(std::bind_front(&TrackRecorder::SimilarCallsignThread, this));
 }
 
-TrackedRecorder::~TrackedRecorder(void)
+TrackRecorder::~TrackRecorder(void)
 {
 	sc_Thread.request_stop();
 	sc_Thread.join();
 }
 
-void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online)
+void TrackRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, const bool online)
 {
 	// Pass online=false to deactivate when disconnecting.
 	if (m_SuppressUpdate == true) return;
@@ -46,14 +46,14 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CFlightPlan FlightPlan, cons
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded but tracking. add
-		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan), m_DefaultFeet };
+		TrackedData trd{ FlightPlan.GetCorrelatedRadarTarget().GetSystemID(), AssignedData(FlightPlan), m_CoordFlagAssumed };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		mlock.unlock();
 		RefreshSimilarCallsign();
 	}
 }
 
-void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
+void TrackRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
 	// Only useful if correlated.
 	if (m_SuppressUpdate == true) return;
@@ -76,50 +76,83 @@ void TrackedRecorder::UpdateFlight(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 	else if (FlightPlan.GetTrackingControllerIsMe()) {
 		// not recorded, tracking. add
-		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan), m_DefaultFeet };
+		TrackedData trd{ RadarTarget.GetSystemID(), AssignedData(FlightPlan), m_CoordFlagAssumed };
 		m_TrackedMap.insert({ FlightPlan.GetCallsign(), trd });
 		mlock.unlock();
 		RefreshSimilarCallsign();
 	}
 }
 
-bool TrackedRecorder::IsCommEstablished(const std::string& callsign)
+bool TrackRecorder::GetCoordinationFlag(const std::string& callsign)
 {
 	std::shared_lock mlock(tr_Mutex);
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
-		return r->second.m_CommEstbed;
+		return r->second.m_CoordFlag;
 	else
-		return true;
+		return false;
 }
 
-void TrackedRecorder::SetCommEstablished(const std::string& callsign)
+void TrackRecorder::SetCoordinationFlag(const std::string& callsign)
 {
 	std::unique_lock mlock(tr_Mutex);
 	auto r = m_TrackedMap.find(callsign);
 	if (r != m_TrackedMap.end())
-		r->second.m_CommEstbed = true;
+		r->second.m_CoordFlag = !r->second.m_CoordFlag;
 }
 
-bool TrackedRecorder::IsCFLConfirmed(const std::string& callsign)
+void TrackRecorder::SetCoordinationFlag(const bool& assumed)
 {
-	std::shared_lock mlock(tr_Mutex);
-	auto r = m_TrackedMap.find(callsign);
-	if (r != m_TrackedMap.end())
-		return r->second.m_CFLConfirmed;
+	m_CoordFlagAssumed = assumed;
+}
+
+void TrackRecorder::HandleNewCfl(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& acknowledge)
+{
+	if (!FlightPlan.IsValid()) return;
+	int t = strlen(FlightPlan.GetTrackingControllerId()) ? (FlightPlan.GetTrackingControllerIsMe() ? 1 : -1) : 0;
+	CflData cd(t, acknowledge);
+	std::unique_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(FlightPlan.GetCallsign());
+	if (r == m_CflMap.end()) {
+		m_CflMap.insert({ FlightPlan.GetCallsign(), cd });
+	}
+	else {
+		r->second = cd;
+	}
+}
+
+bool TrackRecorder::IsCflAcknowledged(const std::string& callsign)
+{
+	// returns true if not found
+	std::shared_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(callsign);
+	if (r != m_CflMap.end())
+		return r->second.m_Acknowledged;
 	else
 		return true;
 }
 
-void TrackedRecorder::SetCFLConfirmed(const std::string& callsign, const bool confirmed)
+void TrackRecorder::AcknowledgeCfl(const std::string& callsign, const bool confirmed)
 {
-	std::unique_lock mlock(tr_Mutex);
-	auto r = m_TrackedMap.find(callsign);
-	if (r != m_TrackedMap.end())
-		r->second.m_CFLConfirmed = confirmed;
+	std::unique_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(callsign);
+	if (r != m_CflMap.end())
+		r->second.m_Acknowledged = confirmed;
 }
 
-bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan)
+int TrackRecorder::GetCflElapsedTime(const std::string& callsign)
+{
+	std::shared_lock mlock(cfl_Mutex);
+	auto r = m_CflMap.find(callsign);
+	if (r != m_CflMap.end()) {
+		auto dura = std::chrono::steady_clock::now() - r->second.m_TimeStamp;
+		auto secs = std::chrono::duration_cast<std::chrono::seconds>(dura);
+		return (int)secs.count();
+	}
+	return -1;
+}
+
+bool TrackRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	// either m_AltUnitCallsign or m_AltUnitSysID will reverse default unit
 	if (!FlightPlan.IsValid()) return m_DefaultFeet;
@@ -131,7 +164,7 @@ bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CFlightPlan FlightPlan)
 	return revt != ((revc || revs) != m_DefaultFeet);
 }
 
-bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackRecorder::IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
 	// either m_AltUnitCallsign or m_AltUnitSysID will reverse default unit
 	if (!RadarTarget.IsValid()) return m_DefaultFeet;
@@ -143,7 +176,7 @@ bool TrackedRecorder::IsForceFeet(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return revt != ((revc || revs) != m_DefaultFeet);
 }
 
-void TrackedRecorder::SetAltitudeUnit(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& feet)
+void TrackRecorder::SetAltitudeUnit(EuroScopePlugIn::CFlightPlan FlightPlan, const bool& feet)
 {
 	if (!FlightPlan.IsValid() || IsForceFeet(FlightPlan) == feet) return; // no need to change
 	std::unique_lock uclock(ucals_Mutex), uslock(usysi_Mutex);
@@ -161,7 +194,7 @@ void TrackedRecorder::SetAltitudeUnit(EuroScopePlugIn::CFlightPlan FlightPlan, c
 	}
 }
 
-void TrackedRecorder::SetAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& feet)
+void TrackRecorder::SetAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& feet)
 {
 	if (!RadarTarget.IsValid() || IsForceFeet(RadarTarget) == feet) return;
 	std::unique_lock uclock(ucals_Mutex), uslock(usysi_Mutex);
@@ -179,7 +212,7 @@ void TrackedRecorder::SetAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget,
 	}
 }
 
-void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
+void TrackRecorder::ResetAltitudeUnit(const bool& feet)
 {
 	m_DefaultFeet = feet;
 	std::shared_lock clock(ucals_Mutex), slock(usysi_Mutex);
@@ -187,20 +220,24 @@ void TrackedRecorder::ResetAltitudeUnit(const bool& feet)
 	m_AltUnitCallsign.clear();
 }
 
-bool TrackedRecorder::IsSquawkDUPE(const std::string& callsign)
+bool TrackRecorder::IsSquawkDUPE(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
-	std::shared_lock mlock(tr_Mutex);
-	const auto r1 = m_TrackedMap.find(callsign);
-	if (r1 == m_TrackedMap.end())
-		return false;
-	return std::any_of(m_TrackedMap.begin(), m_TrackedMap.end(), [&](const auto& r2) {
-		return !r2.second.m_Offline &&
-			r1->first != r2.first &&
-			r1->second.m_AssignedData.m_Squawk == r2.second.m_AssignedData.m_Squawk;
-		});
+	if (!RadarTarget.IsValid()) return false;
+	if (!RadarTarget.GetPosition().GetTransponderC()) return false;
+	bool correlated = RadarTarget.GetCorrelatedFlightPlan().IsValid();
+	std::string sq = RadarTarget.GetPosition().GetSquawk();
+	for (auto rt1 = m_PluginPtr->RadarTargetSelectFirst(); rt1.IsValid(); rt1 = m_PluginPtr->RadarTargetSelectNext(rt1)) {
+		if (!strcmp(rt1.GetSystemID(), RadarTarget.GetSystemID())) continue; // skip itself
+		if (rt1.GetPosition().GetTransponderC() && sq == rt1.GetPosition().GetSquawk()) {
+			if (correlated || rt1.GetCorrelatedFlightPlan().IsValid()) { // at least one is correlated
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
-bool TrackedRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)
+bool TrackRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	std::shared_lock mlock(tr_Mutex);
 	auto r = m_TrackedMap.find(FlightPlan.GetCallsign());
@@ -210,7 +247,7 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CFlightPlan FlightPlan)
 		return true;
 }
 
-bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
 	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
 	if (FlightPlan.IsValid())
@@ -222,13 +259,13 @@ bool TrackedRecorder::IsActive(EuroScopePlugIn::CRadarTarget RadarTarget)
 	}
 }
 
-bool TrackedRecorder::IsSimilarCallsign(const std::string& callsign)
+bool TrackRecorder::IsSimilarCallsign(const std::string& callsign)
 {
 	std::shared_lock lock(sc_Mutex);
 	return m_SCSetMap.find(callsign) != m_SCSetMap.end();
 }
 
-std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(const std::string& callsign)
+std::unordered_set<std::string> TrackRecorder::GetSimilarCallsigns(const std::string& callsign)
 {
 	std::shared_lock lock(sc_Mutex);
 	auto f = m_SCSetMap.find(callsign);
@@ -238,7 +275,7 @@ std::unordered_set<std::string> TrackedRecorder::GetSimilarCallsigns(const std::
 		return std::unordered_set<std::string>();
 }
 
-bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
+bool TrackRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 {
 	// returns true if success
 	std::unique_lock mlock(tr_Mutex);
@@ -282,7 +319,7 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CFlightPlan FlightPlan)
 	return FlightPlan.StartTracking();
 }
 
-bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
 	// returns true if success
 	auto FlightPlan = RadarTarget.GetCorrelatedFlightPlan();
@@ -302,10 +339,10 @@ bool TrackedRecorder::SetTrackedData(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return false;
 }
 
-bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int duration)
+bool TrackRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const int& duration)
 {
-	// set TR->ForceFeet for duration seconds, return true is keyboard alt is pressed
-	if (!RadarTarget.IsValid() || !(GetAsyncKeyState(VK_MENU) & 0x8000)) return false; // keyboard alt is not pressed
+	// set TR->ForceFeet for duration seconds (only accepts positive value), return true if toggle
+	if (duration <= 0 || !RadarTarget.IsValid() || !(GetAsyncKeyState(VK_MENU) & 0x8000)) return false; // invalid duration or keyboard alt is not pressed
 	std::unique_lock uslock(utemp_Mutex);
 	std::unique_lock utlock(uthrd_Mutex);
 	std::string systemid = RadarTarget.GetSystemID();
@@ -341,7 +378,7 @@ bool TrackedRecorder::ToggleAltitudeUnit(EuroScopePlugIn::CRadarTarget RadarTarg
 	return true;
 }
 
-bool TrackedRecorder::IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackRecorder::IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
 	std::shared_lock slock(speed_Mutex);
 	if (RadarTarget.IsValid() && m_SpeedUnitSysID.contains(RadarTarget.GetSystemID())) {
@@ -350,7 +387,7 @@ bool TrackedRecorder::IsForceKnot(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return m_DefaultKnot;
 }
 
-void TrackedRecorder::SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot)
+void TrackRecorder::SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, const bool& knot)
 {
 	if (!RadarTarget.IsValid()) return;
 	std::unique_lock slock(speed_Mutex);
@@ -363,15 +400,16 @@ void TrackedRecorder::SetSpeedUnit(EuroScopePlugIn::CRadarTarget RadarTarget, co
 	}
 }
 
-void TrackedRecorder::SetSpeedUnit(const bool& knot)
+void TrackRecorder::SetSpeedUnit(const bool& knot)
 {
 	std::unique_lock slock(speed_Mutex);
 	m_SpeedUnitSysID.clear();
 	m_DefaultKnot = knot;
 }
 
-bool TrackedRecorder::IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget)
+bool TrackRecorder::IsDifferentUnitPUS(EuroScopePlugIn::CRadarTarget RadarTarget)
 {
+	// PUS = Position Unit Setting
 	if (!RadarTarget.IsValid()) return false;
 	std::shared_lock aclock(ucals_Mutex), ailock(usysi_Mutex), slock(speed_Mutex);
 	std::string callsign = RadarTarget.GetCorrelatedFlightPlan().IsValid() ? RadarTarget.GetCorrelatedFlightPlan().GetCallsign() : "";
@@ -382,7 +420,15 @@ bool TrackedRecorder::IsDifferentUnit(EuroScopePlugIn::CRadarTarget RadarTarget)
 	return revc || revi || revs;
 }
 
-bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
+bool TrackRecorder::IsDifferentUnitRFL(EuroScopePlugIn::CFlightPlan FlightPlan)
+{
+	if (!FlightPlan.IsValid()) return false;
+	int _meter;
+	bool feetRequested = !MetricAlt::RflFeettoM(FlightPlan.GetFinalAltitude(), _meter);
+	return m_DefaultFeet != feetRequested;
+}
+
+bool TrackRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
 {
 	std::shared_lock v_lock(vsdsp_Mutex);
 	if (systemID.size() && m_DisplayVS.contains(systemID)) {
@@ -391,7 +437,7 @@ bool TrackedRecorder::IsDisplayVerticalSpeed(const std::string& systemID)
 	return m_GlobalVS;
 }
 
-void TrackedRecorder::ToggleVerticalSpeed(const std::string& systemID)
+void TrackRecorder::ToggleVerticalSpeed(const std::string& systemID)
 {
 	std::unique_lock v_lock(vsdsp_Mutex);
 	if (!m_DisplayVS.erase(systemID)) {
@@ -399,26 +445,26 @@ void TrackedRecorder::ToggleVerticalSpeed(const std::string& systemID)
 	}
 }
 
-void TrackedRecorder::ToggleVerticalSpeed(const bool& display)
+void TrackRecorder::ToggleVerticalSpeed(const bool& display)
 {
 	std::unique_lock v_lock(vsdsp_Mutex);
 	m_DisplayVS.clear();
 	m_GlobalVS = display;
 }
 
-std::unordered_map<std::string, TrackedRecorder::TrackedData>::iterator TrackedRecorder::GetTrackedDataBySystemID(const std::string& systemID)
+std::unordered_map<std::string, TrackRecorder::TrackedData>::iterator TrackRecorder::GetTrackedDataBySystemID(const std::string& systemID)
 {
 	std::shared_lock mlock(tr_Mutex);
 	return std::find_if(m_TrackedMap.begin(), m_TrackedMap.end(), [&systemID](const auto& d) { return d.second.m_SystemID == systemID; });
 }
 
-void TrackedRecorder::RefreshSimilarCallsign(void)
+void TrackRecorder::RefreshSimilarCallsign(void)
 {
 	sc_NeedRefresh = true;
 	sc_CondVar.notify_all();
 }
 
-void TrackedRecorder::SimilarCallsignThread(std::stop_token stoken)
+void TrackRecorder::SimilarCallsignThread(std::stop_token stoken)
 {
 	std::mutex t_mutex;
 	while (!stoken.stop_requested()) {

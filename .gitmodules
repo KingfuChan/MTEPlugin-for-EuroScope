@@ -1,0 +1,3 @@
+[submodule "MTEPlugin-for-EuroScope.wiki"]
+	path = wiki
+	url = https://github.com/KingfuChan/MTEPlugin-for-EuroScope.wiki.git
