@@ -136,11 +136,19 @@ constexpr auto SETTING_UNIT_IND_2X = "Unit/Indicator2X"; // char, * *(space)
 constexpr auto DEFAULT_UNIT_IND_2X = ' ';
 constexpr auto SETTING_UNIT_IND_2O = "Unit/Indicator2O"; // char, *NULL*
 constexpr auto DEFAULT_UNIT_IND_2O = '\0';
+// coordination indicator
 const CommonSetting SETTING_FLAG_COORD_MODE = { "Flag/CoordinationAuto", "1" }; // bool, 0: manual *1*: auto on assume
 constexpr auto SETTING_FLAG_COORD_X = "Flag/CoordinationX"; // char, *NULL*
 constexpr auto DEFAULT_FLAG_COORD_X = '\0';
 constexpr auto SETTING_FLAG_COORD_O = "Flag/CoordinationO"; // char, *C*
 constexpr auto DEFAULT_FLAG_COORD_O = 'C';
+// RVSM indicator - 3 modes
+constexpr auto SETTING_FLAG_RVSM_O = "Flag/RvsmO"; // char, * *(space)
+constexpr auto DEFAULT_FLAG_RVSM_O = ' ';
+constexpr auto SETTING_FLAG_RVSM_X = "Flag/RvsmX"; // char, *X*
+constexpr auto DEFAULT_FLAG_RVSM_X = 'X';
+constexpr auto SETTING_FLAG_RVSM_V = "Flag/RvsmV"; // char, *V*
+constexpr auto DEFAULT_FLAG_RVSM_V = 'V';
 const CommonSetting SETTING_FLAG_EMG = { "Flag/Emergency", "EM:RF:HJ" }; // string, 2: EM:RF:HJ, 3: EMG:RDO:HIJ
 const CommonSetting SETTING_FLAG_CLAM = { "Flag/CLAM", "CL" }; // string
 const CommonSetting SETTING_FLAG_RAM = { "Flag/RAM", "RA" }; // string

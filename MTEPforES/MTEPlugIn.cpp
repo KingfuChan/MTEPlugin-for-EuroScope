@@ -323,13 +323,13 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
 		std::string acinf = fpdata.GetAircraftInfo();
-		char ind = ' ';
+		char ind = GetPluginCharSetting(SETTING_FLAG_RVSM_O, DEFAULT_FLAG_RVSM_O);
 		if (!strcmp(fpdata.GetPlanType(), "V"))
-			ind = 'V';
+			ind = GetPluginCharSetting(SETTING_FLAG_RVSM_V, DEFAULT_FLAG_RVSM_V);
 		else if (acinf.size() <= 8) { // assume FAA format
 			char capa = fpdata.GetCapibilities();
 			if (std::string("HWJKLZ?").find(capa) == std::string::npos)
-				ind = 'X';
+				ind = GetPluginCharSetting(SETTING_FLAG_RVSM_X, DEFAULT_FLAG_RVSM_X);
 		}
 		else { // assume ICAO format
 			std::string acet;
@@ -342,7 +342,7 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 				acet = acinf.substr(acinf.find('-') + 1);
 			}
 			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
-				ind = 'X';
+				ind = GetPluginCharSetting(SETTING_FLAG_RVSM_X, DEFAULT_FLAG_RVSM_X);
 		}
 		PrintStr(std::string(1, ind));
 		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
