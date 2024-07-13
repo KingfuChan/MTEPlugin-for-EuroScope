@@ -1437,7 +1437,10 @@ void CMTEPlugIn::LoadTransitionLevel(void)
 void CMTEPlugIn::LoadMetricAltitude(void)
 {
 	auto setfn = GetDataFromSettings(SETTING_TRANS_MALT_TXT);
-	std::string fn = GetRealFileName(setfn == nullptr ? "" : setfn);
+	if (setfn == nullptr) {
+		return;
+	}
+	std::string fn = GetRealFileName(setfn);
 	try {
 		MetricAlt::LoadAltitudeDefinition(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
