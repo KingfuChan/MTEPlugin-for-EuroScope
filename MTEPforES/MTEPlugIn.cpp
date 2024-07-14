@@ -324,12 +324,17 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
 		std::string acinf = fpdata.GetAircraftInfo();
 		char ind = GetPluginCharSetting(SETTING_FLAG_RVSM_O, DEFAULT_FLAG_RVSM_O);
-		if (!strcmp(fpdata.GetPlanType(), "V"))
+		GetColorDefinition(SETTING_COLOR_RVSM_O, pColorCode, pRGB);
+		if (!strcmp(fpdata.GetPlanType(), "V")) {
 			ind = GetPluginCharSetting(SETTING_FLAG_RVSM_V, DEFAULT_FLAG_RVSM_V);
+			GetColorDefinition(SETTING_COLOR_RVSM_V, pColorCode, pRGB);
+		}
 		else if (acinf.size() <= 8) { // assume FAA format
 			char capa = fpdata.GetCapibilities();
-			if (std::string("HWJKLZ?").find(capa) == std::string::npos)
+			if (std::string("HWJKLZ?").find(capa) == std::string::npos) {
 				ind = GetPluginCharSetting(SETTING_FLAG_RVSM_X, DEFAULT_FLAG_RVSM_X);
+				GetColorDefinition(SETTING_COLOR_RVSM_X, pColorCode, pRGB);
+			}
 		}
 		else { // assume ICAO format
 			std::string acet;
@@ -341,11 +346,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			else { // no () in string, for erroneous simbrief prefile. e.g. A333/H-SDE3GHIJ2J3J5M1RVWXY/LB2D1
 				acet = acinf.substr(acinf.find('-') + 1);
 			}
-			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
+			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos) {
 				ind = GetPluginCharSetting(SETTING_FLAG_RVSM_X, DEFAULT_FLAG_RVSM_X);
+				GetColorDefinition(SETTING_COLOR_RVSM_X, pColorCode, pRGB);
+			}
 		}
 		PrintStr(std::string(1, ind));
-		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
 		break;
 	}
 	case TAG_ITEM_TYPE_COORD_FLAG: {
