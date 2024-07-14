@@ -357,20 +357,24 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		GetColorDefinition(SETTING_COLOR_COORD_FLAG, pColorCode, pRGB);
 		break;
 	}
-	case TAG_ITEM_TYPE_RECAT_BC: {
-		if (!FlightPlan.IsValid()) break;
-		if (FlightPlan.GetFlightPlanData().GetAircraftWtc() == 'H') {
-			auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
-			if (rc != m_ReCatMap.end() && rc->second != 'J')
-				PrintStr("-" + std::string(1, rc->second));
-		}
-		break;
-	}
+	case TAG_ITEM_TYPE_RECAT_BC:
 	case TAG_TIEM_TYPE_RECAT_WTC: {
 		if (!FlightPlan.IsValid()) break;
-		auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
-		PrintStr(std::string(1,
-			rc != m_ReCatMap.end() ? rc->second : FlightPlan.GetFlightPlanData().GetAircraftWtc()));
+		std::string rcStr;
+		std::string actype = FlightPlan.GetFlightPlanData().GetAircraftFPType();
+		auto rc = m_ReCatMap.find(actype);
+		if (rc != m_ReCatMap.end()) {
+			if (ItemCode == TAG_TIEM_TYPE_RECAT_WTC) {
+				rcStr = rc->second;
+			}
+			else if (rc->second != 'J') {
+				rcStr = std::format("-{}", rc->second);
+			}
+		}
+		else if (ItemCode == TAG_TIEM_TYPE_RECAT_WTC) {
+			rcStr = FlightPlan.GetFlightPlanData().GetAircraftWtc();
+		}
+		PrintStr(rcStr);
 		break;
 	}
 	case TAG_ITEM_TYPE_RTE_CHECK: {
