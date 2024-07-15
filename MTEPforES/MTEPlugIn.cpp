@@ -323,13 +323,18 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!FlightPlan.IsValid()) break;
 		CFlightPlanData fpdata = FlightPlan.GetFlightPlanData();
 		std::string acinf = fpdata.GetAircraftInfo();
-		char ind = ' ';
-		if (!strcmp(fpdata.GetPlanType(), "V"))
-			ind = 'V';
+		char ind = GetPluginCharSetting(SETTING_FLAG_RVSM_O, DEFAULT_FLAG_RVSM_O);
+		GetColorDefinition(SETTING_COLOR_RVSM_O, pColorCode, pRGB);
+		if (!strcmp(fpdata.GetPlanType(), "V")) {
+			ind = GetPluginCharSetting(SETTING_FLAG_RVSM_V, DEFAULT_FLAG_RVSM_V);
+			GetColorDefinition(SETTING_COLOR_RVSM_V, pColorCode, pRGB);
+		}
 		else if (acinf.size() <= 8) { // assume FAA format
 			char capa = fpdata.GetCapibilities();
-			if (std::string("HWJKLZ?").find(capa) == std::string::npos)
-				ind = 'X';
+			if (std::string("HWJKLZ?").find(capa) == std::string::npos) {
+				ind = GetPluginCharSetting(SETTING_FLAG_RVSM_X, DEFAULT_FLAG_RVSM_X);
+				GetColorDefinition(SETTING_COLOR_RVSM_X, pColorCode, pRGB);
+			}
 		}
 		else { // assume ICAO format
 			std::string acet;
@@ -341,11 +346,12 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			else { // no () in string, for erroneous simbrief prefile. e.g. A333/H-SDE3GHIJ2J3J5M1RVWXY/LB2D1
 				acet = acinf.substr(acinf.find('-') + 1);
 			}
-			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos)
-				ind = 'X';
+			if (acet.substr(0, acet.find('/')).find('W') == std::string::npos) {
+				ind = GetPluginCharSetting(SETTING_FLAG_RVSM_X, DEFAULT_FLAG_RVSM_X);
+				GetColorDefinition(SETTING_COLOR_RVSM_X, pColorCode, pRGB);
+			}
 		}
 		PrintStr(std::string(1, ind));
-		GetColorDefinition(SETTING_COLOR_RVSM_IND, pColorCode, pRGB);
 		break;
 	}
 	case TAG_ITEM_TYPE_COORD_FLAG: {
@@ -357,20 +363,24 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		GetColorDefinition(SETTING_COLOR_COORD_FLAG, pColorCode, pRGB);
 		break;
 	}
-	case TAG_ITEM_TYPE_RECAT_BC: {
-		if (!FlightPlan.IsValid()) break;
-		if (FlightPlan.GetFlightPlanData().GetAircraftWtc() == 'H') {
-			auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
-			if (rc != m_ReCatMap.end() && rc->second != 'J')
-				PrintStr("-" + std::string(1, rc->second));
-		}
-		break;
-	}
+	case TAG_ITEM_TYPE_RECAT_BC:
 	case TAG_TIEM_TYPE_RECAT_WTC: {
 		if (!FlightPlan.IsValid()) break;
-		auto rc = m_ReCatMap.find(FlightPlan.GetFlightPlanData().GetAircraftFPType());
-		PrintStr(std::string(1,
-			rc != m_ReCatMap.end() ? rc->second : FlightPlan.GetFlightPlanData().GetAircraftWtc()));
+		std::string rcStr;
+		std::string actype = FlightPlan.GetFlightPlanData().GetAircraftFPType();
+		auto rc = m_ReCatMap.find(actype);
+		if (rc != m_ReCatMap.end()) {
+			if (ItemCode == TAG_TIEM_TYPE_RECAT_WTC) {
+				rcStr = rc->second;
+			}
+			else if (rc->second != 'J') {
+				rcStr = std::format("-{}", rc->second);
+			}
+		}
+		else if (ItemCode == TAG_TIEM_TYPE_RECAT_WTC) {
+			rcStr = FlightPlan.GetFlightPlanData().GetAircraftWtc();
+		}
+		PrintStr(rcStr);
 		break;
 	}
 	case TAG_ITEM_TYPE_RTE_CHECK: {
@@ -1437,7 +1447,10 @@ void CMTEPlugIn::LoadTransitionLevel(void)
 void CMTEPlugIn::LoadMetricAltitude(void)
 {
 	auto setfn = GetDataFromSettings(SETTING_TRANS_MALT_TXT);
-	std::string fn = GetRealFileName(setfn == nullptr ? "" : setfn);
+	if (setfn == nullptr) {
+		return;
+	}
+	std::string fn = GetRealFileName(setfn);
 	try {
 		MetricAlt::LoadAltitudeDefinition(fn);
 		DisplayUserMessage("MESSAGE", "MTEPlugin",
