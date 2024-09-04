@@ -147,3 +147,21 @@ int MetricAlt::GetAltitudeFromMenuItem(const std::string& menuItem, const bool& 
 	}
 	return ALT_MAP_NOT_FOUND;
 }
+
+std::string MetricAlt::GetPreservedCflItem(const int& preservedCfl, const bool& metric)
+{
+	// if alternative items are missing, will fallback to primary itrm
+	if (preservedCfl != 0 && preservedCfl != 1 && preservedCfl != 2)
+		return "";
+	for (auto& as : m_AltStrMap) {
+		if (as.alt == preservedCfl) {
+			if (metric) {
+				return as.ma.size() ? as.ma : as.m;
+			}
+			else {
+				return as.fa.size() ? as.fa : as.f;
+			}
+		}
+	}
+	return "";
+}

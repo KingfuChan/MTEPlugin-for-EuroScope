@@ -231,14 +231,30 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			GetColorDefinition(SETTING_COLOR_CFL_CONFRM, pColorCode, pRGB);
 		}
 		int cflAlt = FlightPlan.GetControllerAssignedData().GetClearedAltitude();
+		bool isfeet = m_TrackRecorder->IsForceFeet(FlightPlan);
 		if (cflAlt == 2) { // cleared for visual approach
-			PrintStr("VA");
+			if (GetPluginSetting<bool>(SETTING_ALT_PCFL)) {
+				PrintStr(MetricAlt::GetPreservedCflItem(2, !isfeet));
+			}
+			else {
+				PrintStr("VA");
+			}
 		}
 		else if (cflAlt == 1) { // cleared for ILS approach
-			PrintStr("ILS");
+			if (GetPluginSetting<bool>(SETTING_ALT_PCFL)) {
+				PrintStr(MetricAlt::GetPreservedCflItem(1, !isfeet));
+			}
+			else {
+				PrintStr("ILS");
+			}
 		}
 		else if (!IsCFLAssigned(FlightPlan)) { // no cleared level or CFL==RFL
-			PrintStr("    ");
+			if (GetPluginSetting<bool>(SETTING_ALT_PCFL)) {
+				PrintStr(MetricAlt::GetPreservedCflItem(0, !isfeet));
+			}
+			else {
+				PrintStr("");
+			}
 		}
 		else { // have a cleared level
 			cflAlt = FlightPlan.GetClearedAltitude(); // difference: no ILS/VA, no CFL will show RFL
@@ -246,7 +262,6 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 			int trslvl, elev;
 			bool isQFE = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev).size() && elev && cflAlt < trslvl;
 			cflAlt -= isQFE ? elev : 0;
-			bool isfeet = m_TrackRecorder->IsForceFeet(FlightPlan);
 			if (!isfeet) {
 				if (MetricAlt::RflFeettoM(cflAlt, dspAlt)) { // is metric RVSM
 					dspAlt = dspAlt / 10;
@@ -604,12 +619,10 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 			if (tgtAlt == 1 || tgtAlt == 2) { // ILS or VA
 				FlightPlan.GetControllerAssignedData().SetAssignedHeading(0);
 			}
-			else if (tgtAlt > 2) {
-				if (GetPluginSetting<int>(SETTING_AMEND_CFL) == 1) {
-					int trslvl, elev;
-					std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
-					tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
-				}
+			else if (tgtAlt > 2 && GetPluginSetting<int>(SETTING_AMEND_CFL) == 1) {
+				int trslvl, elev;
+				std::string aptgt = m_TransitionLevel->GetTargetAirport(FlightPlan, trslvl, elev);
+				tgtAlt += aptgt.size() && tgtAlt < trslvl ? elev : 0; // convert QNH to QFE
 			}
 			FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 		}
@@ -653,7 +666,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 		break;
 	}
-	case TAG_ITEM_FUNCTION_CFL_MENU: {
+	case TAG_ITEM_FUNCTION_CFL_MENU: { // TODO: sync behaviour of confirm CFL for tracked-by-others fp
 		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
@@ -724,7 +737,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break;
 	}
-	case TAG_ITEM_FUNCTION_CFL_EDIT: {
+	case TAG_ITEM_FUNCTION_CFL_EDIT: { // TODO: sync behaviour of confirm CFL for tracked-by-others fp
 		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
@@ -739,7 +752,7 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_CFL_SET_EDIT, "");
 		break;
 	}
-	case TAG_ITEM_FUNCTION_CFL_TOPSKY: {
+	case TAG_ITEM_FUNCTION_CFL_TOPSKY: { // TODO: sync behaviour of confirm CFL for tracked-by-others fp
 		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {

@@ -112,6 +112,7 @@ const CommonSetting SETTING_AMEND_CFL = { "AmendQFEinCFL", "1" }; // 0: off, *1*
 constexpr auto SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9"; // char[10]
 // ALTITUDE
 const CommonSetting SETTING_ALT_FEET = { "ALT/Feet", "0" }; // bool, *0*, include command
+const CommonSetting SETTING_ALT_PCFL = { "ALT/MAforCFL","0" }; // bool, *0*, do not use MA alternative for preserved CFL
 const CommonSetting SETTING_ALT_TOGG = { "ALT/ToggleDura", "5" }; // int, *5* seconds
 // VERTICAL SPEED
 const CommonSetting SETTING_VS_MODE = { "VS/Mode", "0" }; // bool, *0*: hide, 1: show, only valid for toggle, included in command.
