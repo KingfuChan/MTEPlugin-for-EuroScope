@@ -192,7 +192,9 @@ void CMTEPlugIn::OnGetTagItem(CFlightPlan FlightPlan, CRadarTarget RadarTarget,
 		if (!RadarTarget.IsValid()) break;
 		int vs = CalculateVerticalSpeed(RadarTarget);
 		int thld = abs(GetPluginSetting<int>(SETTING_VS_THLD));
-		PrintStr(vs >= thld ? "^" : (vs <= -thld ? "|" : ">"));
+		std::string mrks = GetPluginSetting<std::string>(SETTING_VS_LEVEL);
+		size_t p = vs >= thld ? 1 : vs <= -thld ? 3 : 2;
+		PrintStr(std::string(1, mrks.at(min(mrks.size(), p) - 1)));
 		break;
 	}
 	case TAG_ITEM_TYPE_AFL_MTR: {
