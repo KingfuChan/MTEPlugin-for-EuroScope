@@ -666,16 +666,16 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		FlightPlan.GetControllerAssignedData().SetClearedAltitude(tgtAlt); // no need to check overflow
 		break;
 	}
-	case TAG_ITEM_FUNCTION_CFL_MENU: { // TODO: sync behaviour of confirm CFL for tracked-by-others fp
+	case TAG_ITEM_FUNCTION_CFL_MENU: {
 		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
-		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
-			// don't show list if other controller is tracking
-			break;
-		}
-		else if (!m_TrackRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
+		if (!m_TrackRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
 			// acknowledge previous CFL first
 			m_TrackRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
+			break;
+		}
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
+			// don't show list if other controller is tracking
 			break;
 		}
 		OpenPopupList(Area, "CFL Menu", 1);
@@ -737,27 +737,31 @@ void CMTEPlugIn::OnFunctionCall(int FunctionId, const char* sItemString, POINT P
 		}
 		break;
 	}
-	case TAG_ITEM_FUNCTION_CFL_EDIT: { // TODO: sync behaviour of confirm CFL for tracked-by-others fp
-		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
-		if (!FlightPlan.IsValid()) break;
-		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
-			// don't show list if other controller is tracking
-			break;
-		}
-		else if (!m_TrackRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
-			// acknowledge previous CFL first
-			m_TrackRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
-			break;
-		}
-		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_CFL_SET_EDIT, "");
-		break;
-	}
-	case TAG_ITEM_FUNCTION_CFL_TOPSKY: { // TODO: sync behaviour of confirm CFL for tracked-by-others fp
+	case TAG_ITEM_FUNCTION_CFL_EDIT: {
 		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
 		if (!FlightPlan.IsValid()) break;
 		if (!m_TrackRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
 			// acknowledge previous CFL first
 			m_TrackRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
+			break;
+		}
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
+			// don't show list if other controller is tracking
+			break;
+		}
+		OpenPopupEdit(Area, TAG_ITEM_FUNCTION_CFL_SET_EDIT, "");
+		break;
+	}
+	case TAG_ITEM_FUNCTION_CFL_TOPSKY: {
+		if (m_TrackRecorder->ToggleAltitudeUnit(RadarTarget, GetPluginSetting<int>(SETTING_ALT_TOGG))) break;
+		if (!FlightPlan.IsValid()) break;
+		if (!m_TrackRecorder->IsCflAcknowledged(FlightPlan.GetCallsign())) {
+			// acknowledge previous CFL first
+			m_TrackRecorder->AcknowledgeCfl(FlightPlan.GetCallsign());
+			break;
+		}
+		if (GetTrackingStatus(FlightPlan) == TRACK_STATUS_OTHR) {
+			// don't show list if other controller is tracking
 			break;
 		}
 		CallItemFunction(FlightPlan.GetCallsign(), nullptr, 0, sItemString, "TopSky plugin", 12, Pt, Area);
