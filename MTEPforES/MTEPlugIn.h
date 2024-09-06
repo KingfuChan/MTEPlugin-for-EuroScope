@@ -112,11 +112,13 @@ const CommonSetting SETTING_AMEND_CFL = { "AmendQFEinCFL", "1" }; // 0: off, *1*
 constexpr auto SETTING_CUSTOM_NUMBER_MAP = "CustomNumber0-9"; // char[10]
 // ALTITUDE
 const CommonSetting SETTING_ALT_FEET = { "ALT/Feet", "0" }; // bool, *0*, include command
+const CommonSetting SETTING_ALT_PCFL = { "ALT/MAforCFL","0" }; // bool, *0*, do not use MA alternative for preserved CFL
 const CommonSetting SETTING_ALT_TOGG = { "ALT/ToggleDura", "5" }; // int, *5* seconds
 // VERTICAL SPEED
 const CommonSetting SETTING_VS_MODE = { "VS/Mode", "0" }; // bool, *0*: hide, 1: show, only valid for toggle, included in command.
 const CommonSetting SETTING_VS_THLD = { "VS/Threshold", "100" }; // positive int, *100* FPM
 const CommonSetting SETTING_VS_RNDG = { "VS/Rounding", "1" }; // positive int, *1* FPM
+const CommonSetting SETTING_VS_LEVEL = { "VS/LevelMark", "^>|" };// char[3], *^>|* for climb-level-descend
 // GOUND SPEED
 const CommonSetting SETTING_GS_KNOT = { "GS/Knot", "0" }; // bool, *0*, include command
 const CommonSetting SETTING_GS_MODE = { "GS/ModeThreshold", "0" }; // int, *0* KTS
