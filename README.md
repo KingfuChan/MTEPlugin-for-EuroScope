@@ -12,7 +12,7 @@ MTEPlugin is an [EuroScope](https://www.euroscope.hu) plugin providing miscellan
 
 ## Why
 
-Native EuroScope doesn't provide Eurocat style tag items. Although [Topsky plugin by VATSIM-Scandinavia](https://vatsim-scandinavia.org/forums/topic/3461-topsky-plugin-241/) has profuse features, still some features don't work as desired, especially those related to metric unit system. So MTEPlugin is developed to supplement EuroScope native items and functions as well as those from Topsky, and to improve controller experience with some other functionalities.
+Native EuroScope doesn't provide Eurocat style tag items. Although [Topsky plugin by VATSIM-Scandinavia](https://forum.vatsim-scandinavia.org/t/topsky) has profuse features, still some features don't work as desired, especially those related to metric unit system. So MTEPlugin is developed to supplement EuroScope native items and functions as well as those from Topsky, and to improve controller experience with some other functionalities.
 
 The initiative of MTEPlugin is by [VATPRC](https://www.vatprc.net) staff's request, since the airspace differs a lot from most regions. Therefore some features are designed at their request. Generally speaking, MTEPlugin should not only help VATPRC controllers, but also suitable for other VATSIM divisions or other platforms using EuroScope.
 
